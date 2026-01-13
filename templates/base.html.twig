@@ -5,21 +5,24 @@
     <title>{% block title %}Planifique{% endblock %}</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>📅</text></svg>">
 
-    {# Intégration de Bootstrap 5 via CDN pour le style #}
+    {# --- CSS BOOTSTRAP 5 (CDN) --- #}
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     {% block stylesheets %}
+        {# Si vous avez des styles personnalisés via AssetMapper, décommentez ceci : #}
+        {# {{ importmap('app') }} #}
     {% endblock %}
 
     {% block javascripts %}
-        {# Script Bootstrap pour le menu déroulant mobile #}
+        {# --- JS BOOTSTRAP 5 (CDN) Indispensable pour le menu déroulant --- #}
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" defer></script>
+        {# {{ importmap('app') }} #}
     {% endblock %}
 </head>
 <body class="d-flex flex-column min-vh-100 bg-light">
 
-{# --- MENU DE NAVIGATION --- #}
+{# --- DEBUT BARRE DE NAVIGATION --- #}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container">
         {# Logo / Marque #}
@@ -28,13 +31,15 @@
             Planifique
         </a>
 
-        {# Bouton burger pour mobile #}
+        {# Bouton Burger (Mobile) #}
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
             <span class="navbar-toggler-icon"></span>
         </button>
 
         {# Contenu du menu #}
         <div class="collapse navbar-collapse" id="navbarMain">
+
+            {# Liens à gauche (Tableau de bord, etc.) #}
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 {% if app.user %}
                     <li class="nav-item">
@@ -42,54 +47,61 @@
                             <i class="fas fa-home me-1"></i> Tableau de bord
                         </a>
                     </li>
-                    {# Vous pourrez ajouter d'autres liens ici (Clients, Agenda...) #}
                 {% endif %}
             </ul>
 
-            {# Partie Droite (Utilisateur) #}
-            <ul class="navbar-nav ms-auto">
+            {# Liens à droite (Utilisateur / Connexion) #}
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+
                 {% if app.user %}
-                    {# MENU UTILISATEUR CONNECTÉ #}
+                    {# --- UTILISATEUR CONNECTÉ --- #}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown">
-                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 32px; height: 32px; font-size: 0.9rem;">
                                 {{ app.user.userIdentifier|first|upper }}
                             </div>
-                            <span>{{ app.user.userIdentifier }}</span>
+                            <span>{{ app.user.firstName|default(app.user.userIdentifier) }}</span>
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><h6 class="dropdown-header">Mon Compte</h6></li>
-                            {# On pourrait imaginer un lien profil ici #}
+                        <ul class="dropdown-menu dropdown-menu-end shadow">
+                            <li>
+                                <h6 class="dropdown-header">
+                                    Connecté en tant que<br>
+                                    <strong class="text-primary">{{ app.user.userIdentifier }}</strong>
+                                </h6>
+                            </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <a class="dropdown-item text-danger" href="{{ path('app_logout') }}">
-                                    <i class="fas fa-sign-out-alt me-2"></i> Déconnexion
+                                    <i class="fas fa-sign-out-alt me-2"></i> Se déconnecter
                                 </a>
                             </li>
                         </ul>
                     </li>
+
                 {% else %}
-                    {# MENU VISITEUR #}
+                    {# --- VISITEUR (NON CONNECTÉ) --- #}
                     <li class="nav-item">
-                        <a class="btn btn-outline-light btn-sm" href="{{ path('app_login') }}">
-                            Se connecter
+                        <a class="btn btn-primary btn-sm px-4 rounded-pill" href="{{ path('app_login') }}">
+                            <i class="fas fa-user me-1"></i> Se connecter
                         </a>
                     </li>
                 {% endif %}
+
             </ul>
         </div>
     </div>
 </nav>
+{# --- FIN BARRE DE NAVIGATION --- #}
 
-{# --- CONTENU DE LA PAGE --- #}
+{# --- CONTENU PRINCIPAL --- #}
 <main class="flex-grow-1">
-    {# Flash messages (Succès/Erreur) #}
+    {# Affichage des messages Flash (Succès / Erreur) #}
     {% for label, messages in app.flashes %}
         <div class="container mt-3">
             {% for message in messages %}
-                <div class="alert alert-{{ label }} alert-dismissible fade show" role="alert">
+                <div class="alert alert-{{ label == 'error' ? 'danger' : label }} alert-dismissible fade show shadow-sm" role="alert">
                     {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             {% endfor %}
         </div>
@@ -99,9 +111,13 @@
 </main>
 
 {# --- PIED DE PAGE --- #}
-<footer class="py-3 bg-white mt-auto border-top">
+<footer class="py-4 bg-white mt-auto border-top">
     <div class="container text-center text-muted small">
-        &copy; {{ 'now'|date('Y') }} Planifique Rendez-Vous. Tous droits réservés.
+        <p class="mb-1">&copy; {{ 'now'|date('Y') }} Planifique Rendez-Vous. Tous droits réservés.</p>
+        <p class="mb-0">
+            <a href="#" class="text-decoration-none text-muted me-2">Mentions légales</a>
+            <a href="#" class="text-decoration-none text-muted">Confidentialité</a>
+        </p>
     </div>
 </footer>
 

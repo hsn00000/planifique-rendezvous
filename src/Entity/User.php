@@ -37,6 +37,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 100)]
     private ?string $lastName = null;
 
+    // --- AJOUT DE LA RELATION AVEC MICROSOFT ACCOUNT ---
+    #[ORM\OneToOne(mappedBy: 'user', cascade: ['persist', 'remove'])]
+    private ?MicrosoftAccount $microsoftAccount = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -123,14 +127,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    // --- AJOUT DES GETTERS ET SETTERS POUR MICROSOFT ACCOUNT ---
+
+    public function getMicrosoftAccount(): ?MicrosoftAccount
+    {
+        return $this->microsoftAccount;
+    }
+
+    public function setMicrosoftAccount(MicrosoftAccount $microsoftAccount): static
+    {
+        // set the owning side of the relation if necessary
+        if ($microsoftAccount->getUser() !== $this) {
+            $microsoftAccount->setUser($this);
+        }
+
+        $this->microsoftAccount = $microsoftAccount;
+
+        return $this;
+    }
+
     /**
      * Ensure the session doesn't contain actual password hashes by CRC32C-hashing them, as supported since Symfony 7.3.
      */
-    public function __serialize(): array
-    {
-        $data = (array) $this;
-        $data["\0".self::class."\0password"] = hash('crc32c', $this->password);
-
-        return $data;
-    }
 }
