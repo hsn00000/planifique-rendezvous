@@ -1,34 +1,87 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Log in!{% endblock %}
+{% block title %}Connexion - Planifique{% endblock %}
 
 {% block body %}
-<form method="post">
-    {% if error %}
-        <div class="alert alert-danger">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
-    {% endif %}
+    <div class="container d-flex flex-column justify-content-center align-items-center" style="min-height: 80vh;">
 
-    {% if app.user %}
-        <div class="mb-3">
-            You are logged in as {{ app.user.userIdentifier }}, <a href="{{ logout_path() }}">Logout</a>
+        {# --- BLOC PRINCIPAL : CONSEILLERS --- #}
+        <div class="card shadow-lg border-0 mb-5" style="width: 100%; max-width: 500px; border-radius: 15px;">
+            <div class="card-body p-5 text-center">
+
+                {# Titre et icône #}
+                <div class="mb-4">
+                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" class="bi bi-person-workspace" viewBox="0 0 16 16">
+                            <path d="M4 16s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H4Zm4-5.95a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/>
+                            <path d="M2 1a2 2 0 0 0-2 2v9.5A1.5 1.5 0 0 0 1.5 14h.653a5.373 5.373 0 0 1 1.066-2H1V3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9h-2.219c.554.654.89 1.373 1.066 2h.653a1.5 1.5 0 0 0 1.5-1.5V3a2 2 0 0 0-2-2H2Z"/>
+                        </svg>
+                    </div>
+                    <h1 class="h3 fw-bold text-dark">Espace Conseillers</h1>
+                    <p class="text-muted mt-2">
+                        Bienvenue sur votre outil de planification.
+                    </p>
+                </div>
+
+                {# Messages d'erreur ou d'info #}
+                {% if app.user %}
+                    <div class="alert alert-info py-2 small mb-4">
+                        Connecté en tant que <strong>{{ app.user.userIdentifier }}</strong>.
+                        <a href="{{ path('app_logout') }}">Se déconnecter</a>
+                    </div>
+                {% endif %}
+
+                {% if error %}
+                    <div class="alert alert-danger py-2 small mb-4">
+                        {{ error.messageKey|trans(error.messageData, 'security') }}
+                    </div>
+                {% endif %}
+
+                {# GROS BOUTON MICROSOFT #}
+                <div class="d-grid gap-2">
+                    <a href="{{ path('connect_microsoft_start') }}" class="btn btn-dark btn-lg py-3 shadow-sm position-relative overflow-hidden group-hover">
+                        <div class="d-flex align-items-center justify-content-center gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 23 23">
+                                <path fill="#f35325" d="M1 1h10v10H1z"/>
+                                <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                                <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                                <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                            </svg>
+                            <span class="fw-bold fs-5">Connexion Microsoft</span>
+                        </div>
+                    </a>
+                </div>
+
+                <p class="text-muted small mt-3 mb-0">
+                    Utilisez votre compte professionnel habituel.
+                </p>
+            </div>
         </div>
-    {% endif %}
 
-    <h1 class="h3 mb-3 font-weight-normal">Please sign in</h1>
-    <label for="inputEmail">Email</label>
-    <input type="email" value="{{ last_username }}" name="email" id="inputEmail" class="form-control" autocomplete="email" required autofocus>
-    <label for="inputPassword">Password</label>
-    <input type="password" name="password" id="inputPassword" class="form-control" autocomplete="current-password" required>
-    <input type="hidden" name="_csrf_token" data-controller="csrf-protection" value="{{ csrf_token('authenticate') }}">
 
-    <div class="checkbox mb-3">
-        <label>
-            <input type="checkbox" name="_remember_me"> Remember me
-        </label>
+        {# --- BLOC SECONDAIRE : ADMIN (Discret / Caché) --- #}
+        <div class="text-center">
+            {# Le bouton "accordéon" pour afficher le formulaire admin #}
+            <button class="btn btn-link text-muted text-decoration-none small opacity-50" type="button" data-bs-toggle="collapse" data-bs-target="#adminLogin" aria-expanded="false" aria-controls="adminLogin">
+                <i class="fas fa-lock me-1"></i> Accès Administration
+            </button>
+
+            {# Le formulaire qui ne s'affiche que si on clique #}
+            <div class="collapse mt-3" id="adminLogin" style="width: 300px;">
+                <div class="card card-body bg-light border-0 shadow-sm p-3">
+                    <form method="post">
+                        <div class="mb-2">
+                            <input type="email" value="{{ last_username }}" name="email" class="form-control form-control-sm" placeholder="Email admin" autocomplete="email" required>
+                        </div>
+                        <div class="mb-2">
+                            <input type="password" name="password" class="form-control form-control-sm" placeholder="Mot de passe" autocomplete="current-password" required>
+                        </div>
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+                        <button class="btn btn-outline-secondary btn-sm w-100" type="submit">Valider</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
     </div>
-
-    <button class="btn btn-lg btn-primary" type="submit">
-        Sign in
-    </button>
-</form>
 {% endblock %}
