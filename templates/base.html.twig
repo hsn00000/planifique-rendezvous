@@ -1,17 +1,109 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-        <title>{% block title %}Welcome!{% endblock %}</title>
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>⚫️</text><text y=%221.3em%22 x=%220.2em%22 font-size=%2276%22 fill=%22%23fff%22>sf</text></svg>">
-        {% block stylesheets %}
-        {% endblock %}
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Planifique{% endblock %}</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>📅</text></svg>">
 
-        {% block javascripts %}
-            {% block importmap %}{{ importmap('app') }}{% endblock %}
-        {% endblock %}
-    </head>
-    <body>
-        {% block body %}{% endblock %}
-    </body>
+    {# Intégration de Bootstrap 5 via CDN pour le style #}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    {% block stylesheets %}
+    {% endblock %}
+
+    {% block javascripts %}
+        {# Script Bootstrap pour le menu déroulant mobile #}
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" defer></script>
+    {% endblock %}
+</head>
+<body class="d-flex flex-column min-vh-100 bg-light">
+
+{# --- MENU DE NAVIGATION --- #}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container">
+        {# Logo / Marque #}
+        <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="{{ path('app_home') }}">
+            <i class="fas fa-calendar-check text-primary"></i>
+            Planifique
+        </a>
+
+        {# Bouton burger pour mobile #}
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        {# Contenu du menu #}
+        <div class="collapse navbar-collapse" id="navbarMain">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                {% if app.user %}
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ path('app_home') }}">
+                            <i class="fas fa-home me-1"></i> Tableau de bord
+                        </a>
+                    </li>
+                    {# Vous pourrez ajouter d'autres liens ici (Clients, Agenda...) #}
+                {% endif %}
+            </ul>
+
+            {# Partie Droite (Utilisateur) #}
+            <ul class="navbar-nav ms-auto">
+                {% if app.user %}
+                    {# MENU UTILISATEUR CONNECTÉ #}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                {{ app.user.userIdentifier|first|upper }}
+                            </div>
+                            <span>{{ app.user.userIdentifier }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Mon Compte</h6></li>
+                            {# On pourrait imaginer un lien profil ici #}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item text-danger" href="{{ path('app_logout') }}">
+                                    <i class="fas fa-sign-out-alt me-2"></i> Déconnexion
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                {% else %}
+                    {# MENU VISITEUR #}
+                    <li class="nav-item">
+                        <a class="btn btn-outline-light btn-sm" href="{{ path('app_login') }}">
+                            Se connecter
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</nav>
+
+{# --- CONTENU DE LA PAGE --- #}
+<main class="flex-grow-1">
+    {# Flash messages (Succès/Erreur) #}
+    {% for label, messages in app.flashes %}
+        <div class="container mt-3">
+            {% for message in messages %}
+                <div class="alert alert-{{ label }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endfor %}
+
+    {% block body %}{% endblock %}
+</main>
+
+{# --- PIED DE PAGE --- #}
+<footer class="py-3 bg-white mt-auto border-top">
+    <div class="container text-center text-muted small">
+        &copy; {{ 'now'|date('Y') }} Planifique Rendez-Vous. Tous droits réservés.
+    </div>
+</footer>
+
+</body>
 </html>

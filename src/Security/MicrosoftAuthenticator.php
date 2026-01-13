@@ -33,14 +33,13 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
         RouterInterface $router,
         UserRepository $userRepository
     ) {
-        $clientRegistry->getClient('azure'); // Vérifie que le client existe
+        $clientRegistry->getClient('azure');
         $this->clientRegistry = $clientRegistry;
         $this->entityManager = $entityManager;
         $this->router = $router;
         $this->userRepository = $userRepository;
     }
 
-    // Définit quand cet authenticator se déclenche (sur la route /check)
     public function supports(Request $request): ?bool
     {
         return $request->attributes->get('_route') === 'connect_microsoft_check';
@@ -56,26 +55,46 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
                 /** @var AzureResourceOwner $microsoftUser */
                 $microsoftUser = $client->fetchUserFromToken($accessToken);
 
-                $email = $microsoftUser->getUpn(); // Souvent l'email principal dans Azure AD
+                // --- CORRECTION DE LA RÉCUPÉRATION DE L'EMAIL ---
 
-                // 1. On cherche l'utilisateur dans notre base
+                // 1. Essai via UPN (Standard Pro)
+                $email = $microsoftUser->getUpn();
+
+                // 2. Si vide, essai via Mail (Parfois utilisé)
+                if (empty($email) && method_exists($microsoftUser, 'getMail')) {
+                    $email = $microsoftUser->getMail();
+                }
+
+                // 3. Si toujours vide, on regarde les données brutes (Standard Perso)
+                if (empty($email)) {
+                    $userData = $microsoftUser->toArray();
+                    $email = $userData['email'] ?? $userData['userPrincipalName'] ?? null;
+                }
+
+                // --- FIN CORRECTION ---
+
+                if (empty($email)) {
+                    throw new CustomUserMessageAuthenticationException(
+                        'Impossible de récupérer votre adresse email depuis Microsoft. Merci de contacter le support.'
+                    );
+                }
+
+                // On cherche l'utilisateur dans notre base
                 $user = $this->userRepository->findOneBy(['email' => $email]);
 
                 if (!$user) {
-                    // Refus si l'utilisateur n'est pas déjà créé par un admin
                     throw new CustomUserMessageAuthenticationException(
                         sprintf('Aucun compte trouvé pour l\'email "%s". Contactez l\'administrateur.', $email)
                     );
                 }
 
-                // 2. On met à jour ou on crée le lien MicrosoftAccount
+                // Mise à jour ou création du lien MicrosoftAccount
                 $microsoftAccount = $user->getMicrosoftAccount();
                 if (!$microsoftAccount) {
                     $microsoftAccount = new MicrosoftAccount();
                     $microsoftAccount->setUser($user);
                 }
 
-                // 3. On sauvegarde les nouveaux tokens
                 $microsoftAccount->setMicrosoftId($microsoftUser->getId());
                 $microsoftAccount->setMicrosoftEmail($email);
                 $microsoftAccount->setAccessToken($accessToken->getToken());
@@ -92,13 +111,11 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
     {
-        // Succès : on redirige vers le tableau de bord
         return new RedirectResponse($this->router->generate('app_home'));
     }
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
-        // Échec : on renvoie au login avec un message d'erreur
         $message = strtr($exception->getMessageKey(), $exception->getMessageData());
         $request->getSession()->set(\Symfony\Component\Security\Http\SecurityRequestAttributes::AUTHENTICATION_ERROR, $exception);
 

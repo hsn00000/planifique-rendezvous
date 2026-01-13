@@ -1,25 +1,30 @@
 knpu_oauth2_client:
     clients:
-        # On appellera ce client "azure" dans notre code
+        # On appelle ce client "azure" (à utiliser dans MicrosoftAuthController)
         azure:
             type: generic
             provider_class: TheNetworg\OAuth2\Client\Provider\Azure
 
-            # Ces identifiants viendront de ton fichier .env
+            # Vos identifiants (.env)
             client_id: '%env(OAUTH_AZURE_CLIENT_ID)%'
             client_secret: '%env(OAUTH_AZURE_CLIENT_SECRET)%'
 
-            # L'URL où Microsoft renvoie l'utilisateur après connexion
+            # Route de retour
             redirect_route: connect_microsoft_check
             redirect_params: {}
 
-            # Options spécifiques à Microsoft
+            # Options spécifiques à la librairie Azure
             provider_options:
-                # 'common' permet à n'importe quel compte Microsoft de se connecter
-                # Si tu voulais limiter à ton entreprise, tu mettrais l'ID de ton Tenant ici
+                # 'common' pour tous les comptes Microsoft (perso + pro)
                 tenant: 'common'
 
-                # Les permissions qu'on va demander tout de suite
-                # openid, profile, email, offline_access (pour le refresh token)
-                # On ajoutera Calendars.ReadWrite plus tard
-                scope: 'openid profile email offline_access https://graph.microsoft.com/Calendars.ReadWrite'
+                # Force l'utilisation de l'API v2.0 (recommandé)
+                defaultEndPointVersion: '2.0'
+
+                # IMPORTANT : Les scopes doivent être une LISTE (tableau)
+                scopes:
+                    - openid
+                    - profile
+                    - email
+                    - offline_access
+                    - https://graph.microsoft.com/Calendars.ReadWrite
