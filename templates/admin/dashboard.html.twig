@@ -1,0 +1,82 @@
+{# templates/admin/dashboard.html.twig #}
+{% extends '@EasyAdmin/page/content.html.twig' %}
+
+{% block content_title %}Tableau de Bord{% endblock %}
+
+{% block main %}
+    <div class="container-fluid py-4">
+
+        {# Message de bienvenue #}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white; border-radius: 16px;">
+                    <div class="card-body p-5">
+                        <h1 class="display-6 fw-bold mb-2">Bienvenue, Administrateur 👋</h1>
+                        <p class="lead text-white-50 mb-0">
+                            C'est ici que vous gérez les équipes, les événements et les utilisateurs de <strong>Planifique</strong>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Cartes d'accès rapide #}
+        <div class="row g-4">
+
+            {# Carte 1 : Groupes #}
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px; transition: transform 0.2s;">
+                    <div class="card-body p-4 text-center">
+                        <div class="mb-3 p-3 rounded-circle d-inline-block" style="background-color: #e0f2fe; color: #0284c7;">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                        <h3 class="h5 fw-bold text-dark">Gérer les Groupes</h3>
+                        <p class="text-muted small">Créez des équipes et liez-les aux groupes Microsoft Azure (Object ID).</p>
+                    </div>
+                    <div class="card-footer bg-transparent border-0 pb-4 pt-0">
+                        <a href="{{ ea_url().setController('App\\Controller\\Admin\\GroupeCrudController').generateUrl() }}" class="btn btn-outline-primary rounded-pill w-100 fw-bold">
+                            Accéder
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            {# Carte 2 : Types d'événements (Le cœur de Calendly) #}
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px; transition: transform 0.2s;">
+                    <div class="card-body p-4 text-center">
+                        <div class="mb-3 p-3 rounded-circle d-inline-block" style="background-color: #dcfce7; color: #16a34a;">
+                            <i class="fas fa-calendar-alt fa-2x"></i>
+                        </div>
+                        <h3 class="h5 fw-bold text-dark">Types d'Événements</h3>
+                        <p class="text-muted small">Configurez les rendez-vous (Durée, Couleur) disponibles pour chaque groupe.</p>
+                    </div>
+                    <div class="card-footer bg-transparent border-0 pb-4 pt-0">
+                        <a href="{{ ea_url().setController('App\\Controller\\Admin\\EvenementCrudController').generateUrl() }}" class="btn btn-outline-success rounded-pill w-100 fw-bold">
+                            Configurer
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            {# Carte 3 : Utilisateurs #}
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px; transition: transform 0.2s;">
+                    <div class="card-body p-4 text-center">
+                        <div class="mb-3 p-3 rounded-circle d-inline-block" style="background-color: #f3e8ff; color: #9333ea;">
+                            <i class="fas fa-user-cog fa-2x"></i>
+                        </div>
+                        <h3 class="h5 fw-bold text-dark">Utilisateurs</h3>
+                        <p class="text-muted small">Visualisez les inscrits et vérifiez leur synchronisation avec les groupes.</p>
+                    </div>
+                    <div class="card-footer bg-transparent border-0 pb-4 pt-0">
+                        <a href="{{ ea_url().setController('App\\Controller\\Admin\\UserCrudController').generateUrl() }}" class="btn btn-outline-secondary rounded-pill w-100 fw-bold">
+                            Gérer
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,11 @@
+# translations/messages.fr.yaml
+
+# --- Menu Admin ---
+Groupes: Équipes
+Utilisateurs: Collaborateurs
+"Types d'Événements": Modèles de Rendez-vous
+Dashboard: Tableau de Bord
+
+# --- Interface ---
+Bienvenue: Bienvenue sur Planifique
+Connectez-vous: Connexion sécurisée

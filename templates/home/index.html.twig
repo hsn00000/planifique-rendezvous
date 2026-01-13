@@ -10,13 +10,20 @@
     {% if app.user %}
         <div class="dashboard-container">
             <div class="container py-5">
+
                 {# En-tête Salutation #}
                 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-5 fade-in">
                     <div>
                         <h1 class="fw-bold text-dark mb-1">
                             Bonjour, <span style="color: #2563eb;">{{ app.user.firstName|default('Conseiller') }}</span>
                         </h1>
-                        <p class="text-muted">Votre espace de gestion est prêt.</p>
+                        <p class="text-muted">
+                            {% if app.user.groupe %}
+                                Membre du <strong>{{ app.user.groupe.nom }}</strong>
+                            {% else %}
+                                Votre compte n'est pas encore affilié à un groupe.
+                            {% endif %}
+                        </p>
                     </div>
                     <div>
                         <span class="badge bg-white text-dark border px-3 py-2 rounded-pill shadow-sm">
@@ -25,67 +32,83 @@
                     </div>
                 </div>
 
-                {# Grille de cartes #}
-                <div class="row g-4">
-                    {# Carte 1 #}
-                    <div class="col-md-4 fade-in" style="animation-delay: 0.1s;">
-                        <div class="card h-100 border-0 shadow-sm hover-card">
-                            <div class="card-body p-4">
-                                <div class="icon-box bg-primary-subtle text-primary mb-3">
-                                    <i class="fas fa-calendar-alt fa-lg"></i>
+                {# ==================================================== #}
+                {# 👑 ZONE ADMINISTRATEUR (Visible uniquement par Admin) #}
+                {# ==================================================== #}
+                {% if is_granted('ROLE_ADMIN') %}
+                    <div class="row mb-5 fade-in" style="animation-delay: 0.1s;">
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white;">
+                                <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-center">
+                                    <div class="mb-3 mb-md-0">
+                                        <h2 class="h5 fw-bold mb-1"><i class="fas fa-user-shield me-2 text-warning"></i> Espace Administration</h2>
+                                        <p class="mb-0 text-white-50">Vous avez les droits d'accès au Back-Office pour gérer l'application.</p>
+                                    </div>
+                                    <a href="{{ path('admin') }}" class="btn btn-warning fw-bold px-4 py-2 rounded-pill shadow-lg hover-scale text-dark">
+                                        <i class="fas fa-cogs me-2"></i> Accéder au Back-Office
+                                    </a>
                                 </div>
-                                <h3 class="h5 fw-bold">Mon Planning</h3>
-                                <p class="text-muted small">Gérez vos disponibilités de la semaine.</p>
-                                <a href="#" class="btn btn-sm btn-outline-primary rounded-pill px-4 stretched-link">Accéder</a>
                             </div>
                         </div>
                     </div>
-                    {# Carte 2 #}
-                    <div class="col-md-4 fade-in" style="animation-delay: 0.2s;">
-                        <div class="card h-100 border-0 shadow-sm hover-card">
-                            <div class="card-body p-4">
-                                <div class="icon-box bg-success-subtle text-success mb-3">
-                                    <i class="fas fa-check-circle fa-lg"></i>
+                {% endif %}
+
+                {# Grille de cartes (Événements du groupe) #}
+                <h3 class="h6 text-uppercase text-muted fw-bold mb-4 fade-in">Vos Événements de Groupe</h3>
+
+                {% if evenements is defined and evenements|length > 0 %}
+                    <div class="row g-4">
+                        {% for event in evenements %}
+                            <div class="col-md-4 col-lg-3 fade-in" style="animation-delay: {{ loop.index0 * 0.1 }}s;">
+                                <div class="card h-100 border-0 shadow-sm hover-card event-card">
+                                    <div class="card-body p-4 d-flex flex-column" style="border-top: 4px solid {{ event.couleur|default('#2563eb') }};">
+
+                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                            <span class="badge bg-light text-dark border">{{ event.duree }} min</span>
+                                            {% if event.visioUrl %}
+                                                <i class="fas fa-video text-primary" title="Visio disponible"></i>
+                                            {% endif %}
+                                        </div>
+
+                                        <h3 class="h6 fw-bold text-dark mb-2">
+                                            {{ event.titre }}
+                                        </h3>
+
+                                        <p class="text-muted small mb-4 flex-grow-1">
+                                            {{ event.description|default('Aucune description.')|slice(0, 80) }}...
+                                        </p>
+
+                                        <button class="btn btn-sm btn-outline-primary rounded-pill w-100 mt-auto">
+                                            Copier le lien
+                                        </button>
+                                    </div>
                                 </div>
-                                <h3 class="h5 fw-bold">Rendez-vous</h3>
-                                <p class="text-muted small">Validez les demandes en attente.</p>
-                                <a href="#" class="btn btn-sm btn-outline-success rounded-pill px-4 stretched-link">Voir liste</a>
                             </div>
+                        {% endfor %}
+                    </div>
+
+                {% elseif app.user.groupe %}
+                    <div class="text-center py-5 fade-in">
+                        <div class="alert alert-light d-inline-block shadow-sm border-0">
+                            <i class="fas fa-info-circle text-primary me-2"></i> Aucun type d'événement configuré pour le groupe <strong>{{ app.user.groupe.nom }}</strong>.
                         </div>
                     </div>
-                    {# Carte 3 #}
-                    <div class="col-md-4 fade-in" style="animation-delay: 0.3s;">
-                        <div class="card h-100 border-0 shadow-sm hover-card">
-                            <div class="card-body p-4">
-                                <div class="icon-box bg-warning-subtle text-warning mb-3">
-                                    <i class="fas fa-users fa-lg"></i>
-                                </div>
-                                <h3 class="h5 fw-bold">Clients</h3>
-                                <p class="text-muted small">Accédez aux fiches techniques.</p>
-                                <a href="#" class="btn btn-sm btn-outline-warning rounded-pill px-4 stretched-link">Rechercher</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                {% endif %}
+
             </div>
         </div>
 
         {# ================================================= #}
-        {# CAS 2 : VISITEUR (PAGE D'ACCUEIL AVEC IMAGE)      #}
+        {# CAS 2 : VISITEUR (PAGE D'ACCUEIL)                 #}
         {# ================================================= #}
     {% else %}
 
         <div class="hero-section">
-            {# IMAGE D'ARRIÈRE-PLAN #}
             <div class="bg-image" style="background-image: url('{{ asset('img/planifique.jpg') }}');"></div>
-
-            {# Overlay sombre pour lisibilité #}
             <div class="bg-overlay"></div>
 
             <div class="container position-relative z-2 text-center">
-
                 <div class="glass-card p-5 mx-auto fade-in-up">
-                    {# Logo Rond Centré #}
                     <div class="logo-wrapper mx-auto mb-4">
                         <img src="{{ asset('img/logo.png') }}" alt="Planifique Logo" class="img-fluid">
                     </div>
@@ -95,91 +118,37 @@
                     </h1>
 
                     <p class="lead text-white-50 mb-5 mx-auto" style="max-width: 500px;">
-                        Connectez-vous à votre portail <strong>Planifique</strong> pour gérer votre agenda et vos rendez-vous en temps réel.
+                        Connectez-vous à votre portail <strong>Planifique</strong> pour accéder à vos outils.
                     </p>
 
                     <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
-                        <a href="{{ path('app_login') }}" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow-lg hover-scale">
-                            <i class="fas fa-lock me-2"></i> Accéder à mon espace
+                        <a href="{{ path('connect_microsoft_start') }}" class="btn btn-light btn-lg px-4 py-3 rounded-pill shadow-lg hover-scale fw-bold text-primary">
+                            <i class="fab fa-microsoft me-2"></i> Connexion Microsoft
                         </a>
                     </div>
                 </div>
 
+                <div class="mt-5 text-white-50 small fade-in" style="animation-delay: 0.5s;">
+                    &copy; {{ 'now'|date('Y') }} Planifique Rendez-vous • Usage interne
+                </div>
             </div>
         </div>
 
     {% endif %}
 
-    {# STYLES CSS INTÉGRÉS POUR CETTE PAGE #}
     <style>
-        /* --- Styles communs --- */
-        .tracking-tight { letter-spacing: -0.02em; }
         .fade-in { animation: fadeIn 0.8s ease-out forwards; opacity: 0; }
         .fade-in-up { animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; transform: translateY(30px); }
-
         @keyframes fadeIn { to { opacity: 1; } }
         @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
-
-        /* --- Dashboard Styles --- */
-        .dashboard-container { min-height: 80vh; background-color: #f8fafc; }
-        .icon-box { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; }
-        .hover-card { transition: transform 0.2s; }
-        .hover-card:hover { transform: translateY(-5px); }
-
-        /* --- Hero / Visiteur Styles --- */
-        .hero-section {
-            position: relative;
-            height: 100vh;
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-
-        /* L'image de fond */
-        .bg-image {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background-size: cover;
-            background-position: center;
-            z-index: 0;
-            transform: scale(1.05); /* Zoom léger pour effet cinéma */
-        }
-
-        /* Filtre sombre par dessus l'image */
-        .bg-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.7) 100%);
-            z-index: 1;
-            backdrop-filter: blur(4px); /* Léger flou sur l'image de fond */
-        }
-
-        /* Carte effet "Verre" (Glassmorphism) */
-        .glass-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 24px;
-            max-width: 650px;
-            width: 100%;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-
-        .logo-wrapper {
-            width: 120px;
-            height: 120px;
-            background: white;
-            border-radius: 50%;
-            padding: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-
+        .dashboard-container { min-height: 100vh; background-color: #f8fafc; }
+        .hover-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .hover-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
+        .hero-section { position: relative; height: 100vh; width: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; z-index: 0; transform: scale(1.05); }
+        .bg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%); z-index: 1; backdrop-filter: blur(4px); }
+        .glass-card { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 24px; max-width: 600px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .logo-wrapper { width: 100px; height: 100px; background: white; border-radius: 50%; padding: 15px; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .hover-scale { transition: transform 0.3s ease; }
         .hover-scale:hover { transform: scale(1.05); }
     </style>
