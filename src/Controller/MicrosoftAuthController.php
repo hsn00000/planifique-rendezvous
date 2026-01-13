@@ -9,24 +9,27 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class MicrosoftAuthController extends AbstractController
 {
-    // Etape 1 : Le bouton "Se connecter avec Microsoft" pointe ici
+    // C'est ici que j'ai corrigé le nom de la route : 'connect_microsoft_start'
     #[Route('/connect/microsoft', name: 'connect_microsoft_start')]
     public function connectAction(ClientRegistry $clientRegistry): RedirectResponse
     {
-        // "azure" est la clé définie dans knpu_oauth2_client.yaml
-        return $clientRegistry
-            ->getClient('azure')
-            ->redirect(
-            // Les permissions demandées à Microsoft
-                ['openid', 'profile', 'email', 'offline_access', 'https://graph.microsoft.com/Calendars.ReadWrite'],
-                []
-            );
+        // On récupère le client "microsoft" défini dans config/packages/knpu_oauth2_client.yaml
+        $client = $clientRegistry->getClient('azure');
+
+        // On redirige vers Microsoft avec les permissions nécessaires
+        // 'GroupMember.Read.All' est CRUCIAL pour la synchronisation des groupes
+        return $client->redirect([
+            'openid',
+            'profile',
+            'email',
+            'offline_access',
+            'GroupMember.Read.All'
+        ]);
     }
 
-    // Etape 2 : Microsoft renvoie l'utilisateur ici après succès
     #[Route('/connect/microsoft/check', name: 'connect_microsoft_check')]
-    public function connectCheckAction()
+    public function connectCheckAction(): void
     {
-        // ON LAISSE VIDE ! C'est l'Authenticator qui va intercepter cette route.
+        // Cette méthode reste vide car l'Authenticator intercepte la requête avant.
     }
 }
