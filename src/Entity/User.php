@@ -41,6 +41,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToOne(mappedBy: 'user', cascade: ['persist', 'remove'])]
     private ?MicrosoftAccount $microsoftAccount = null;
 
+    #[ORM\ManyToOne(inversedBy: 'users')]
+    private ?Groupe $groupe = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -149,4 +152,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * Ensure the session doesn't contain actual password hashes by CRC32C-hashing them, as supported since Symfony 7.3.
      */
+
+    public function getGroupe(): ?Groupe
+    {
+        return $this->groupe;
+    }
+
+    public function setGroupe(?Groupe $groupe): static
+    {
+        $this->groupe = $groupe;
+
+        return $this;
+    }
 }
