@@ -4,152 +4,185 @@
 
 {% block body %}
 
-    {# --- CAS 1 : CONSEILLER CONNECTÉ --- #}
+    {# ================================================= #}
+    {# CAS 1 : UTILISATEUR CONNECTÉ (TABLEAU DE BORD)   #}
+    {# ================================================= #}
     {% if app.user %}
-        <div class="container py-5">
+        <div class="position-relative overflow-hidden bg-light" style="min-height: calc(100vh - 70px);">
 
-            {# En-tête du Tableau de Bord #}
-            <div class="row align-items-center mb-5">
-                <div class="col-md-8">
-                    <h1 class="display-5 fw-bold text-primary">
-                        Bonjour, {{ app.user.firstName|default('Conseiller') }} !
-                    </h1>
-                    <p class="lead text-muted">
-                        Bienvenue sur votre espace Planifique. Voici votre tableau de bord du jour.
-                    </p>
-                </div>
-                <div class="col-md-4 text-md-end">
-                    <div class="badge bg-success bg-opacity-10 text-success px-3 py-2 border border-success rounded-pill">
-                        <i class="fab fa-microsoft me-2"></i> Compte synchronisé Outlook
-                    </div>
-                </div>
+            {# Logo en filigrane (Background Branding) #}
+            <div class="position-absolute top-50 start-50 translate-middle" style="z-index: 0; opacity: 0.03; pointer-events: none;">
+                <img src="{{ asset('img/logo.png') }}" width="600" alt="Logo Background">
             </div>
 
-            {# Cartes d'actions rapides #}
-            <div class="row g-4 mb-5">
+            <div class="container py-5" style="position: relative; z-index: 1;">
 
-                {# Carte 1 : Planning #}
-                <div class="col-md-4">
-                    <div class="card h-100 border-0 shadow-sm hover-card transition-all">
-                        <div class="card-body p-4 text-center">
-                            <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-inline-flex p-3 mb-3">
-                                <i class="fas fa-calendar-alt fa-2x"></i>
+                {# En-tête #}
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-5">
+                    <div class="mb-3 mb-md-0">
+                        <h1 class="display-6 fw-bold text-dark mb-1">
+                            Bonjour, <span class="text-primary">{{ app.user.firstName|default('Conseiller') }}</span>
+                        </h1>
+                        <p class="text-muted mb-0">Votre espace de gestion Planifique est prêt.</p>
+                    </div>
+                    <div>
+                        <span class="badge bg-white text-dark border shadow-sm px-3 py-2 rounded-pill">
+                            <i class="fas fa-circle text-success me-2" style="font-size: 0.5rem;"></i> Système opérationnel
+                        </span>
+                    </div>
+                </div>
+
+                {# Cartes d'actions #}
+                <div class="row g-4">
+                    {# Carte 1 : Planning #}
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 shadow-sm hover-card">
+                            <div class="card-body p-4">
+                                <div class="icon-square bg-primary bg-opacity-10 text-primary rounded-3 mb-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                    <i class="fas fa-calendar-alt fa-lg"></i>
+                                </div>
+                                <h3 class="h5 fw-bold text-dark">Mon Planning</h3>
+                                <p class="text-muted small mb-4">Gérez vos disponibilités et visualisez vos plages horaires.</p>
+                                <a href="#" class="btn btn-outline-primary btn-sm stretched-link rounded-pill px-4">Accéder</a>
                             </div>
-                            <h3 class="h5 card-title fw-bold">Mon Planning</h3>
-                            <p class="card-text text-muted small">
-                                Consultez vos disponibilités et gérez vos plages horaires d'ouverture pour les clients.
-                            </p>
-                            <a href="#" class="btn btn-outline-primary stretched-link mt-2">Gérer mon planning</a>
+                        </div>
+                    </div>
+
+                    {# Carte 2 : Rendez-vous #}
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 shadow-sm hover-card">
+                            <div class="card-body p-4">
+                                <div class="icon-square bg-success bg-opacity-10 text-success rounded-3 mb-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                    <i class="fas fa-user-clock fa-lg"></i>
+                                </div>
+                                <h3 class="h5 fw-bold text-dark">Rendez-vous</h3>
+                                <p class="text-muted small mb-4">Consultez et validez les rendez-vous pris par vos clients.</p>
+                                <a href="#" class="btn btn-outline-success btn-sm stretched-link rounded-pill px-4">Voir la liste</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    {# Carte 3 : Dossiers #}
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 shadow-sm hover-card">
+                            <div class="card-body p-4">
+                                <div class="icon-square bg-warning bg-opacity-10 text-warning rounded-3 mb-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                    <i class="fas fa-folder-open fa-lg"></i>
+                                </div>
+                                <h3 class="h5 fw-bold text-dark">Dossiers Clients</h3>
+                                <p class="text-muted small mb-4">Accédez à l'historique et aux fiches techniques.</p>
+                                <a href="#" class="btn btn-outline-warning btn-sm stretched-link rounded-pill px-4">Rechercher</a>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {# Carte 2 : Rendez-vous #}
-                <div class="col-md-4">
-                    <div class="card h-100 border-0 shadow-sm hover-card transition-all">
-                        <div class="card-body p-4 text-center">
-                            <div class="bg-info bg-opacity-10 text-info rounded-circle d-inline-flex p-3 mb-3">
-                                <i class="fas fa-users fa-2x"></i>
-                            </div>
-                            <h3 class="h5 card-title fw-bold">Prochains RDV</h3>
-                            <p class="card-text text-muted small">
-                                Vous avez <strong>0 rendez-vous</strong> prévus aujourd'hui. Accédez à la liste complète.
-                            </p>
-                            <a href="#" class="btn btn-outline-info stretched-link mt-2">Voir mes rendez-vous</a>
-                        </div>
-                    </div>
-                </div>
-
-                {# Carte 3 : Historique / Clients #}
-                <div class="col-md-4">
-                    <div class="card h-100 border-0 shadow-sm hover-card transition-all">
-                        <div class="card-body p-4 text-center">
-                            <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-inline-flex p-3 mb-3">
-                                <i class="fas fa-history fa-2x"></i>
-                            </div>
-                            <h3 class="h5 card-title fw-bold">Historique</h3>
-                            <p class="card-text text-muted small">
-                                Retrouvez l'historique de vos rendez-vous passés et vos fiches clients.
-                            </p>
-                            <a href="#" class="btn btn-outline-warning stretched-link mt-2">Consulter</a>
-                        </div>
-                    </div>
-                </div>
             </div>
-
-            {# Section Explicative (Guide) #}
-            <div class="card border-0 bg-light rounded-4 p-4">
-                <div class="card-body">
-                    <h4 class="h5 fw-bold mb-4"><i class="fas fa-info-circle me-2 text-primary"></i> Comment utiliser l'application ?</h4>
-
-                    <div class="row g-4">
-                        <div class="col-md-4 d-flex">
-                            <div class="me-3">
-                                <span class="badge bg-primary rounded-circle p-2" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">1</span>
-                            </div>
-                            <div>
-                                <h6 class="fw-bold">Synchronisation Auto</h6>
-                                <p class="small text-muted mb-0">Vos rendez-vous pris ici s'ajoutent automatiquement à votre calendrier Outlook Microsoft.</p>
-                            </div>
-                        </div>
-                        <div class="col-md-4 d-flex">
-                            <div class="me-3">
-                                <span class="badge bg-primary rounded-circle p-2" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">2</span>
-                            </div>
-                            <div>
-                                <h6 class="fw-bold">Gestion des dispos</h6>
-                                <p class="small text-muted mb-0">Définissez vos créneaux. Si vous mettez "Occupé" dans Outlook, le créneau sera bloqué ici.</p>
-                            </div>
-                        </div>
-                        <div class="col-md-4 d-flex">
-                            <div class="me-3">
-                                <span class="badge bg-primary rounded-circle p-2" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">3</span>
-                            </div>
-                            <div>
-                                <h6 class="fw-bold">Confirmation Client</h6>
-                                <p class="small text-muted mb-0">Le client reçoit un email de confirmation automatique avec le lien Teams/Lieu.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
         </div>
 
 
-        {# --- CAS 2 : VISITEUR NON CONNECTÉ --- #}
+        {# ================================================= #}
+        {# CAS 2 : VISITEUR (PAGE D'ACCUEIL MODERNE)        #}
+        {# ================================================= #}
     {% else %}
 
-        <div class="bg-dark text-white position-relative overflow-hidden">
-            {# Fond abstrait optionnel #}
-            <div class="position-absolute top-0 start-0 w-100 h-100 opacity-10" style="background: radial-gradient(circle at top right, #0d6efd, transparent);"></div>
+        <div class="d-flex align-items-center justify-content-center position-relative w-100" style="min-height: 100vh; background: radial-gradient(circle at top left, #f8fafc, #ffffff, #eef2ff);">
 
-            <div class="container py-5 py-md-6 position-relative z-1 text-center" style="min-height: 80vh; display: flex; flex-direction: column; justify-content: center;">
+            {# Formes décoratives en fond (Glassmorphism effect) #}
+            <div class="position-absolute rounded-circle bg-primary opacity-10 blur-shape" style="width: 400px; height: 400px; top: -100px; left: -100px; filter: blur(80px); opacity: 0.1;"></div>
+            <div class="position-absolute rounded-circle bg-info opacity-10 blur-shape" style="width: 300px; height: 300px; bottom: 50px; right: -50px; filter: blur(60px); opacity: 0.1;"></div>
 
-                <div class="mb-4">
-                    <div class="bg-white bg-opacity-10 rounded-circle d-inline-flex p-4 mb-4">
-                        <i class="fas fa-calendar-check fa-4x text-primary"></i>
+            <div class="container position-relative text-center" style="z-index: 2;">
+
+                <div class="login-wrapper mx-auto" style="max-width: 600px;">
+
+                    {# LE LOGO CENTRAL #}
+                    <div class="mb-4 fade-in-up">
+                        <div class="logo-container bg-white shadow-lg mx-auto">
+                            <img src="{{ asset('img/logo.png') }}" alt="Logo Planifique" class="img-fluid logo-img">
+                        </div>
+                    </div>
+
+                    <div class="fade-in-up content-area" style="animation-delay: 0.1s;">
+                        <h1 class="display-5 fw-extrabold mb-3 text-dark tracking-tight">
+                            Espace Collaborateurs
+                        </h1>
+                        <p class="lead text-muted mb-5 mx-auto fs-6">
+                            Bienvenue sur votre portail de gestion <strong>Planifique</strong>.<br>
+                            Connectez-vous pour accéder à votre agenda et vos outils.
+                        </p>
+
+                        <div class="d-flex justify-content-center">
+                            <a href="{{ path('app_login') }}" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow-lg hover-lift btn-glow">
+                                <i class="fas fa-lock me-2"></i> Accéder à mon espace
+                            </a>
+                        </div>
+
+                        <div class="mt-5 pt-4 border-top border-light">
+                            <p class="text-muted small opacity-75 mb-0">
+                                &copy; {{ 'now'|date('Y') }} Planifique Rendez-vous <span class="mx-2">•</span> Usage interne uniquement
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                <h1 class="display-4 fw-bold mb-3">Planifique Rendez-Vous</h1>
-                <p class="lead text-white-50 mb-5 mx-auto" style="max-width: 600px;">
-                    La plateforme de gestion de rendez-vous dédiée aux conseillers.
-                    Simplifiez votre planning et synchronisez tout avec Microsoft Outlook.
-                </p>
-
-                <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
-                    <a href="{{ path('app_login') }}" class="btn btn-primary btn-lg px-5 py-3 fw-bold rounded-pill shadow-lg hover-scale">
-                        <i class="fab fa-microsoft me-2"></i> Accéder à mon espace
-                    </a>
-                </div>
-
-                <p class="mt-5 text-white-50 small">
-                    Accès réservé au personnel autorisé.<br>
-                    Pour toute assistance, contactez le support informatique.
-                </p>
             </div>
         </div>
+
+        <style>
+            /* --- Styles CSS Spécifiques pour l'accueil --- */
+
+            /* Logo Container */
+            .logo-container {
+                width: 140px;
+                height: 140px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                margin-bottom: 2rem;
+                border: 4px solid rgba(255, 255, 255, 0.8);
+            }
+            .logo-img {
+                max-width: 100%;
+                max-height: 100%;
+                object-fit: contain;
+            }
+
+            /* Animations */
+            .fade-in-up {
+                opacity: 0;
+                transform: translateY(20px);
+                animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            }
+
+            @keyframes fadeInUp {
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            /* Bouton "Hover Lift" */
+            .hover-lift {
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+            }
+            .hover-lift:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.4) !important;
+            }
+
+            /* Cartes Dashboard */
+            .hover-card {
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+            }
+            .hover-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 10px 20px rgba(0,0,0,0.05) !important;
+            }
+
+            /* Typo */
+            .fw-extrabold { font-weight: 800; }
+            .tracking-tight { letter-spacing: -0.02em; }
+        </style>
 
     {% endif %}
 

@@ -1,11 +1,118 @@
-body {
-    background-color: white;
+:root {
+    /* --- 🎨 TA CHARTE GRAPHIQUE --- */
+    /* REMPLACE CE CODE PAR LA COULEUR DOMINANTE DE TON LOGO */
+    --brand-primary: #0d6efd;  /* <--- Change moi ! (Ex: #c0392b pour rouge, #27ae60 pour vert) */
+
+    /* Couleurs secondaires (calculées automatiquement ou à ajuster) */
+    --brand-hover: color-mix(in srgb, var(--brand-primary), black 10%);
+    --brand-light: color-mix(in srgb, var(--brand-primary), white 90%);
+    --text-dark: #2c3e50;
 }
 
-.hover-card {
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; /* Police moderne type Microsoft */
+    color: var(--text-dark);
+}
+
+/* --- 1. BARRE DE NAVIGATION PRO --- */
+.navbar {
+    background-color: white !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05); /* Ombre douce et moderne */
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--text-dark) !important;
+}
+
+.nav-link {
+    font-weight: 500;
+    color: #6c757d;
+    transition: color 0.3s ease;
+}
+
+.nav-link:hover, .nav-link.active {
+    color: var(--brand-primary) !important;
+}
+
+/* Avatar utilisateur dans le menu */
+.user-avatar {
+    background-color: var(--brand-light);
+    color: var(--brand-primary);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px var(--brand-primary);
+}
+
+/* --- 2. BOUTONS PERSONNALISÉS --- */
+/* On écrase le bleu bootstrap par TA couleur */
+.btn-primary {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+    padding: 0.6rem 1.5rem;
+    font-weight: 600;
+    border-radius: 8px; /* Coins plus arrondis */
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: var(--brand-hover);
+    border-color: var(--brand-hover);
+    transform: translateY(-2px); /* Petit effet de levier */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.btn-outline-primary {
+    color: var(--brand-primary);
+    border-color: var(--brand-primary);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+}
+
+/* --- 3. CARTES ET OMBRES --- */
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
+
+/* Effet au survol des cartes du dashboard */
 .hover-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 1rem 3rem rgba(0,0,0,.175)!important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+/* Icônes dans des cercles colorés */
+.icon-circle {
+    width: 60px;
+    height: 60px;
+    background-color: var(--brand-light);
+    color: var(--brand-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin: 0 auto 1rem;
+}
+
+/* --- 4. ALERTE FLASH --- */
+.alert {
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
