@@ -19,12 +19,13 @@ security:
         main:
             lazy: true
             provider: app_user_provider
-            custom_authenticator: App\Security\AppAuthenticator
+            custom_authenticator:
+                - App\Security\AppAuthenticator      # Ton login classique (email/password)
+                - App\Security\MicrosoftAuthenticator
             logout:
                 path: app_logout
                 # where to redirect after logout
                 # target: app_any_route
-
             remember_me:
                 secret: '%kernel.secret%'
                 lifetime: 604800
