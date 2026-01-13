@@ -47,8 +47,7 @@ security:
         # 2. Tout le monde peut lancer la connexion Microsoft
         - { path: ^/connect, roles: PUBLIC_ACCESS }
         # 3. 🔒 SÉCURITÉ MAXIMUM : Seuls les admins entrent ici
-        # Remplacez '^/admin' par le début de l'URL de votre dashboard admin (ex: ^/admin ou ^/dashboard)
-        - { path: ^/admin, roles: ROLE_ADMIN
+        - { path: ^/admin, roles: ROLE_ADMIN }
 
 when@test:
     security:
