@@ -1,4 +1,3 @@
-import './stimulus_bootstrap.js';
 /*
  * Welcome to your app's main JavaScript file!
  *
@@ -7,4 +6,12 @@ import './stimulus_bootstrap.js';
  */
 import './styles/app.css';
 
-console.log('This log comes from assets/app.js - welcome to AssetMapper! 🎉');
+import './bootstrap.js';
+
+// 1. Import du CSS de Bootstrap (grâce à la commande de l'étape 3)
+import 'bootstrap/dist/css/bootstrap.min.css';
+
+// 2. Import du JS de Bootstrap
+import 'bootstrap';
+
+console.log('Bootstrap est chargé via AssetMapper !');
