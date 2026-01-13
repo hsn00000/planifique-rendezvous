@@ -32,6 +32,12 @@ class Evenement
     #[ORM\ManyToOne(inversedBy: 'evenements')]
     private ?Groupe $groupe = null;
 
+    #[ORM\Column(length: 7, nullable: true)]
+    private ?string $couleur = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $visioUrl = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -105,6 +111,30 @@ class Evenement
     public function setGroupe(?Groupe $groupe): static
     {
         $this->groupe = $groupe;
+
+        return $this;
+    }
+
+    public function getCouleur(): ?string
+    {
+        return $this->couleur;
+    }
+
+    public function setCouleur(?string $couleur): static
+    {
+        $this->couleur = $couleur;
+
+        return $this;
+    }
+
+    public function getVisioUrl(): ?string
+    {
+        return $this->visioUrl;
+    }
+
+    public function setVisioUrl(?string $visioUrl): static
+    {
+        $this->visioUrl = $visioUrl;
 
         return $this;
     }
