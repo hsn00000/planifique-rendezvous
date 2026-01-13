@@ -5,185 +5,183 @@
 {% block body %}
 
     {# ================================================= #}
-    {# CAS 1 : UTILISATEUR CONNECTÉ (TABLEAU DE BORD)   #}
+    {# CAS 1 : UTILISATEUR CONNECTÉ (DASHBOARD)          #}
     {# ================================================= #}
     {% if app.user %}
-        <div class="position-relative overflow-hidden bg-light" style="min-height: calc(100vh - 70px);">
-
-            {# Logo en filigrane (Background Branding) #}
-            <div class="position-absolute top-50 start-50 translate-middle" style="z-index: 0; opacity: 0.03; pointer-events: none;">
-                <img src="{{ asset('img/logo.png') }}" width="600" alt="Logo Background">
-            </div>
-
-            <div class="container py-5" style="position: relative; z-index: 1;">
-
-                {# En-tête #}
-                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-5">
-                    <div class="mb-3 mb-md-0">
-                        <h1 class="display-6 fw-bold text-dark mb-1">
-                            Bonjour, <span class="text-primary">{{ app.user.firstName|default('Conseiller') }}</span>
+        <div class="dashboard-container">
+            <div class="container py-5">
+                {# En-tête Salutation #}
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-5 fade-in">
+                    <div>
+                        <h1 class="fw-bold text-dark mb-1">
+                            Bonjour, <span style="color: #2563eb;">{{ app.user.firstName|default('Conseiller') }}</span>
                         </h1>
-                        <p class="text-muted mb-0">Votre espace de gestion Planifique est prêt.</p>
+                        <p class="text-muted">Votre espace de gestion est prêt.</p>
                     </div>
                     <div>
-                        <span class="badge bg-white text-dark border shadow-sm px-3 py-2 rounded-pill">
-                            <i class="fas fa-circle text-success me-2" style="font-size: 0.5rem;"></i> Système opérationnel
+                        <span class="badge bg-white text-dark border px-3 py-2 rounded-pill shadow-sm">
+                            <i class="fas fa-circle text-success me-2" style="font-size: 0.5rem;"></i> En ligne
                         </span>
                     </div>
                 </div>
 
-                {# Cartes d'actions #}
+                {# Grille de cartes #}
                 <div class="row g-4">
-                    {# Carte 1 : Planning #}
-                    <div class="col-md-4">
+                    {# Carte 1 #}
+                    <div class="col-md-4 fade-in" style="animation-delay: 0.1s;">
                         <div class="card h-100 border-0 shadow-sm hover-card">
                             <div class="card-body p-4">
-                                <div class="icon-square bg-primary bg-opacity-10 text-primary rounded-3 mb-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                <div class="icon-box bg-primary-subtle text-primary mb-3">
                                     <i class="fas fa-calendar-alt fa-lg"></i>
                                 </div>
-                                <h3 class="h5 fw-bold text-dark">Mon Planning</h3>
-                                <p class="text-muted small mb-4">Gérez vos disponibilités et visualisez vos plages horaires.</p>
-                                <a href="#" class="btn btn-outline-primary btn-sm stretched-link rounded-pill px-4">Accéder</a>
+                                <h3 class="h5 fw-bold">Mon Planning</h3>
+                                <p class="text-muted small">Gérez vos disponibilités de la semaine.</p>
+                                <a href="#" class="btn btn-sm btn-outline-primary rounded-pill px-4 stretched-link">Accéder</a>
                             </div>
                         </div>
                     </div>
-
-                    {# Carte 2 : Rendez-vous #}
-                    <div class="col-md-4">
+                    {# Carte 2 #}
+                    <div class="col-md-4 fade-in" style="animation-delay: 0.2s;">
                         <div class="card h-100 border-0 shadow-sm hover-card">
                             <div class="card-body p-4">
-                                <div class="icon-square bg-success bg-opacity-10 text-success rounded-3 mb-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                                    <i class="fas fa-user-clock fa-lg"></i>
+                                <div class="icon-box bg-success-subtle text-success mb-3">
+                                    <i class="fas fa-check-circle fa-lg"></i>
                                 </div>
-                                <h3 class="h5 fw-bold text-dark">Rendez-vous</h3>
-                                <p class="text-muted small mb-4">Consultez et validez les rendez-vous pris par vos clients.</p>
-                                <a href="#" class="btn btn-outline-success btn-sm stretched-link rounded-pill px-4">Voir la liste</a>
+                                <h3 class="h5 fw-bold">Rendez-vous</h3>
+                                <p class="text-muted small">Validez les demandes en attente.</p>
+                                <a href="#" class="btn btn-sm btn-outline-success rounded-pill px-4 stretched-link">Voir liste</a>
                             </div>
                         </div>
                     </div>
-
-                    {# Carte 3 : Dossiers #}
-                    <div class="col-md-4">
+                    {# Carte 3 #}
+                    <div class="col-md-4 fade-in" style="animation-delay: 0.3s;">
                         <div class="card h-100 border-0 shadow-sm hover-card">
                             <div class="card-body p-4">
-                                <div class="icon-square bg-warning bg-opacity-10 text-warning rounded-3 mb-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                                    <i class="fas fa-folder-open fa-lg"></i>
+                                <div class="icon-box bg-warning-subtle text-warning mb-3">
+                                    <i class="fas fa-users fa-lg"></i>
                                 </div>
-                                <h3 class="h5 fw-bold text-dark">Dossiers Clients</h3>
-                                <p class="text-muted small mb-4">Accédez à l'historique et aux fiches techniques.</p>
-                                <a href="#" class="btn btn-outline-warning btn-sm stretched-link rounded-pill px-4">Rechercher</a>
+                                <h3 class="h5 fw-bold">Clients</h3>
+                                <p class="text-muted small">Accédez aux fiches techniques.</p>
+                                <a href="#" class="btn btn-sm btn-outline-warning rounded-pill px-4 stretched-link">Rechercher</a>
                             </div>
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
 
-
         {# ================================================= #}
-        {# CAS 2 : VISITEUR (PAGE D'ACCUEIL MODERNE)        #}
+        {# CAS 2 : VISITEUR (PAGE D'ACCUEIL AVEC IMAGE)      #}
         {# ================================================= #}
     {% else %}
 
-        <div class="d-flex align-items-center justify-content-center position-relative w-100" style="min-height: 100vh; background: radial-gradient(circle at top left, #f8fafc, #ffffff, #eef2ff);">
+        <div class="hero-section">
+            {# IMAGE D'ARRIÈRE-PLAN #}
+            <div class="bg-image" style="background-image: url('{{ asset('img/planifique.jpg') }}');"></div>
 
-            {# Formes décoratives en fond (Glassmorphism effect) #}
-            <div class="position-absolute rounded-circle bg-primary opacity-10 blur-shape" style="width: 400px; height: 400px; top: -100px; left: -100px; filter: blur(80px); opacity: 0.1;"></div>
-            <div class="position-absolute rounded-circle bg-info opacity-10 blur-shape" style="width: 300px; height: 300px; bottom: 50px; right: -50px; filter: blur(60px); opacity: 0.1;"></div>
+            {# Overlay sombre pour lisibilité #}
+            <div class="bg-overlay"></div>
 
-            <div class="container position-relative text-center" style="z-index: 2;">
+            <div class="container position-relative z-2 text-center">
 
-                <div class="login-wrapper mx-auto" style="max-width: 600px;">
-
-                    {# LE LOGO CENTRAL #}
-                    <div class="mb-4 fade-in-up">
-                        <div class="logo-container bg-white shadow-lg mx-auto">
-                            <img src="{{ asset('img/logo.png') }}" alt="Logo Planifique" class="img-fluid logo-img">
-                        </div>
+                <div class="glass-card p-5 mx-auto fade-in-up">
+                    {# Logo Rond Centré #}
+                    <div class="logo-wrapper mx-auto mb-4">
+                        <img src="{{ asset('img/logo.png') }}" alt="Planifique Logo" class="img-fluid">
                     </div>
 
-                    <div class="fade-in-up content-area" style="animation-delay: 0.1s;">
-                        <h1 class="display-5 fw-extrabold mb-3 text-dark tracking-tight">
-                            Espace Collaborateurs
-                        </h1>
-                        <p class="lead text-muted mb-5 mx-auto fs-6">
-                            Bienvenue sur votre portail de gestion <strong>Planifique</strong>.<br>
-                            Connectez-vous pour accéder à votre agenda et vos outils.
-                        </p>
+                    <h1 class="display-5 fw-bolder text-white mb-3 tracking-tight">
+                        Espace Collaborateurs
+                    </h1>
 
-                        <div class="d-flex justify-content-center">
-                            <a href="{{ path('app_login') }}" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow-lg hover-lift btn-glow">
-                                <i class="fas fa-lock me-2"></i> Accéder à mon espace
-                            </a>
-                        </div>
+                    <p class="lead text-white-50 mb-5 mx-auto" style="max-width: 500px;">
+                        Connectez-vous à votre portail <strong>Planifique</strong> pour gérer votre agenda et vos rendez-vous en temps réel.
+                    </p>
 
-                        <div class="mt-5 pt-4 border-top border-light">
-                            <p class="text-muted small opacity-75 mb-0">
-                                &copy; {{ 'now'|date('Y') }} Planifique Rendez-vous <span class="mx-2">•</span> Usage interne uniquement
-                            </p>
-                        </div>
+                    <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
+                        <a href="{{ path('app_login') }}" class="btn btn-primary btn-lg px-5 py-3 rounded-pill shadow-lg hover-scale">
+                            <i class="fas fa-lock me-2"></i> Accéder à mon espace
+                        </a>
                     </div>
                 </div>
 
             </div>
         </div>
 
-        <style>
-            /* --- Styles CSS Spécifiques pour l'accueil --- */
-
-            /* Logo Container */
-            .logo-container {
-                width: 140px;
-                height: 140px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 20px;
-                margin-bottom: 2rem;
-                border: 4px solid rgba(255, 255, 255, 0.8);
-            }
-            .logo-img {
-                max-width: 100%;
-                max-height: 100%;
-                object-fit: contain;
-            }
-
-            /* Animations */
-            .fade-in-up {
-                opacity: 0;
-                transform: translateY(20px);
-                animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-            }
-
-            @keyframes fadeInUp {
-                to { opacity: 1; transform: translateY(0); }
-            }
-
-            /* Bouton "Hover Lift" */
-            .hover-lift {
-                transition: transform 0.3s ease, box-shadow 0.3s ease;
-            }
-            .hover-lift:hover {
-                transform: translateY(-3px);
-                box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.4) !important;
-            }
-
-            /* Cartes Dashboard */
-            .hover-card {
-                transition: transform 0.2s ease, box-shadow 0.2s ease;
-            }
-            .hover-card:hover {
-                transform: translateY(-5px);
-                box-shadow: 0 10px 20px rgba(0,0,0,0.05) !important;
-            }
-
-            /* Typo */
-            .fw-extrabold { font-weight: 800; }
-            .tracking-tight { letter-spacing: -0.02em; }
-        </style>
-
     {% endif %}
+
+    {# STYLES CSS INTÉGRÉS POUR CETTE PAGE #}
+    <style>
+        /* --- Styles communs --- */
+        .tracking-tight { letter-spacing: -0.02em; }
+        .fade-in { animation: fadeIn 0.8s ease-out forwards; opacity: 0; }
+        .fade-in-up { animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; transform: translateY(30px); }
+
+        @keyframes fadeIn { to { opacity: 1; } }
+        @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+
+        /* --- Dashboard Styles --- */
+        .dashboard-container { min-height: 80vh; background-color: #f8fafc; }
+        .icon-box { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; }
+        .hover-card { transition: transform 0.2s; }
+        .hover-card:hover { transform: translateY(-5px); }
+
+        /* --- Hero / Visiteur Styles --- */
+        .hero-section {
+            position: relative;
+            height: 100vh;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* L'image de fond */
+        .bg-image {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-size: cover;
+            background-position: center;
+            z-index: 0;
+            transform: scale(1.05); /* Zoom léger pour effet cinéma */
+        }
+
+        /* Filtre sombre par dessus l'image */
+        .bg-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.7) 100%);
+            z-index: 1;
+            backdrop-filter: blur(4px); /* Léger flou sur l'image de fond */
+        }
+
+        /* Carte effet "Verre" (Glassmorphism) */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
+            max-width: 650px;
+            width: 100%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .logo-wrapper {
+            width: 120px;
+            height: 120px;
+            background: white;
+            border-radius: 50%;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .hover-scale { transition: transform 0.3s ease; }
+        .hover-scale:hover { transform: scale(1.05); }
+    </style>
 
 {% endblock %}
