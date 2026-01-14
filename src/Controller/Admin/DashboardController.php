@@ -2,10 +2,10 @@
 
 namespace App\Controller\Admin;
 
+use App\Entity\DisponibiliteHebdomadaire;
 use App\Entity\Evenement;
 use App\Entity\Groupe;
 use App\Entity\User;
-use App\Entity\Disponibilite;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractDashboardController;
@@ -36,8 +36,9 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::section('Gestion');
         yield MenuItem::linkToCrud('Groupes', 'fas fa-users', Groupe::class);
         yield MenuItem::linkToCrud('Types d\'Événements', 'fas fa-calendar-check', Evenement::class);
-        yield MenuItem::linkToCrud('Utilisateurs', 'fas fa-user', User::class);
-        yield MenuItem::linkToCrud('Disponibilités', 'fas fa-clock', Disponibilite::class);
+
+        // C'est ici que tout se passe maintenant :
+        yield MenuItem::linkToCrud('Collaborateurs (Dossiers)', 'fas fa-user-tie', User::class);
 
         yield MenuItem::section('Liens');
         yield MenuItem::linkToRoute('Retour au site', 'fas fa-arrow-left', 'app_home');

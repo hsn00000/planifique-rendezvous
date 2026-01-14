@@ -54,11 +54,22 @@ class DisponibiliteController extends AbstractController
     #[Route('/supprimer/{id}', name: 'app_dispo_delete')]
     public function delete(DisponibiliteHebdomadaire $dispo, EntityManagerInterface $em): Response
     {
-        if ($dispo->getUser() === $this->getUser()) {
-            $em->remove($dispo);
-            $em->flush();
-            $this->addFlash('info', 'Horaire supprimé.');
+        // Vérification 1 : C'est bien l'utilisateur connecté
+        if ($dispo->getUser() !== $this->getUser()) {
+            throw $this->createAccessDeniedException();
         }
+
+        // Vérification 2 : LE CRÉNEAU EST-IL BLOQUÉ ?
+        if ($dispo->isEstBloque()) {
+            // Message d'erreur
+            $this->addFlash('danger', 'Impossible de supprimer ce créneau : il a été verrouillé par l\'administration.');
+            return $this->redirectToRoute('app_dispo_index');
+        }
+
+        $em->remove($dispo);
+        $em->flush();
+        $this->addFlash('info', 'Horaire supprimé.');
+
         return $this->redirectToRoute('app_dispo_index');
     }
 }

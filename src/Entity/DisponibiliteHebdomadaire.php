@@ -26,6 +26,9 @@ class DisponibiliteHebdomadaire
     #[ORM\ManyToOne(inversedBy: 'disponibiliteHebdomadaires')]
     private ?User $user = null;
 
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $estBloque = false;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -59,6 +62,18 @@ class DisponibiliteHebdomadaire
     public function setUser(?User $user): static
     {
         $this->user = $user;
+
+        return $this;
+    }
+
+    public function isEstBloque(): bool
+    {
+        return $this->estBloque;
+    }
+
+    public function setEstBloque(bool $estBloque): static
+    {
+        $this->estBloque = $estBloque;
 
         return $this;
     }
