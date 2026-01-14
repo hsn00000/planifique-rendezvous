@@ -17,29 +17,25 @@ class Evenement
     #[ORM\Column(length: 255)]
     private ?string $titre = null;
 
-    #[ORM\Column]
-    private ?\DateTime $dateDebut = null;
-
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $description = null;
-
     #[ORM\Column(length: 255)]
     private ?string $slug = null;
 
     #[ORM\Column]
     private ?int $duree = null;
 
-    #[ORM\ManyToOne(inversedBy: 'evenements')]
-    private ?Groupe $groupe = null;
-
     #[ORM\Column(length: 7, nullable: true)]
     private ?string $couleur = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $visioUrl = null;
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $description = null;
 
-    #[ORM\Column]
-    private ?bool $isRoundRobin = null;
+    // J'ai ajouté isRoundRobin car c'est crucial pour ta logique d'équipe
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private ?bool $isRoundRobin = false;
+
+    #[ORM\ManyToOne(inversedBy: 'evenements')]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?Groupe $groupe = null;
 
     public function getId(): ?int
     {
@@ -54,31 +50,10 @@ class Evenement
     public function setTitre(string $titre): static
     {
         $this->titre = $titre;
-
-        return $this;
-    }
-
-    public function getDateDebut(): ?\DateTime
-    {
-        return $this->dateDebut;
-    }
-
-    public function setDateDebut(\DateTime $dateDebut): static
-    {
-        $this->dateDebut = $dateDebut;
-
-        return $this;
-    }
-
-    public function getDescription(): ?string
-    {
-        return $this->description;
-    }
-
-    public function setDescription(?string $description): static
-    {
-        $this->description = $description;
-
+        // On génère le slug automatiquement si non défini
+        if (!$this->slug) {
+            $this->slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $titre)));
+        }
         return $this;
     }
 
@@ -90,7 +65,6 @@ class Evenement
     public function setSlug(string $slug): static
     {
         $this->slug = $slug;
-
         return $this;
     }
 
@@ -102,19 +76,6 @@ class Evenement
     public function setDuree(int $duree): static
     {
         $this->duree = $duree;
-
-        return $this;
-    }
-
-    public function getGroupe(): ?Groupe
-    {
-        return $this->groupe;
-    }
-
-    public function setGroupe(?Groupe $groupe): static
-    {
-        $this->groupe = $groupe;
-
         return $this;
     }
 
@@ -126,19 +87,17 @@ class Evenement
     public function setCouleur(?string $couleur): static
     {
         $this->couleur = $couleur;
-
         return $this;
     }
 
-    public function getVisioUrl(): ?string
+    public function getDescription(): ?string
     {
-        return $this->visioUrl;
+        return $this->description;
     }
 
-    public function setVisioUrl(?string $visioUrl): static
+    public function setDescription(?string $description): static
     {
-        $this->visioUrl = $visioUrl;
-
+        $this->description = $description;
         return $this;
     }
 
@@ -150,7 +109,22 @@ class Evenement
     public function setIsRoundRobin(bool $isRoundRobin): static
     {
         $this->isRoundRobin = $isRoundRobin;
-
         return $this;
+    }
+
+    public function getGroupe(): ?Groupe
+    {
+        return $this->groupe;
+    }
+
+    public function setGroupe(?Groupe $groupe): static
+    {
+        $this->groupe = $groupe;
+        return $this;
+    }
+
+    public function __toString(): string
+    {
+        return $this->titre ?? 'Événement';
     }
 }
