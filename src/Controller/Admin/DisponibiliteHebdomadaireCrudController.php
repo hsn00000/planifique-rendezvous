@@ -3,13 +3,15 @@
 namespace App\Controller\Admin;
 
 use App\Entity\DisponibiliteHebdomadaire;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Filters; // 👈 Important
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TimeField;
-use EasyCorp\Bundle\EasyAdminBundle\Filter\EntityFilter; // 👈 Important
+use EasyCorp\Bundle\EasyAdminBundle\Filter\BooleanFilter;
+use EasyCorp\Bundle\EasyAdminBundle\Filter\EntityFilter;
 
 class DisponibiliteHebdomadaireCrudController extends AbstractCrudController
 {
@@ -18,21 +20,35 @@ class DisponibiliteHebdomadaireCrudController extends AbstractCrudController
         return DisponibiliteHebdomadaire::class;
     }
 
-    // 👇 AJOUTE CETTE MÉTHODE POUR ACTIVER LE FILTRE
+    public function configureCrud(Crud $crud): Crud
+    {
+        return $crud
+            ->setEntityLabelInSingular('Créneau')
+            ->setEntityLabelInPlural('Planning Hebdomadaire')
+            ->setDefaultSort(['jourSemaine' => 'ASC', 'heureDebut' => 'ASC']);
+    }
+
+    // 👇 C'EST ICI QUE TOUT SE JOUE
     public function configureFilters(Filters $filters): Filters
     {
         return $filters
-            ->add(EntityFilter::new('user', 'Conseiller'));
+            // 1. Filtre Technique (Obligatoire pour recevoir le clic depuis "Collaborateurs")
+            // On le laisse, mais on le met en second plan ou on le nomme "Conseiller affiché"
+            ->add(EntityFilter::new('user', 'Conseiller affiché'))
+
+            // 2. Filtre Métier (Celui que tu veux utiliser ICI)
+            ->add(BooleanFilter::new('estBloque', 'Filtrer par état')
+                ->setLabel('Afficher les créneaux verrouillés ?')
+            );
     }
 
     public function configureFields(string $pageName): iterable
     {
         return [
+            // On affiche le conseiller en lecture seule pour rappel
             AssociationField::new('user', 'Conseiller')
-                ->formatValue(function ($value, $entity) {
-                    return $entity->getUser() ? sprintf('%s %s (%s)', $entity->getUser()->getFirstName(), $entity->getUser()->getLastName(), $entity->getUser()->getEmail()) : 'Inconnu';
-                })
-                ->setSortable(true),
+                ->setFormTypeOption('disabled', 'disabled')
+                ->setSortable(false),
 
             ChoiceField::new('jourSemaine', 'Jour')
                 ->setChoices([
@@ -46,8 +62,10 @@ class DisponibiliteHebdomadaireCrudController extends AbstractCrudController
             TimeField::new('heureDebut', 'Début'),
             TimeField::new('heureFin', 'Fin'),
 
-            BooleanField::new('estBloque', 'Verrouillé')
+            // Le switch pour bloquer/débloquer
+            BooleanField::new('estBloque', 'Est Verrouillé')
                 ->renderAsSwitch(false)
+                ->setHelp('Si coché, le conseiller ne peut pas supprimer ce créneau.'),
         ];
     }
 }
