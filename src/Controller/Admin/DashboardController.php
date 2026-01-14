@@ -6,6 +6,9 @@ use App\Entity\DisponibiliteHebdomadaire;
 use App\Entity\Evenement;
 use App\Entity\Groupe;
 use App\Entity\User;
+use App\Repository\EvenementRepository;
+use App\Repository\GroupeRepository;
+use App\Repository\UserRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractDashboardController;
@@ -14,15 +17,32 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class DashboardController extends AbstractDashboardController
 {
+    // On injecte les repositories pour avoir accès aux données
+    public function __construct(
+        private UserRepository $userRepository,
+        private EvenementRepository $evenementRepository,
+        private GroupeRepository $groupeRepository
+    ) {}
+
     #[Route('/admin', name: 'admin')]
     public function index(): Response
     {
-        return $this->render('admin/dashboard.html.twig');
+        // On récupère les compteurs
+        $stats = [
+            'users' => $this->userRepository->count([]),
+            'events' => $this->evenementRepository->count([]),
+            'groupes' => $this->groupeRepository->count([]),
+        ];
+
+        return $this->render('admin/dashboard.html.twig', [
+            'stats' => $stats
+        ]);
     }
 
     public function configureDashboard(): Dashboard
     {
         return Dashboard::new()
+            // Titre propre avec le logo et un espacement corrigé
             ->setTitle('<img src="/img/logo.png" style="height: 35px; margin-right: 10px; vertical-align: text-bottom;"> Planifique <span style="font-size: 0.8em; color: #777;">Admin</span>')
             ->setFaviconPath('img/logo.png')
             ->renderContentMaximized();
@@ -35,9 +55,10 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::section('Gestion');
         yield MenuItem::linkToCrud('Groupes', 'fas fa-users', Groupe::class);
         yield MenuItem::linkToCrud('Types d\'Événements', 'fas fa-calendar-check', Evenement::class);
+        yield MenuItem::linkToCrud('Collaborateurs', 'fas fa-user-tie', User::class);
 
-        // C'est ici que tout se passe maintenant :
-        yield MenuItem::linkToCrud('Collaborateurs (Dossiers)', 'fas fa-user-tie', User::class);
+        // Lien direct vers les plannings (si le cache est vidé, ça marchera !)
+        yield MenuItem::linkToCrud('Tous les Plannings', 'fas fa-calendar-week', DisponibiliteHebdomadaire::class);
 
         yield MenuItem::section('Liens');
         yield MenuItem::linkToRoute('Retour au site', 'fas fa-arrow-left', 'app_home');

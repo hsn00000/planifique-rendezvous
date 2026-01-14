@@ -6,77 +6,135 @@
 {% block main %}
     <div class="container-fluid py-4">
 
-        {# Message de bienvenue #}
-        <div class="row mb-4">
+        {# --- 1. BANNIÈRE DE BIENVENUE --- #}
+        {# On garde un style distinct pour la bannière pour qu'elle ressorte #}
+        <div class="row mb-5">
             <div class="col-12">
-                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white; border-radius: 16px;">
-                    <div class="card-body p-5">
-                        <h1 class="display-6 fw-bold mb-2">Bienvenue, Administrateur 👋</h1>
-                        <p class="lead text-white-50 mb-0">
-                            C'est ici que vous gérez les équipes, les événements et les utilisateurs de <strong>Planifique</strong>.
-                        </p>
+                <div class="card border-0 shadow-lg overflow-hidden welcome-card">
+                    <div class="card-body p-5 position-relative z-2">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h1 class="display-5 fw-bold text-white mb-3">Bonjour, Administrateur 👋</h1>
+                                <p class="lead text-white-50 mb-4">
+                                    Bienvenue sur votre espace de gestion <strong>Planifique</strong>.
+                                    Pilotez vos équipes, configurez les événements et suivez les inscriptions en un coup d'œil.
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-center d-none d-md-block">
+                                <i class="fas fa-calendar-check fa-8x text-white opacity-25"></i>
+                            </div>
+                        </div>
                     </div>
+                    {# Décoration de fond #}
+                    <div class="bg-decoration"></div>
                 </div>
             </div>
         </div>
 
-        {# Cartes d'accès rapide #}
+        {# --- 2. CARTES DE NAVIGATION (THEME ADAPTATIF) --- #}
         <div class="row g-4">
 
-            {# Carte 1 : Groupes #}
+            {# CARD : GROUPES #}
             <div class="col-md-4">
-                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px; transition: transform 0.2s;">
-                    <div class="card-body p-4 text-center">
-                        <div class="mb-3 p-3 rounded-circle d-inline-block" style="background-color: #e0f2fe; color: #0284c7;">
+                <div class="card h-100 border-0 shadow-sm hover-scale position-relative p-2">
+                    <div class="card-body d-flex flex-column align-items-center text-center p-4">
+                        <div class="icon-box bg-primary bg-opacity-10 text-primary mb-4">
                             <i class="fas fa-users fa-2x"></i>
                         </div>
-                        <h3 class="h5 fw-bold text-dark">Gérer les Groupes</h3>
-                        <p class="text-muted small">Créez des équipes et liez-les aux groupes Microsoft Azure (Object ID).</p>
-                    </div>
-                    <div class="card-footer bg-transparent border-0 pb-4 pt-0">
-                        <a href="{{ ea_url().setController('App\\Controller\\Admin\\GroupeCrudController').generateUrl() }}" class="btn btn-outline-primary rounded-pill w-100 fw-bold">
-                            Accéder
-                        </a>
+                        {# 'text-body' s'adapte auto (Noir en Light, Blanc en Dark) #}
+                        <h3 class="h4 fw-bold mb-2 text-body">Groupes & Équipes</h3>
+                        <p class="text-secondary mb-0">
+                            Gérez les équipes et liez-les aux IDs Microsoft Azure.
+                        </p>
+
+                        {# LE LIEN MAGIQUE : Couvre toute la carte #}
+                        <a href="{{ ea_url().setController('App\\Controller\\Admin\\GroupeCrudController').setAction('index').generateUrl() }}"
+                           class="stretched-link"></a>
                     </div>
                 </div>
             </div>
 
-            {# Carte 2 : Types d'événements (Le cœur de Calendly) #}
+            {# CARD : TYPES D'ÉVÉNEMENTS #}
             <div class="col-md-4">
-                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px; transition: transform 0.2s;">
-                    <div class="card-body p-4 text-center">
-                        <div class="mb-3 p-3 rounded-circle d-inline-block" style="background-color: #dcfce7; color: #16a34a;">
+                <div class="card h-100 border-0 shadow-sm hover-scale position-relative p-2">
+                    <div class="card-body d-flex flex-column align-items-center text-center p-4">
+                        <div class="icon-box bg-success bg-opacity-10 text-success mb-4">
                             <i class="fas fa-calendar-alt fa-2x"></i>
                         </div>
-                        <h3 class="h5 fw-bold text-dark">Types d'Événements</h3>
-                        <p class="text-muted small">Configurez les rendez-vous (Durée, Couleur) disponibles pour chaque groupe.</p>
-                    </div>
-                    <div class="card-footer bg-transparent border-0 pb-4 pt-0">
-                        <a href="{{ ea_url().setController('App\\Controller\\Admin\\EvenementCrudController').generateUrl() }}" class="btn btn-outline-success rounded-pill w-100 fw-bold">
-                            Configurer
-                        </a>
+                        <h3 class="h4 fw-bold mb-2 text-body">Types d'Événements</h3>
+                        <p class="text-secondary mb-0">
+                            Configurez les durées, couleurs et descriptions des RDV.
+                        </p>
+
+                        <a href="{{ ea_url().setController('App\\Controller\\Admin\\EvenementCrudController').setAction('index').generateUrl() }}"
+                           class="stretched-link"></a>
                     </div>
                 </div>
             </div>
 
-            {# Carte 3 : Utilisateurs #}
+            {# CARD : UTILISATEURS #}
             <div class="col-md-4">
-                <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px; transition: transform 0.2s;">
-                    <div class="card-body p-4 text-center">
-                        <div class="mb-3 p-3 rounded-circle d-inline-block" style="background-color: #f3e8ff; color: #9333ea;">
-                            <i class="fas fa-user-cog fa-2x"></i>
+                <div class="card h-100 border-0 shadow-sm hover-scale position-relative p-2">
+                    <div class="card-body d-flex flex-column align-items-center text-center p-4">
+                        <div class="icon-box bg-warning bg-opacity-10 text-warning mb-4">
+                            <i class="fas fa-user-tie fa-2x"></i>
                         </div>
-                        <h3 class="h5 fw-bold text-dark">Utilisateurs</h3>
-                        <p class="text-muted small">Visualisez les inscrits et vérifiez leur synchronisation avec les groupes.</p>
-                    </div>
-                    <div class="card-footer bg-transparent border-0 pb-4 pt-0">
-                        <a href="{{ ea_url().setController('App\\Controller\\Admin\\UserCrudController').generateUrl() }}" class="btn btn-outline-secondary rounded-pill w-100 fw-bold">
-                            Gérer
-                        </a>
+                        <h3 class="h4 fw-bold mb-2 text-body">Collaborateurs</h3>
+                        <p class="text-secondary mb-0">
+                            Visualisez les inscrits et accédez à leurs plannings.
+                        </p>
+
+                        <a href="{{ ea_url().setController('App\\Controller\\Admin\\UserCrudController').setAction('index').generateUrl() }}"
+                           class="stretched-link"></a>
                     </div>
                 </div>
             </div>
 
         </div>
     </div>
+
+    {# --- CSS INTÉGRÉ POUR LE DESIGN MODERNE --- #}
+    <style>
+        /* Animation de survol "Levitation" */
+        .hover-scale {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            /* Pour EasyAdmin Dark Mode : on force le background de la carte à s'adapter */
+            background-color: var(--bs-card-bg);
+        }
+        .hover-scale:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important;
+            cursor: pointer;
+        }
+
+        /* Style des icônes */
+        .icon-box {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease;
+        }
+        .hover-scale:hover .icon-box {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        /* Bannière de bienvenue */
+        .welcome-card {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            position: relative;
+        }
+        .bg-decoration {
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(37,99,235,0.2) 0%, rgba(0,0,0,0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+    </style>
 {% endblock %}
