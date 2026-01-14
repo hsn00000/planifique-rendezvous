@@ -4,6 +4,9 @@
 
 {% block body %}
 
+    {# ================================================= #}
+    {# CAS 1 : UTILISATEUR CONNECTÉ (DASHBOARD)          #}
+    {# ================================================= #}
     {% if app.user %}
         <div class="dashboard-container">
             <div class="container py-5">
@@ -33,23 +36,20 @@
                     </div>
                 </div>
 
-                {# --- SECTION AGENDA CONSEILLER --- #}
+                {# --- SECTION AGENDA CONSEILLER (QUICK ACTION) --- #}
                 {% if not is_granted('ROLE_ADMIN') %}
                     <div class="row mb-5 fade-in">
                         <div class="col-12">
                             <div class="card border-0 shadow-lg text-white" style="background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); border-radius: 24px;">
                                 <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-center">
                                     <div class="mb-3 mb-md-0 d-flex align-items-center">
-                                        <div class="bg-white bg-opacity-20 rounded-circle p-3 me-3">
-                                            <i class="fas fa-calendar-plus fa-2x"></i>
-                                        </div>
                                         <div>
-                                            <h2 class="h4 fw-bold mb-1">Prêt pour de nouveaux rendez-vous ?</h2>
-                                            <p class="mb-0 opacity-75">Gérez vos créneaux et voyez vos disponibilités actuelles.</p>
+                                            <h2 class="h4 fw-bold mb-1">Gérer mon planning</h2>
+                                            <p class="mb-0 opacity-75">Ouvrez ou fermez vos créneaux de disponibilité en un clic.</p>
                                         </div>
                                     </div>
                                     <a href="{{ path('app_dispo_index') }}" class="btn btn-light fw-bold px-4 py-3 rounded-pill shadow hover-scale">
-                                        <i class="fas fa-clock me-2"></i> Mon Planning de Travail
+                                        <i class="fas fa-clock me-2"></i> Mon Agenda
                                     </a>
                                 </div>
                             </div>
@@ -64,18 +64,18 @@
                             <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white;">
                                 <div class="card-body p-5 d-flex flex-column flex-md-row justify-content-between align-items-center">
                                     <div class="mb-4 mb-md-0">
-                                        <h2 class="h4 fw-bold mb-2"><i class="fas fa-user-shield me-2 text-warning"></i> Gestion de l'Application</h2>
+                                        <h2 class="h4 fw-bold mb-2"><i class="fas fa-user-shield me-2 text-warning"></i> Administration</h2>
                                         <p class="mb-0 text-white-50">Accédez au Back-Office pour gérer les équipes et les événements.</p>
                                     </div>
                                     <a href="{{ path('admin') }}" class="btn btn-warning fw-bold px-5 py-3 rounded-pill shadow-lg hover-scale text-dark">
-                                        <i class="fas fa-cogs me-2"></i> Accéder au Back-Office
+                                        <i class="fas fa-cogs me-2"></i> Back-Office
                                     </a>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {# ZONE CONSEILLER (ÉVÉNEMENTS) #}
+                    {# ZONE CONSEILLER (TYPES D'ÉVÉNEMENTS) #}
                 {% else %}
 
                     <h3 class="h6 text-uppercase text-muted fw-bold mb-4 fade-in">Mes Types de Rendez-vous</h3>
@@ -90,6 +90,7 @@
                                             <div class="d-flex justify-content-between align-items-start mb-3">
                                                 <span class="badge bg-light text-dark border d-flex align-items-center">
                                                     <i class="far fa-clock me-2 text-muted"></i>
+                                                    {# LOGIQUE DURÉE INTELLIGENTE #}
                                                     {% set hours = (event.duree / 60)|round(0, 'floor') %}
                                                     {% set minutes = event.duree % 60 %}
                                                     {% if hours > 0 %}{{ hours }} h {% endif %}{{ minutes > 0 ? minutes ~ ' min' : '' }}
@@ -155,6 +156,18 @@
                                 </div>
                             {% endfor %}
                         </div>
+
+                    {% elseif app.user.groupe %}
+                        <div class="text-center py-5 fade-in">
+                            <div class="alert alert-light d-inline-block shadow-sm border-0">
+                                <i class="fas fa-info-circle text-primary me-2"></i> Aucun événement configuré pour le groupe <strong>{{ app.user.groupe.nom }}</strong>.
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning shadow-sm border-0 fade-in">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Votre compte n'est pas encore affilié à un groupe. Contactez votre administrateur.
+                        </div>
                     {% endif %}
 
                 {% endif %}
@@ -162,11 +175,97 @@
             </div>
         </div>
 
+        {# ================================================= #}
+        {# CAS 2 : VISITEUR (LANDING PAGE ÉPURÉE)            #}
+        {# ================================================= #}
     {% else %}
-        {# Hero section pour les non-connectés #}
-        <div class="hero-section">
-            {# ... ton code existant ici ... #}
+
+        {# --- HERO SECTION --- #}
+        <div class="position-relative w-100 overflow-hidden d-flex align-items-center justify-content-center" style="background-color: #0f172a; height: 90vh;">
+            {# Image de fond #}
+            <div class="position-absolute top-0 start-0 w-100 h-100"
+                 style="background-image: url('{{ asset('img/planifique.jpg') }}'); background-size: cover; background-position: center; opacity: 0.4;"></div>
+
+            {# Overlay dégradé pour lisibilité #}
+            <div class="position-absolute top-0 start-0 w-100 h-100"
+                 style="background: linear-gradient(to bottom, rgba(15, 23, 42, 0.4) 0%, rgba(15, 23, 42, 0.95) 100%);"></div>
+
+            <div class="container position-relative z-2 text-center pt-5">
+                <div class="fade-in-up mx-auto" style="max-width: 800px;">
+
+                    {# TITRE CENTRÉ ET ÉPURÉ (Sans logo au dessus) #}
+                    <h1 class="display-3 fw-bolder text-white mb-4 tracking-tight" style="text-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+                        La prise de rendez-vous <br>
+                        <span class="text-transparent bg-clip-text bg-gradient-primary">simplifiée pour tous.</span>
+                    </h1>
+
+                    <p class="lead text-white-50 mb-5 fs-4" style="max-width: 650px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+                        Centralisez vos disponibilités, gérez vos équipes et offrez une expérience de réservation fluide à vos clients.
+                    </p>
+
+                    <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center mt-4">
+                        <a href="{{ path('connect_microsoft_start') }}" class="btn btn-primary btn-lg px-5 py-3 rounded-pill fw-bold shadow-lg hover-scale">
+                            <i class="fab fa-microsoft me-2"></i> Connexion Microsoft
+                        </a>
+                        <a href="#features" class="btn btn-outline-light btn-lg px-5 py-3 rounded-pill fw-bold hover-scale backdrop-blur">
+                            En savoir plus
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        {# --- FEATURES SECTION --- #}
+        <div id="features" class="py-5" style="background-color: #f8fafc;">
+            <div class="container py-5">
+                <div class="text-center mb-5">
+                    <h2 class="fw-bold display-6 text-dark">Pourquoi utiliser Planifique ?</h2>
+                    <p class="text-muted lead">Tout ce dont vous avez besoin pour gérer votre temps.</p>
+                </div>
+
+                <div class="row g-4">
+                    {# Feature 1 #}
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 shadow-sm hover-card p-4 text-center">
+                            <div class="mb-4 mx-auto d-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle" style="width: 80px; height: 80px;">
+                                <i class="fas fa-sync-alt fa-2x"></i>
+                            </div>
+                            <h3 class="h5 fw-bold text-dark">Synchronisation Outlook</h3>
+                            <p class="text-muted">
+                                Connecté nativement à votre calendrier Microsoft. Fini les doubles réservations, tout est automatique.
+                            </p>
+                        </div>
+                    </div>
+
+                    {# Feature 2 #}
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 shadow-sm hover-card p-4 text-center">
+                            <div class="mb-4 mx-auto d-flex align-items-center justify-content-center bg-success bg-opacity-10 text-success rounded-circle" style="width: 80px; height: 80px;">
+                                <i class="fas fa-users fa-2x"></i>
+                            </div>
+                            <h3 class="h5 fw-bold text-dark">Gestion d'Équipe</h3>
+                            <p class="text-muted">
+                                Répartissez les rendez-vous automatiquement (Round Robin) entre les membres disponibles de votre équipe.
+                            </p>
+                        </div>
+                    </div>
+
+                    {# Feature 3 #}
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 shadow-sm hover-card p-4 text-center">
+                            <div class="mb-4 mx-auto d-flex align-items-center justify-content-center bg-warning bg-opacity-10 text-warning rounded-circle" style="width: 80px; height: 80px;">
+                                <i class="fas fa-calendar-check fa-2x"></i>
+                            </div>
+                            <h3 class="h5 fw-bold text-dark">Disponibilités Flexibles</h3>
+                            <p class="text-muted">
+                                Définissez vos horaires hebdomadaires en toute simplicité. Vous gardez le contrôle total sur votre agenda.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     {% endif %}
 
     <script>
@@ -189,12 +288,26 @@
 
     <style>
         .fade-in { animation: fadeIn 0.8s ease-out forwards; opacity: 0; }
+        .fade-in-up { animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; transform: translateY(30px); }
         @keyframes fadeIn { to { opacity: 1; } }
-        .dashboard-container { min-height: 100vh; background-color: #f8fafc; }
-        .hover-card { transition: all 0.3s ease; }
-        .hover-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
-        .hover-scale { transition: transform 0.3s ease; }
-        .hover-scale:hover { transform: scale(1.02); }
+        @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+
+        .dashboard-container { background-color: transparent; }
+
+        .hover-card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .hover-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important; }
+
+        .hover-scale { transition: transform 0.2s ease; }
+        .hover-scale:hover { transform: scale(1.05); }
+
+        .bg-gradient-primary {
+            background: linear-gradient(to right, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .backdrop-blur { backdrop-filter: blur(5px); }
+
+        /* Correction Modale */
         .modal-backdrop { z-index: 1040 !important; }
         .modal { z-index: 1050 !important; }
         body.modal-open { overflow: hidden !important; padding-right: 0 !important; }

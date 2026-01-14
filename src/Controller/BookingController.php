@@ -6,7 +6,7 @@ use App\Entity\Evenement;
 use App\Entity\RendezVous;
 use App\Entity\User;
 use App\Form\BookingFormType;
-use App\Repository\DisponibiliteRepository;
+use App\Repository\DisponibiliteHebdomadaireRepository;
 use App\Repository\RendezVousRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,10 +18,10 @@ class BookingController extends AbstractController
 {
     // CAS 1 : Lien Personnel (On connaît le conseiller)
     #[Route('/book/{user}/{event}', name: 'app_booking_personal')]
-    public function bookPersonal(User $user, Evenement $event, RendezVousRepository $rdvRepo): Response
+    public function bookPersonal(User $user, Evenement $event, RendezVousRepository $rdvRepo, DisponibiliteHebdomadaireRepository $dispoRepo): Response
     {
-        // On génère les créneaux pour les 14 prochains jours
-        $availableSlots = $this->generateSlots($user, $event, $rdvRepo);
+        // 👇 On passe le dispoRepo à la fonction
+        $availableSlots = $this->generateSlots($user, $event, $rdvRepo, $dispoRepo);
 
         return $this->render('booking/index.html.twig', [
             'conseiller' => $user,
@@ -85,39 +85,78 @@ class BookingController extends AbstractController
     /**
      * Logique de génération des créneaux de 9h à 18h
      */
-    private function generateSlots(User $user, Evenement $event, DisponibiliteRepository $dispoRepo, RendezVousRepository $rdvRepo): array
+    /**
+     * Génère les créneaux basés sur le planning HEBDOMADAIRE
+     */
+    private function generateSlots(User $user, Evenement $event, RendezVousRepository $rdvRepo, DisponibiliteHebdomadaireRepository $dispoRepo): array
     {
         $slotsByDay = [];
         $duration = $event->getDuree();
+        $today = new \DateTime();
 
-        // 1. Récupérer uniquement les créneaux avec le statut 'disponible' pour ce conseiller
-        $disponibilites = $dispoRepo->findBy([
-            'conseiller' => $user,
-            'statut' => 'disponible'
-        ]);
+        // 1. On récupère toutes les règles hebdo du conseiller
+        $disposHebdo = $dispoRepo->findBy(['user' => $user]);
 
-        foreach ($disponibilites as $dispo) {
-            $start = clone $dispo->getDateDebut();
-            $end = $dispo->getDateFin();
-            $dayKey = $start->format('Y-m-d');
+        // On les organise par jour de semaine pour un accès rapide (1 => [Dispo1, Dispo2], 2 => ...)
+        $rulesByDay = [];
+        foreach ($disposHebdo as $dispo) {
+            $rulesByDay[$dispo->getJourSemaine()][] = $dispo;
+        }
 
-            // 2. Découper ces créneaux en fonction de la durée de l'événement
-            while ($start < $end) {
-                $slotStart = clone $start;
-                $slotEnd = (clone $start)->modify("+$duration minutes");
+        // 2. On boucle sur les 30 prochains jours
+        for ($i = 0; $i < 30; $i++) {
+            $date = (clone $today)->modify("+$i days");
+            $dayOfWeek = (int)$date->format('N'); // 1 (Lundi) à 7 (Dimanche)
+            $dayKey = $date->format('Y-m-d');
 
-                // 3. Vérifier si le créneau n'est pas déjà pris par un RendezVous existant
-                $isBusy = $rdvRepo->findOneBy([
-                    'conseiller' => $user,
-                    'dateDebut' => $slotStart
-                ]);
+            // S'il n'y a aucune règle pour ce jour de la semaine, on passe
+            if (!isset($rulesByDay[$dayOfWeek])) {
+                continue;
+            }
 
-                if (!$isBusy && $slotEnd <= $end) {
-                    $slotsByDay[$dayKey][] = $slotStart->format('H:i');
+            $slotsByDay[$dayKey] = [];
+
+            // 3. Pour chaque plage horaire définie ce jour-là (ex: 9h-12h et 14h-17h)
+            foreach ($rulesByDay[$dayOfWeek] as $rule) {
+                // On crée le DateTime de début et fin pour CE jour spécifique
+                $start = (clone $date)->setTime(
+                    (int)$rule->getHeureDebut()->format('H'),
+                    (int)$rule->getHeureDebut()->format('i')
+                );
+                $end = (clone $date)->setTime(
+                    (int)$rule->getHeureFin()->format('H'),
+                    (int)$rule->getHeureFin()->format('i')
+                );
+
+                // 4. On découpe la plage en créneaux
+                while ($start < $end) {
+                    $slotStart = clone $start;
+                    $slotEnd = (clone $start)->modify("+$duration minutes");
+
+                    // Si le créneau dépasse l'heure de fin, on arrête
+                    if ($slotEnd > $end) break;
+
+                    // Vérification : est-ce que ce créneau est déjà pris ?
+                    $isBusy = $rdvRepo->findOneBy([
+                        'conseiller' => $user,
+                        'dateDebut' => $slotStart
+                    ]);
+
+                    if (!$isBusy) {
+                        $slotsByDay[$dayKey][] = $slotStart->format('H:i');
+                    }
+
+                    // On avance au prochain créneau
+                    $start = $slotEnd;
                 }
-                $start->modify("+$duration minutes");
+            }
+
+            // Si la liste est vide pour ce jour (tout est pris), on supprime la clé
+            if (empty($slotsByDay[$dayKey])) {
+                unset($slotsByDay[$dayKey]);
             }
         }
+
         return $slotsByDay;
     }
 }

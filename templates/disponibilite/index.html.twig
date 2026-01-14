@@ -67,10 +67,10 @@
                                     {% endif %}
 
                                     {# 👇 LE BOUTON "+" : Ajouté ici #}
-                                    <button type="button" class="btn btn-link text-primary p-0 border-0 ms-auto"
-                                            title="Ajouter un créneau pour {{ nom }}"
+                                    <button type="button" class="btn btn-link p-0 border-0 ms-auto btn-plus-action"
+                                            title="Ajouter un créneau"
                                             onclick="preselectDay({{ id }})">
-                                        <i class="fas fa-plus-circle fa-lg shadow-sm"></i>
+                                        <i class="fas fa-plus-circle fa-2x"></i>
                                     </button>
                                 </div>
                             </div>
@@ -109,6 +109,17 @@
             height: 100%;
             background-color: #f8fafc !important;
             margin: 0;
+        }
+        /* Animation du bouton "+" */
+        .btn-plus-action {
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Effet rebond */
+            color: #cbd5e1; /* Gris clair par défaut */
+        }
+
+        .btn-plus-action:hover {
+            transform: scale(1.3) rotate(90deg); /* Grossit et tourne */
+            color: #2563eb; /* Devient bleu */
+            cursor: pointer;
         }
     </style>
 {% endblock %}
