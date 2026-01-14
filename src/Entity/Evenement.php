@@ -33,6 +33,9 @@ class Evenement
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private ?bool $isRoundRobin = false;
 
+    #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
+    private ?\DateTimeInterface $dateLimite = null;
+
     #[ORM\ManyToOne(inversedBy: 'evenements')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Groupe $groupe = null;
@@ -120,6 +123,17 @@ class Evenement
     public function setGroupe(?Groupe $groupe): static
     {
         $this->groupe = $groupe;
+        return $this;
+    }
+
+    public function getDateLimite(): ?\DateTimeInterface
+    {
+        return $this->dateLimite;
+    }
+
+    public function setDateLimite(?\DateTimeInterface $dateLimite): static
+    {
+        $this->dateLimite = $dateLimite;
         return $this;
     }
 

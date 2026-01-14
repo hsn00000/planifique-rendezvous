@@ -22,14 +22,21 @@
 
                         <h1 class="fw-bold display-6 mb-3 text-dark">{{ event.titre }}</h1>
 
+                        {# FORMATAGE DURÉE (Minutes -> Heures) #}
                         <div class="d-flex align-items-center text-secondary mb-2">
                             <i class="far fa-clock me-3 fs-5" style="width: 20px;"></i>
-                            <span class="fw-bold">{{ event.duree }} min</span>
+                            <span class="fw-bold">
+                            {% set hours = (event.duree / 60)|round(0, 'floor') %}
+                                {% set minutes = event.duree % 60 %}
+                                {% if hours > 0 %}{{ hours }}h {% endif %}{{ minutes > 0 ? minutes ~ 'min' : '' }}
+                        </span>
                         </div>
-                        <div class="d-flex align-items-center text-secondary">
-                            <i class="fas fa-video me-3 fs-5" style="width: 20px;"></i>
-                            <span class="fw-bold">Visioconférence Teams</span>
-                        </div>
+
+                        {# Suppression de la mention Teams en dur, sauf si tu la veux #}
+                        {# <div class="d-flex align-items-center text-secondary">
+                        <i class="fas fa-video me-3 fs-5" style="width: 20px;"></i>
+                        <span class="fw-bold">Visioconférence</span>
+                    </div> #}
                     </div>
 
                     <div class="mt-auto pt-4 border-top">
@@ -39,54 +46,72 @@
 
                 {# --- COLONNE DROITE (CALENDRIER) --- #}
                 <div class="col-lg-8 bg-white p-5 position-relative">
-                    <h3 class="h5 fw-bold mb-4">Sélectionnez une date et une heure</h3>
+                    <h3 class="h5 fw-bold mb-4 text-center">Sélectionnez une date et une heure</h3>
 
-                    {# --- VUE CALENDRIER --- #}
-                    <div id="calendar-view">
-                        {% for monthData in slotsByDay %}
-                            <div class="mb-5">
-                                <h4 class="text-center fw-bold text-capitalize mb-3" style="color: #334155;">
-                                    {{ monthData.days|first.dateObj|format_datetime(pattern='MMMM y', locale='fr') }}
-                                </h4>
+                    {# --- VUE CALENDRIER (NAVIGATION MOIS PAR MOIS) --- #}
+                    <div id="calendar-view" class="position-relative">
 
-                                {# En-têtes Jours #}
-                                <div class="calendar-grid-header mb-2">
-                                    <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
-                                </div>
+                        {# Contrôles de navigation Mois #}
+                        <div class="d-flex justify-content-between align-items-center mb-4 px-3">
+                            <button onclick="changeMonth(-1)" class="btn btn-light rounded-circle shadow-sm border" id="prev-month-btn" disabled>
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <h4 class="fw-bold text-capitalize mb-0 text-dark" id="current-month-label">
+                                Chargement...
+                            </h4>
+                            <button onclick="changeMonth(1)" class="btn btn-light rounded-circle shadow-sm border" id="next-month-btn">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
 
-                                {# Grille Jours #}
-                                <div class="calendar-grid">
-                                    {# Padding pour le 1er jour (décalage) #}
-                                    {% set firstDay = monthData.days|first %}
-                                    {% set startPadding = firstDay.dateObj|date('N') - 1 %}
-                                    {% if startPadding > 0 %}
-                                        {% for i in 1..startPadding %}
-                                            <div></div>
-                                        {% endfor %}
-                                    {% endif %}
+                        {# En-têtes Jours #}
+                        <div class="calendar-grid-header mb-2 text-center">
+                            <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
+                        </div>
 
-                                    {# Jours #}
-                                    {% for day in monthData.days %}
-                                        {% if day.hasAvailability %}
-                                            {# JOUR CLIQUABLE #}
-                                            <button class="btn btn-day {{ day.isToday ? 'today' : '' }}"
-                                                {# On utilise format_date (juste la date) et on précise locale='fr' #}
-                                                    onclick='showTimeSlots({{ day.slots|json_encode|raw }}, "{{ day.dateObj|format_date('full', locale='fr')|capitalize }}", "{{ day.dateObj|date('Y-m-d') }}")'
-                                            </button>
-                                        {% else %}
-                                            {# JOUR VIDE / PASSÉ #}
-                                            <div class="day-empty">
-                                                {{ day.dayNum }}
-                                            </div>
+                        {# Conteneur des Mois (Tous générés mais masqués par CSS) #}
+                        <div id="months-container">
+                            {% for monthKey, monthData in slotsByDay %}
+                                <div class="calendar-month-grid d-none" data-month-index="{{ loop.index0 }}" data-label="{{ monthData.label|format_datetime(pattern='MMMM y', locale='fr')|capitalize }}">
+                                    {# Grille Jours #}
+                                    <div class="calendar-grid">
+                                        {# Padding début mois #}
+                                        {% set firstDay = monthData.days|first %}
+                                        {% set startPadding = firstDay.dateObj|date('N') - 1 %}
+                                        {% if startPadding > 0 %}
+                                            {% for i in 1..startPadding %}
+                                                <div class="day-spacer"></div>
+                                            {% endfor %}
                                         {% endif %}
-                                    {% endfor %}
+
+                                        {# Jours #}
+                                        {% for day in monthData.days %}
+                                            {% if day.hasAvailability %}
+                                                {# JOUR CLIQUABLE #}
+                                                <button class="btn btn-day {{ day.isToday ? 'today' : '' }}"
+                                                        onclick='showTimeSlots({{ day.slots|json_encode|raw }}, "{{ day.dateObj|format_date('full', locale='fr')|capitalize }}", "{{ day.dateObj|date('Y-m-d') }}")'>
+                                                    {{ day.dayNum }}
+                                                </button>
+                                            {% else %}
+                                                {# JOUR VIDE (Non cliquable, gris clair) #}
+                                                <div class="day-disabled">
+                                                    {{ day.dayNum }}
+                                                </div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
                                 </div>
-                            </div>
-                        {% endfor %}
+                            {% else %}
+                                <div class="text-center py-5">
+                                    <i class="far fa-calendar-times fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">Aucune disponibilité pour les prochains mois.</p>
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
 
                     {# --- VUE HEURES (Cachée par défaut) --- #}
-                    <div id="slots-view" class="d-none h-100 w-100 position-absolute top-0 start-0 bg-white p-5 fade-in" style="z-index: 10;">
+                    <div id="slots-view" class="d-none h-100 w-100 position-absolute top-0 start-0 bg-white p-5 fade-in" style="z-index: 20;">
                         <div class="d-flex align-items-center mb-4">
                             <button onclick="backToCalendar()" class="btn btn-light rounded-circle me-3 shadow-sm border">
                                 <i class="fas fa-arrow-left"></i>
@@ -97,7 +122,7 @@
                             </div>
                         </div>
 
-                        <div class="d-grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));" id="slots-container">
+                        <div class="d-grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));" id="slots-container">
                         </div>
                     </div>
 
@@ -106,29 +131,60 @@
         </div>
     </div>
 
-    {# SCRIPT DYNAMIQUE #}
     <script>
+        let currentMonthIndex = 0;
+        const months = document.querySelectorAll('.calendar-month-grid');
+        const labelTitle = document.getElementById('current-month-label');
+        const prevBtn = document.getElementById('prev-month-btn');
+        const nextBtn = document.getElementById('next-month-btn');
+
+        function updateMonthDisplay() {
+            // Masquer tous les mois
+            months.forEach(el => el.classList.add('d-none'));
+
+            // Afficher le mois courant
+            if (months[currentMonthIndex]) {
+                months[currentMonthIndex].classList.remove('d-none');
+                // Mettre à jour le titre
+                labelTitle.innerText = months[currentMonthIndex].dataset.label;
+            }
+
+            // Gérer l'état des boutons
+            prevBtn.disabled = (currentMonthIndex === 0);
+            nextBtn.disabled = (currentMonthIndex === months.length - 1);
+        }
+
+        function changeMonth(direction) {
+            if (direction === 1 && currentMonthIndex < months.length - 1) {
+                currentMonthIndex++;
+            } else if (direction === -1 && currentMonthIndex > 0) {
+                currentMonthIndex--;
+            }
+            updateMonthDisplay();
+        }
+
+        // Initialisation
+        if (months.length > 0) {
+            updateMonthDisplay();
+        }
+
+        // --- Gestion des Slots (inchangée) ---
         function showTimeSlots(slots, dateLabel, dateValue) {
-            const calendarView = document.getElementById('calendar-view');
             const slotsView = document.getElementById('slots-view');
             const container = document.getElementById('slots-container');
             const label = document.getElementById('selected-date-label');
 
-            // Mise à jour du titre
             label.innerText = dateLabel;
             container.innerHTML = '';
 
-            // Génération des boutons d'heures
             slots.forEach(time => {
                 const btn = document.createElement('a');
-                // Lien vers la confirmation
                 btn.href = `{{ path('app_booking_confirm', {'event': event.id, 'user': conseiller.id}) }}?date=${dateValue} ${time}`;
                 btn.className = 'btn btn-outline-primary fw-bold py-2 slot-anim';
                 btn.innerText = time;
                 container.appendChild(btn);
             });
 
-            // Transition
             slotsView.classList.remove('d-none');
         }
 
@@ -137,73 +193,78 @@
         }
     </script>
 
-    {# STYLE CSS GRID #}
     <style>
         /* Grille Calendrier */
         .calendar-grid-header, .calendar-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            gap: 10px;
+            gap: 8px; /* Espacement réduit pour plus de propreté */
             text-align: center;
         }
         .calendar-grid-header div {
-            font-size: 0.8rem;
-            font-weight: bold;
+            font-size: 0.75rem;
+            font-weight: 700;
             color: #94a3b8;
             text-transform: uppercase;
             margin-bottom: 10px;
         }
 
-        /* Style des Jours */
+        /* Style des Jours Disponibles (Boutons) */
         .btn-day {
-            width: 45px;
-            height: 45px;
+            width: 40px;
+            height: 40px;
             margin: 0 auto;
             border-radius: 50%;
             color: {{ event.couleur|default('#2563eb') }};
-            background-color: rgba(37, 99, 235, 0.1); /* Bleu très clair */
+            background-color: rgba(37, 99, 235, 0.1);
             font-weight: 600;
-            border: none;
+            font-size: 0.9rem;
+            border: 1px solid transparent;
             transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
         }
         .btn-day:hover {
             background-color: {{ event.couleur|default('#2563eb') }};
             color: white;
             transform: scale(1.1);
         }
+
+        /* Indicateur 'Aujourd'hui' */
         .btn-day.today {
-            position: relative;
-        }
-        .btn-day.today::after {
-            content: '';
-            position: absolute;
-            bottom: 4px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 4px;
-            height: 4px;
-            background-color: currentColor;
-            border-radius: 50%;
+            border-color: {{ event.couleur|default('#2563eb') }};
+            font-weight: 800;
         }
 
-        /* Jours vides */
-        .day-empty {
-            width: 45px;
-            height: 45px;
+        /* Jours Indisponibles (Grisés, sans interaction) */
+        .day-disabled {
+            width: 40px;
+            height: 40px;
             margin: 0 auto;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #cbd5e1;
+            color: #cbd5e1; /* Gris très clair */
             font-size: 0.9rem;
+            cursor: default; /* Pas de curseur main */
         }
 
-        /* Animation d'apparition */
+        /* Espaces vides (Début de mois) */
+        .day-spacer {
+            width: 40px;
+            height: 40px;
+        }
+
+        /* Animation Slots */
         .fade-in { animation: fadeIn 0.3s ease-out; }
         .slot-anim { animation: fadeInUp 0.4s ease-out backwards; }
+        /* Décalage d'animation pour effet cascade */
         .slot-anim:nth-child(1) { animation-delay: 0.05s; }
         .slot-anim:nth-child(2) { animation-delay: 0.1s; }
         .slot-anim:nth-child(3) { animation-delay: 0.15s; }
+        .slot-anim:nth-child(4) { animation-delay: 0.2s; }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

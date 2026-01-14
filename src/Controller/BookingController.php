@@ -83,9 +83,6 @@ class BookingController extends AbstractController
     }
 
     /**
-     * Logique de génération des créneaux de 9h à 18h
-     */
-    /**
      * Génère les créneaux basés sur le planning HEBDOMADAIRE
      */
     private function generateSlots(User $user, Evenement $event, RendezVousRepository $rdvRepo, DisponibiliteHebdomadaireRepository $dispoRepo): array
@@ -95,48 +92,55 @@ class BookingController extends AbstractController
 
         // On commence au 1er du mois actuel
         $startPeriod = new \DateTime('first day of this month');
-        // On affiche ce mois-ci et le mois suivant (2 mois de visibilité)
-        $endPeriod = (clone $startPeriod)->modify('+2 months')->modify('-1 day');
+        // On affiche 3 mois de visibilité (ou plus si tu veux)
+        $endPeriod = (clone $startPeriod)->modify('+3 months')->modify('-1 day');
 
-        // 1. Récupération des règles hebdo du conseiller
+        // Récupération de la date limite de l'événement
+        $dateLimite = $event->getDateLimite();
+
+        // 1. Récupération des règles hebdo
         $disposHebdo = $dispoRepo->findBy(['user' => $user]);
         $rulesByDay = [];
         foreach ($disposHebdo as $dispo) {
-            $rulesByDay[$dispo->getJourSemaine()][] = $dispo; // 1 = Lundi, 7 = Dimanche
+            $rulesByDay[$dispo->getJourSemaine()][] = $dispo;
         }
 
         // 2. Boucle jour par jour
         $currentDate = clone $startPeriod;
 
         while ($currentDate <= $endPeriod) {
-            $monthKey = $currentDate->format('F Y'); // Ex: "Janvier 2026"
+            // SI UNE DATE LIMITE EXISTE ET QU'ON LA DÉPASSE : ON ARRÊTE TOUT
+            if ($dateLimite && $currentDate > $dateLimite) {
+                break;
+            }
+
+            $monthKey = $currentDate->format('F Y'); // Clé unique pour le mois (ex: Janvier 2026)
             $dayDate = $currentDate->format('Y-m-d');
             $dayOfWeek = (int)$currentDate->format('N');
 
-            // Initialisation du mois si inexistant
+            // Initialisation du mois
             if (!isset($calendarData[$monthKey])) {
                 $calendarData[$monthKey] = [
-                    'label' => $monthKey,
+                    'label' => $currentDate, // On garde l'objet date pour le filtre twig
                     'days' => []
                 ];
             }
 
-            // Structure du jour
+            // Données du jour
             $dayData = [
                 'dateObj' => clone $currentDate,
                 'dayNum' => $currentDate->format('d'),
                 'isToday' => $dayDate === (new \DateTime())->format('Y-m-d'),
-                'isPast' => $currentDate < new \DateTime('today'),
+                'isPast' => $currentDate < new \DateTime('today'), // Passé
                 'slots' => [],
                 'hasAvailability' => false
             ];
 
-            // Si c'est un jour futur et qu'il y a une règle pour ce jour de la semaine
+            // Si c'est un jour futur et qu'il y a une règle hebdo
             if (!$dayData['isPast'] && isset($rulesByDay[$dayOfWeek])) {
                 foreach ($rulesByDay[$dayOfWeek] as $rule) {
-                    if ($rule->isEstBloque()) continue; // On saute si bloqué par l'admin
+                    if ($rule->isEstBloque()) continue;
 
-                    // Création des bornes pour CE jour précis
                     $start = (clone $currentDate)->setTime(
                         (int)$rule->getHeureDebut()->format('H'),
                         (int)$rule->getHeureDebut()->format('i')
@@ -146,12 +150,10 @@ class BookingController extends AbstractController
                         (int)$rule->getHeureFin()->format('i')
                     );
 
-                    // Découpage en créneaux
                     while ($start < $end) {
                         $slotEnd = (clone $start)->modify("+$duration minutes");
                         if ($slotEnd > $end) break;
 
-                        // Vérif conflit RDV existant
                         $isBusy = $rdvRepo->findOneBy([
                             'conseiller' => $user,
                             'dateDebut' => $start
@@ -170,6 +172,7 @@ class BookingController extends AbstractController
             $currentDate->modify('+1 day');
         }
 
+        // Nettoyage : On retire les mois vides si nécessaire (optionnel)
         return $calendarData;
     }
 }

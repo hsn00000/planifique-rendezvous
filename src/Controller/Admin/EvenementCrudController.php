@@ -10,6 +10,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\ColorField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextEditorField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\DateField;
 
 class EvenementCrudController extends AbstractCrudController
 {
@@ -32,6 +33,8 @@ class EvenementCrudController extends AbstractCrudController
             ColorField::new('couleur', 'Couleur'),
 
             TextEditorField::new('description')->hideOnIndex(),
+
+            DateField::new('dateLimite', 'Date limite de réservation')->setHelp('Après cette date, l\'événement ne sera plus proposé.'),
         ];
     }
 }
