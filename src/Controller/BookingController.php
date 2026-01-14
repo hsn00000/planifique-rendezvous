@@ -21,13 +21,13 @@ class BookingController extends AbstractController
     public function bookPersonal(User $user, Evenement $event, RendezVousRepository $rdvRepo, DisponibiliteHebdomadaireRepository $dispoRepo): Response
     {
         // 👇 On passe le dispoRepo à la fonction
-        $availableSlots = $this->generateSlots($user, $event, $rdvRepo, $dispoRepo);
+        $slotsByDay = $this->generateSlots($user, $event, $rdvRepo, $dispoRepo);
 
         return $this->render('booking/index.html.twig', [
             'conseiller' => $user,
             'event' => $event,
             'isRoundRobin' => false,
-            'slotsByDay' => $availableSlots
+            'slotsByDay' => $slotsByDay
         ]);
     }
 
@@ -90,89 +90,90 @@ class BookingController extends AbstractController
         $calendarData = [];
         $duration = $event->getDuree();
 
-        // On commence au 1er du mois actuel
+        // 1. DÉBUT : 1er du mois actuel
         $startPeriod = new \DateTime('first day of this month');
-        // On affiche 3 mois de visibilité (ou plus si tu veux)
-        $endPeriod = (clone $startPeriod)->modify('+3 months')->modify('-1 day');
 
-        // Récupération de la date limite de l'événement
+        // 2. FIN : Logique intelligente
         $dateLimite = $event->getDateLimite();
 
-        // 1. Récupération des règles hebdo
+        if ($dateLimite) {
+            // Si une date limite existe, on s'arrête exactement à cette date
+            // On clone pour éviter de modifier l'objet original
+            $endPeriod = clone $dateLimite;
+
+            // Sécurité : si la date limite est passée, on ne montre rien
+            if ($endPeriod < new \DateTime('today')) {
+                return [];
+            }
+        } else {
+            // Si PAS de date limite, on ouvre sur 1 AN glissant (12 mois)
+            $endPeriod = (clone $startPeriod)->modify('+12 months')->modify('last day of this month');
+        }
+
         $disposHebdo = $dispoRepo->findBy(['user' => $user]);
         $rulesByDay = [];
         foreach ($disposHebdo as $dispo) {
             $rulesByDay[$dispo->getJourSemaine()][] = $dispo;
         }
 
-        // 2. Boucle jour par jour
         $currentDate = clone $startPeriod;
 
+        // On boucle jour par jour jusqu'à la fin de la période
         while ($currentDate <= $endPeriod) {
-            // SI UNE DATE LIMITE EXISTE ET QU'ON LA DÉPASSE : ON ARRÊTE TOUT
-            if ($dateLimite && $currentDate > $dateLimite) {
-                break;
-            }
 
-            $monthKey = $currentDate->format('F Y'); // Clé unique pour le mois (ex: Janvier 2026)
-            $dayDate = $currentDate->format('Y-m-d');
-            $dayOfWeek = (int)$currentDate->format('N');
+            // Clé de tri Y-m (ex: 2026-05) pour l'ordre chronologique
+            $sortKey = $currentDate->format('Y-m');
 
-            // Initialisation du mois
-            if (!isset($calendarData[$monthKey])) {
-                $calendarData[$monthKey] = [
-                    'label' => $currentDate, // On garde l'objet date pour le filtre twig
+            if (!isset($calendarData[$sortKey])) {
+                $calendarData[$sortKey] = [
+                    'label' => clone $currentDate,
                     'days' => []
                 ];
             }
 
-            // Données du jour
             $dayData = [
                 'dateObj' => clone $currentDate,
                 'dayNum' => $currentDate->format('d'),
-                'isToday' => $dayDate === (new \DateTime())->format('Y-m-d'),
-                'isPast' => $currentDate < new \DateTime('today'), // Passé
+                'isToday' => $currentDate->format('Y-m-d') === (new \DateTime())->format('Y-m-d'),
+                'isPast' => $currentDate < new \DateTime('today'),
                 'slots' => [],
                 'hasAvailability' => false
             ];
 
-            // Si c'est un jour futur et qu'il y a une règle hebdo
-            if (!$dayData['isPast'] && isset($rulesByDay[$dayOfWeek])) {
-                foreach ($rulesByDay[$dayOfWeek] as $rule) {
-                    if ($rule->isEstBloque()) continue;
+            // Calcul des créneaux
+            if (!$dayData['isPast']) {
+                $dayOfWeek = (int)$currentDate->format('N');
 
-                    $start = (clone $currentDate)->setTime(
-                        (int)$rule->getHeureDebut()->format('H'),
-                        (int)$rule->getHeureDebut()->format('i')
-                    );
-                    $end = (clone $currentDate)->setTime(
-                        (int)$rule->getHeureFin()->format('H'),
-                        (int)$rule->getHeureFin()->format('i')
-                    );
+                if (isset($rulesByDay[$dayOfWeek])) {
+                    foreach ($rulesByDay[$dayOfWeek] as $rule) {
+                        if ($rule->isEstBloque()) continue;
 
-                    while ($start < $end) {
-                        $slotEnd = (clone $start)->modify("+$duration minutes");
-                        if ($slotEnd > $end) break;
+                        $start = (clone $currentDate)->setTime((int)$rule->getHeureDebut()->format('H'), (int)$rule->getHeureDebut()->format('i'));
+                        $end = (clone $currentDate)->setTime((int)$rule->getHeureFin()->format('H'), (int)$rule->getHeureFin()->format('i'));
 
-                        $isBusy = $rdvRepo->findOneBy([
-                            'conseiller' => $user,
-                            'dateDebut' => $start
-                        ]);
+                        while ($start < $end) {
+                            $slotEnd = (clone $start)->modify("+$duration minutes");
+                            if ($slotEnd > $end) break;
 
-                        if (!$isBusy) {
-                            $dayData['slots'][] = $start->format('H:i');
-                            $dayData['hasAvailability'] = true;
+                            $isBusy = $rdvRepo->findOneBy(['conseiller' => $user, 'dateDebut' => $start]);
+                            if (!$isBusy) {
+                                $dayData['slots'][] = $start->format('H:i');
+                                $dayData['hasAvailability'] = true;
+                            }
+                            $start = $slotEnd;
                         }
-                        $start = $slotEnd;
                     }
                 }
             }
 
-            $calendarData[$monthKey]['days'][] = $dayData;
+            $calendarData[$sortKey]['days'][] = $dayData;
             $currentDate->modify('+1 day');
         }
 
-        // Nettoyage : On retire les mois vides si nécessaire (optionnel)
-        return $calendarData;
+        ksort($calendarData); // Tri chronologique des mois
+
+        // On nettoie : si un mois n'a AUCUNE disponibilité (tout vide), on pourrait le laisser
+        // mais c'est mieux de l'afficher pour montrer la continuité.
+        return array_values($calendarData);
     }
 }

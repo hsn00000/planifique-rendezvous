@@ -1,4 +1,3 @@
-{# templates/booking/index.html.twig #}
 {% extends 'base_public.html.twig' %}
 
 {% block title %}Réserver - {{ event.titre }}{% endblock %}
@@ -6,35 +5,24 @@
 {% block body %}
     <div class="container d-flex align-items-center justify-content-center min-vh-100 py-5">
 
-        <div class="card border-0 shadow-xl overflow-hidden" style="border-radius: 16px; width: 100%; max-width: 1000px; min-height: 600px; box-shadow: 0 20px 40px rgba(0,0,0,0.08);">
+        <div class="card border-0 shadow-lg overflow-hidden" style="border-radius: 16px; width: 100%; max-width: 1000px; min-height: 600px;">
             <div class="row g-0 h-100">
 
-                {# ================================= #}
-                {# COLONNE GAUCHE : INFOS DU RDV     #}
-                {# ================================= #}
-                <div class="col-lg-4 bg-white border-end p-4 p-md-5 d-flex flex-column position-relative">
-
-                    {# Bouton Retour #}
-                    <div class="mb-4">
-                        <a href="{{ path('app_home') }}" class="btn btn-light btn-sm rounded-circle border shadow-sm" title="Retour à l'accueil" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-                            <i class="fas fa-arrow-left text-muted" style="font-size: 0.8rem;"></i>
-                        </a>
-                    </div>
-
-                    {# Logo (Optionnel) #}
-                    <div class="mb-4">
-                        <img src="{{ asset('img/logo.png') }}" alt="Logo" style="height: 35px; width: auto; opacity: 0.8;">
+                {# --- GAUCHE : INFOS --- #}
+                <div class="col-lg-4 bg-white border-end p-4 p-md-5 d-flex flex-column">
+                    <div class="mb-5">
+                        <img src="{{ asset('img/logo.png') }}" alt="Planifique" style="height: 40px; width: auto;">
                     </div>
 
                     <div class="mb-4">
                         <div class="text-muted small text-uppercase fw-bold ls-1 mb-1">Conseiller</div>
-                        <div class="fw-bold text-dark h5 mb-4">{{ conseiller.firstName }} {{ conseiller.lastName }}</div>
-
-                        <hr class="border-light my-4">
+                        <div class="d-flex align-items-center mb-4">
+                            <div class="avatar-initials me-3">{{ conseiller.firstName|first }}{{ conseiller.lastName|first }}</div>
+                            <div class="fw-bold text-dark h5 mb-0">{{ conseiller.firstName }} {{ conseiller.lastName }}</div>
+                        </div>
 
                         <h1 class="fw-bold h4 mb-3 text-dark">{{ event.titre }}</h1>
 
-                        {# Durée #}
                         <div class="d-flex align-items-center text-secondary mb-2">
                             <i class="far fa-clock me-3 text-muted" style="width: 20px; text-align: center;"></i>
                             <span class="fw-bold text-dark">
@@ -50,12 +38,9 @@
                     </div>
                 </div>
 
-                {# ================================= #}
-                {# COLONNE DROITE : CALENDRIER       #}
-                {# ================================= #}
+                {# --- DROITE : CALENDRIER --- #}
                 <div class="col-lg-8 bg-white position-relative d-flex flex-column">
 
-                    {# --- VUE CALENDRIER --- #}
                     <div id="calendar-container" class="p-4 p-md-5 flex-grow-1 h-100 d-flex flex-column">
                         <h3 class="h5 fw-bold mb-4 text-dark">Sélectionnez une date</h3>
 
@@ -74,28 +59,25 @@
                             </div>
                         </div>
 
-                        {# En-têtes Jours #}
+                        {# En-têtes #}
                         <div class="calendar-header mb-3 text-center">
                             <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
                         </div>
 
-                        {# Conteneur des Mois #}
+                        {# Mois #}
                         <div id="months-wrapper" class="flex-grow-1 position-relative">
-                            {% for monthKey, monthData in slotsByDay %}
-                                {# ATTENTION : On utilise data-label pour le JS #}
+                            {% for monthData in slotsByDay %}
                                 <div class="month-grid d-none w-100"
                                      data-index="{{ loop.index0 }}"
-                                     data-label="{{ monthData.label|format_datetime(pattern='MMMM y', locale='fr')|capitalize }}">
+                                     data-label="{{ monthData.label|format_datetime(pattern='MMMM yyyy', locale='fr')|capitalize }}">
 
                                     <div class="calendar-grid">
-                                        {# Padding début mois #}
                                         {% set firstDay = monthData.days|first %}
                                         {% set startPadding = firstDay.dateObj|date('N') - 1 %}
                                         {% if startPadding > 0 %}
                                             {% for i in 1..startPadding %}<div></div>{% endfor %}
                                         {% endif %}
 
-                                        {# Jours #}
                                         {% for day in monthData.days %}
                                             {% if day.hasAvailability %}
                                                 <button class="btn btn-day {{ day.isToday ? 'today' : '' }}"
@@ -110,17 +92,15 @@
                                 </div>
                             {% else %}
                                 <div class="text-center py-5">
-                                    <i class="far fa-calendar-times fa-2x text-muted mb-3 opacity-50"></i>
-                                    <p class="text-muted small">Aucune disponibilité trouvée.</p>
+                                    <p class="text-muted">Aucune disponibilité.</p>
                                 </div>
                             {% endfor %}
                         </div>
                     </div>
 
-                    {# --- VUE PANNEAU HEURES (Slide Over) --- #}
+                    {# Panneau Heures #}
                     <div id="slots-panel" class="bg-white border-start h-100 position-absolute top-0 end-0 shadow-lg d-none"
                          style="width: 300px; z-index: 100; transition: transform 0.3s ease;">
-
                         <div class="p-4 h-100 d-flex flex-column">
                             <div class="d-flex align-items-center justify-content-between mb-4">
                                 <h5 class="fw-bold mb-0 text-dark fs-6" id="selected-date-title">Date</h5>
@@ -130,8 +110,7 @@
                             </div>
 
                             <div class="flex-grow-1 overflow-auto custom-scrollbar pe-2">
-                                <div class="d-grid gap-2" id="slots-list">
-                                </div>
+                                <div class="d-grid gap-2" id="slots-list"></div>
                             </div>
                         </div>
                     </div>
@@ -141,7 +120,6 @@
         </div>
     </div>
 
-    {# SCRIPT #}
     <script>
         let currentIndex = 0;
         const months = document.querySelectorAll('.month-grid');
@@ -151,21 +129,17 @@
         const slotsPanel = document.getElementById('slots-panel');
 
         function updateCalendar() {
-            // 1. Masquer tous les mois
-            months.forEach(m => m.classList.add('d-none'));
+            months.forEach((m, index) => {
+                if (index === currentIndex) {
+                    m.classList.remove('d-none');
+                    label.textContent = m.dataset.label;
+                } else {
+                    m.classList.add('d-none');
+                }
+            });
 
-            // 2. Afficher le bon mois
-            if (months[currentIndex]) {
-                months[currentIndex].classList.remove('d-none');
-                // Mise à jour du titre (Mai 2026, Juin 2026...)
-                label.textContent = months[currentIndex].dataset.label;
-            }
-
-            // 3. Gestion boutons
             prevBtn.disabled = (currentIndex === 0);
             nextBtn.disabled = (currentIndex === months.length - 1);
-
-            // Style visuel des boutons désactivés
             prevBtn.style.opacity = (currentIndex === 0) ? '0.3' : '1';
             nextBtn.style.opacity = (currentIndex === months.length - 1) ? '0.3' : '1';
         }
@@ -174,103 +148,69 @@
             if (dir === 1 && currentIndex < months.length - 1) currentIndex++;
             if (dir === -1 && currentIndex > 0) currentIndex--;
             updateCalendar();
-            closeSlots(); // Fermer le panneau des heures si on change de mois
+            closeSlots();
         }
 
-        // Lancer au démarrage
-        if (months.length > 0) {
-            updateCalendar();
-        } else {
-            label.textContent = "Aucune date";
-        }
+        if (months.length > 0) updateCalendar();
 
-        // --- Gestion des Heures ---
         function selectDate(btn, slots, dateText, dateValue) {
-            // Active visual state
             document.querySelectorAll('.btn-day').forEach(b => b.classList.remove('active-day'));
             btn.classList.add('active-day');
-
-            // Update Panel
             document.getElementById('selected-date-title').textContent = dateText;
             const list = document.getElementById('slots-list');
             list.innerHTML = '';
 
             slots.forEach(time => {
                 const link = document.createElement('a');
-                // Construction de l'URL de confirmation
                 link.href = `{{ path('app_booking_confirm', {'event': event.id, 'user': conseiller.id}) }}?date=${dateValue} ${time}`;
-                link.className = 'btn btn-outline-primary fw-bold w-100 py-2 mb-1 slot-btn';
+                link.className = 'btn btn-outline-primary fw-bold w-100 py-3 mb-2 slot-btn';
                 link.textContent = time;
                 list.appendChild(link);
             });
-
-            // Show Panel
             slotsPanel.classList.remove('d-none');
-            slotsPanel.classList.add('d-flex');
         }
 
         function closeSlots() {
             slotsPanel.classList.add('d-none');
-            slotsPanel.classList.remove('d-flex');
             document.querySelectorAll('.btn-day').forEach(b => b.classList.remove('active-day'));
         }
     </script>
 
-    {# STYLE #}
     <style>
-        /* CSS Grid pour le calendrier */
-        .calendar-header, .calendar-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 8px;
-            text-align: center;
-        }
-        .calendar-header div {
-            font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;
-        }
+        :root { --primary-color: #2563eb; --primary-light: #eff6ff; }
 
-        /* Bouton Jour */
+        .calendar-header, .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; text-align: center; }
+        .calendar-header div { font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
+
         .btn-day {
-            width: 40px; height: 40px;
-            margin: 0 auto;
-            border-radius: 50%;
-            border: 1px solid transparent;
-            background-color: #f1f5f9; /* Gris très clair par défaut */
-            color: {{ event.couleur|default('#2563eb') }};
-            font-weight: 600; font-size: 0.9rem;
-            transition: all 0.2s;
+            width: 45px; height: 45px; margin: 0 auto; border-radius: 50%; border: 1px solid transparent;
+            background-color: #f8fafc; color: var(--primary-color);
+            font-weight: 600; font-size: 0.95rem; transition: all 0.2s;
             display: flex; align-items: center; justify-content: center;
         }
         .btn-day:hover, .active-day {
-            background-color: {{ event.couleur|default('#2563eb') }} !important;
+            background-color: var(--primary-color) !important;
             color: white !important;
             transform: scale(1.1);
             cursor: pointer;
         }
+        .today { border-color: var(--primary-color); background-color: white; }
+        .day-disabled { width: 45px; height: 45px; margin: 0 auto; display: flex; align-items: center; justify-content: center; color: #cbd5e1; cursor: default; }
 
-        /* Jour Aujourd'hui */
-        .today {
-            border-color: {{ event.couleur|default('#2563eb') }};
-            background-color: white;
+        .avatar-initials {
+            width: 48px; height: 48px; background-color: var(--primary-color); color: white;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;
         }
 
-        /* Jours vides */
-        .day-disabled {
-            width: 40px; height: 40px; margin: 0 auto;
-            display: flex; align-items: center; justify-content: center;
-            color: #cbd5e1; font-size: 0.9rem;
-            cursor: default;
+        .slot-btn {
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            transition: 0.2s;
         }
-
-        /* Scrollbar panneau heures */
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
-
-        /* Slot Buttons */
         .slot-btn:hover {
-            background-color: {{ event.couleur|default('#2563eb') }};
-            border-color: {{ event.couleur|default('#2563eb') }};
+            background-color: var(--primary-color);
             color: white;
+            transform: translateX(5px);
         }
     </style>
 {% endblock %}
