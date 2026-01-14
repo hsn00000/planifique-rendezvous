@@ -23,8 +23,7 @@ class DashboardController extends AbstractDashboardController
     public function configureDashboard(): Dashboard
     {
         return Dashboard::new()
-            // 👇 C'est ici que ça se passe : HTML dans le titre
-            ->setTitle('<img src="/img/logo.png" style="height: 35px; margin-right: 5px; vertical-align: middle;"> Planifique <span style="font-size: 0.8em; color: #777;">Admin</span>')
+            ->setTitle('<img src="/img/logo.png" style="height: 35px; margin-right: 10px; vertical-align: text-bottom;"> Planifique <span style="font-size: 0.8em; color: #777;">Admin</span>')
             ->setFaviconPath('img/logo.png')
             ->renderContentMaximized();
     }

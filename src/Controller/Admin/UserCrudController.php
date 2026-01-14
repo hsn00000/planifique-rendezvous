@@ -12,6 +12,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\ArrayField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\EmailField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use EasyCorp\Bundle\EasyAdminBundle\Filter\EntityFilter;
 use EasyCorp\Bundle\EasyAdminBundle\Filter\TextFilter; // 👈 Pour les filtres
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 
@@ -34,12 +35,16 @@ class UserCrudController extends AbstractCrudController
             ->setSearchFields(['firstName', 'lastName', 'email']);
     }
 
-    // 👇 2. AJOUT DES FILTRES DE CONSEILLERS
     public function configureFilters(Filters $filters): Filters
     {
         return $filters
-            ->add(TextFilter::new('lastName', 'Nom de famille'))
-            ->add(TextFilter::new('email', 'Email'));
+            // Filtre par Entité (Génère une liste déroulante automatique avec tous les users)
+            ->add(EntityFilter::new('id', 'Sélectionner un collaborateur') // On filtre sur l'ID mais on affiche le nom
+            ->setFormTypeOption('value_type_options.class', User::class)
+                ->setFormTypeOption('value_type_options.choice_label', function (User $u) {
+                    return $u->__toString(); // Affiche "Prénom Nom"
+                })
+            );
     }
 
     public function configureActions(Actions $actions): Actions

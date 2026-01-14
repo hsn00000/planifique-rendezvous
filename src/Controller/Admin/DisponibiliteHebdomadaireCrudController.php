@@ -28,18 +28,11 @@ class DisponibiliteHebdomadaireCrudController extends AbstractCrudController
             ->setDefaultSort(['jourSemaine' => 'ASC', 'heureDebut' => 'ASC']);
     }
 
-    // 👇 C'EST ICI QUE TOUT SE JOUE
     public function configureFilters(Filters $filters): Filters
     {
         return $filters
-            // 1. Filtre Technique (Obligatoire pour recevoir le clic depuis "Collaborateurs")
-            // On le laisse, mais on le met en second plan ou on le nomme "Conseiller affiché"
-            ->add(EntityFilter::new('user', 'Conseiller affiché'))
+            ->add(BooleanFilter::new('estBloque', '🔒 Verrouillé ?'));
 
-            // 2. Filtre Métier (Celui que tu veux utiliser ICI)
-            ->add(BooleanFilter::new('estBloque', 'Filtrer par état')
-                ->setLabel('Afficher les créneaux verrouillés ?')
-            );
     }
 
     public function configureFields(string $pageName): iterable
