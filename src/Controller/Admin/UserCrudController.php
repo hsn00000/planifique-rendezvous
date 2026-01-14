@@ -25,21 +25,26 @@ class UserCrudController extends AbstractCrudController
 
     public function configureActions(Actions $actions): Actions
     {
-        // 👇 CRÉATION DU BOUTON "VOIR PLANNING"
-        $viewSchedule = Action::new('viewSchedule', 'Gérer Planning', 'fas fa-calendar-alt')
+        // Création de l'action personnalisée
+        $viewSchedule = Action::new('viewSchedule', 'Planning Hebdo')
+            ->setIcon('fas fa-calendar-alt') // Icône calendrier
             ->linkToUrl(function (User $user) {
-                // On génère l'URL vers le contrôleur des dispos
                 return $this->adminUrlGenerator
                     ->setController(DisponibiliteHebdomadaireCrudController::class)
                     ->setAction(Action::INDEX)
-                    // On applique le filtre automatiquement pour n'afficher que CE user
+                    // Le filtre magique qui isole les horaires de CE user
                     ->set('filters', ['user' => ['value' => $user->getId(), 'comparison' => '=']])
                     ->generateUrl();
             })
-            ->setCssClass('btn btn-outline-primary'); // Style du bouton
+            // 👇 Astuce UI : On ne met pas de classe CSS lourde, on laisse EasyAdmin gérer
+            ->setHtmlAttributes(['title' => 'Gérer les disponibilités de ce conseiller']);
 
         return $actions
-            ->add(Crud::PAGE_INDEX, $viewSchedule);
+            // On ajoute le bouton sur la ligne de chaque utilisateur (PAGE_INDEX)
+            ->add(Crud::PAGE_INDEX, $viewSchedule)
+
+            // Optionnel : on le met aussi sur la page de détail si tu l'utilises
+            ->add(Crud::PAGE_DETAIL, $viewSchedule);
     }
 
     public function configureFields(string $pageName): iterable

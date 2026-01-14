@@ -245,4 +245,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
         return $this;
     }
+
+    public function __toString(): string
+    {
+        // On retourne le Nom Complet ou l'email si pas de nom
+        return $this->firstName && $this->lastName
+            ? $this->firstName . ' ' . $this->lastName
+            : $this->email;
+    }
 }
