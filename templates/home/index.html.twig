@@ -15,10 +15,15 @@
                 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-5 fade-in">
                     <div>
                         <h1 class="fw-bold text-dark mb-1">
-                            Bonjour, <span style="color: #2563eb;">{{ app.user.firstName|default('Conseiller') }}</span>
+                            Bonjour, <span style="color: #2563eb;">{{ app.user.firstName|default('Utilisateur') }}</span>
                         </h1>
                         <p class="text-muted">
-                            {% if app.user.groupe %}
+                            {# LOGIQUE D'AFFICHAGE INTELLIGENTE #}
+                            {% if is_granted('ROLE_ADMIN') %}
+                                <span class="badge bg-warning text-dark border-0">
+                                    <i class="fas fa-crown me-1"></i> Administrateur Global
+                                </span>
+                            {% elseif app.user.groupe %}
                                 Membre du <strong>{{ app.user.groupe.nom }}</strong>
                             {% else %}
                                 Votre compte n'est pas encore affilié à un groupe.
@@ -39,61 +44,76 @@
                     <div class="row mb-5 fade-in" style="animation-delay: 0.1s;">
                         <div class="col-12">
                             <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white;">
-                                <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-center">
-                                    <div class="mb-3 mb-md-0">
-                                        <h2 class="h5 fw-bold mb-1"><i class="fas fa-user-shield me-2 text-warning"></i> Espace Administration</h2>
-                                        <p class="mb-0 text-white-50">Vous avez les droits d'accès au Back-Office pour gérer l'application.</p>
+                                <div class="card-body p-5 d-flex flex-column flex-md-row justify-content-between align-items-center">
+                                    <div class="mb-4 mb-md-0">
+                                        <h2 class="h4 fw-bold mb-2"><i class="fas fa-user-shield me-2 text-warning"></i> Gestion de l'Application</h2>
+                                        <p class="mb-0 text-white-50">
+                                            Vous n'avez pas besoin d'être affilié à un groupe.<br>
+                                            Accédez au Back-Office pour gérer les équipes et les événements.
+                                        </p>
                                     </div>
-                                    <a href="{{ path('admin') }}" class="btn btn-warning fw-bold px-4 py-2 rounded-pill shadow-lg hover-scale text-dark">
+                                    <a href="{{ path('admin') }}" class="btn btn-warning fw-bold px-5 py-3 rounded-pill shadow-lg hover-scale text-dark">
                                         <i class="fas fa-cogs me-2"></i> Accéder au Back-Office
                                     </a>
                                 </div>
                             </div>
                         </div>
                     </div>
-                {% endif %}
 
-                {# Grille de cartes (Événements du groupe) #}
-                <h3 class="h6 text-uppercase text-muted fw-bold mb-4 fade-in">Vos Événements de Groupe</h3>
+                    {# ==================================================== #}
+                    {# 📅 ZONE CONSEILLER (Visible si PAS Admin)            #}
+                    {# ==================================================== #}
+                {% else %}
 
-                {% if evenements is defined and evenements|length > 0 %}
-                    <div class="row g-4">
-                        {% for event in evenements %}
-                            <div class="col-md-4 col-lg-3 fade-in" style="animation-delay: {{ loop.index0 * 0.1 }}s;">
-                                <div class="card h-100 border-0 shadow-sm hover-card event-card">
-                                    <div class="card-body p-4 d-flex flex-column" style="border-top: 4px solid {{ event.couleur|default('#2563eb') }};">
+                    {# Grille de cartes (Événements du groupe) #}
+                    <h3 class="h6 text-uppercase text-muted fw-bold mb-4 fade-in">Vos Événements de Groupe</h3>
 
-                                        <div class="d-flex justify-content-between align-items-start mb-3">
-                                            <span class="badge bg-light text-dark border">{{ event.duree }} min</span>
-                                            {% if event.visioUrl %}
-                                                <i class="fas fa-video text-primary" title="Visio disponible"></i>
-                                            {% endif %}
+                    {% if evenements is defined and evenements|length > 0 %}
+                        <div class="row g-4">
+                            {% for event in evenements %}
+                                <div class="col-md-4 col-lg-3 fade-in" style="animation-delay: {{ loop.index0 * 0.1 }}s;">
+                                    <div class="card h-100 border-0 shadow-sm hover-card event-card">
+                                        <div class="card-body p-4 d-flex flex-column" style="border-top: 4px solid {{ event.couleur|default('#2563eb') }};">
+
+                                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                                <span class="badge bg-light text-dark border">{{ event.duree }} min</span>
+                                                {% if event.visioUrl %}
+                                                    <i class="fas fa-video text-primary" title="Visio disponible"></i>
+                                                {% endif %}
+                                            </div>
+
+                                            <h3 class="h6 fw-bold text-dark mb-2">
+                                                {{ event.titre }}
+                                            </h3>
+
+                                            <p class="text-muted small mb-4 flex-grow-1">
+                                                {{ event.description|default('Aucune description.')|slice(0, 80) }}...
+                                            </p>
+
+                                            <button class="btn btn-sm btn-outline-primary rounded-pill w-100 mt-auto">
+                                                Copier le lien
+                                            </button>
                                         </div>
-
-                                        <h3 class="h6 fw-bold text-dark mb-2">
-                                            {{ event.titre }}
-                                        </h3>
-
-                                        <p class="text-muted small mb-4 flex-grow-1">
-                                            {{ event.description|default('Aucune description.')|slice(0, 80) }}...
-                                        </p>
-
-                                        <button class="btn btn-sm btn-outline-primary rounded-pill w-100 mt-auto">
-                                            Copier le lien
-                                        </button>
                                     </div>
                                 </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-
-                {% elseif app.user.groupe %}
-                    <div class="text-center py-5 fade-in">
-                        <div class="alert alert-light d-inline-block shadow-sm border-0">
-                            <i class="fas fa-info-circle text-primary me-2"></i> Aucun type d'événement configuré pour le groupe <strong>{{ app.user.groupe.nom }}</strong>.
+                            {% endfor %}
                         </div>
-                    </div>
-                {% endif %}
+
+                    {% elseif app.user.groupe %}
+                        <div class="text-center py-5 fade-in">
+                            <div class="alert alert-light d-inline-block shadow-sm border-0">
+                                <i class="fas fa-info-circle text-primary me-2"></i> Aucun type d'événement configuré pour le groupe <strong>{{ app.user.groupe.nom }}</strong>.
+                            </div>
+                        </div>
+                    {% else %}
+                        {# Cas : Pas de groupe (et pas Admin) #}
+                        <div class="alert alert-warning shadow-sm border-0 fade-in">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Votre compte n'est pas encore affilié à un groupe. Contactez votre administrateur ou vérifiez votre fiche Microsoft Entra.
+                        </div>
+                    {% endif %}
+
+                {% endif %} {# Fin du bloc Conseiller #}
 
             </div>
         </div>
