@@ -58,33 +58,6 @@
                             </span>
                         </div>
 
-                        {# 2. Lieu / Visio #}
-                        <div class="d-flex align-items-start">
-                            <div style="width: 24px;" class="me-2 text-center pt-1">
-                                {% if event.visioUrl %}
-                                    <i class="fa-solid fa-video fs-5"></i>
-                                {% else %}
-                                    <i class="fa-solid fa-location-dot fs-5"></i>
-                                {% endif %}
-                            </div>
-                            <div>
-                                <span class="text-dark d-block fw-bold">
-                                    {% if event.visioUrl %}
-                                        Visioconférence
-                                    {% else %}
-                                        Présentiel
-                                    {% endif %}
-                                </span>
-                                <span class="small text-muted">
-                                    {% if event.visioUrl %}
-                                        Les détails de connexion seront fournis après confirmation.
-                                    {% else %}
-                                        L'adresse exacte vous sera communiquée par email.
-                                    {% endif %}
-                                </span>
-                            </div>
-                        </div>
-
                         {# 3. Description #}
                         {% if event.description %}
                             <div class="d-flex align-items-start mt-2">

@@ -3,8 +3,12 @@
 namespace App\Controller;
 
 use App\Entity\Evenement;
+use App\Entity\RendezVous;
 use App\Entity\User;
+use App\Form\BookingFormType;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -32,6 +36,32 @@ class BookingController extends AbstractController
             'conseiller' => null, // Pas de conseiller affiché
             'event' => $event,
             'isRoundRobin' => true
+        ]);
+    }
+
+    #[Route('/book/confirm/{event}/{user?}', name: 'app_booking_confirm')]
+    public function confirm(Request $request, Evenement $event, ?User $user, EntityManagerInterface $em): Response
+    {
+        $rendezVous = new RendezVous();
+        $rendezVous->setEvenement($event);
+        if ($user) $rendezVous->setConseiller($user);
+
+        $form = $this->createForm(BookingFormType::class, $rendezVous);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $em->persist($rendezVous);
+            $em->flush();
+
+            return $this->render('booking/success.html.twig', [
+                'rendezVous' => $rendezVous
+            ]);
+        }
+
+        return $this->render('booking/confirm.html.twig', [
+            'event' => $event,
+            'conseiller' => $user,
+            'form' => $form->createView(),
         ]);
     }
 }

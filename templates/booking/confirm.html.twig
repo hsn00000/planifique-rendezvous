@@ -1,0 +1,45 @@
+{% extends 'base_public.html.twig' %}
+
+{% block body %}
+    <div class="container py-5">
+        <div class="card shadow-sm border-0 mx-auto" style="max-width: 800px; border-radius: 15px;">
+            <div class="card-body p-5">
+                <h2 class="fw-bold mb-4">Finaliser votre rendez-vous</h2>
+                <p class="text-muted">Type : <strong>{{ event.titre }}</strong> ({{ event.duree }} min)</p>
+
+                {{ form_start(form) }}
+                <div class="row">
+                    <div class="col-md-6 mb-3">{{ form_row(form.prenom) }}</div>
+                    <div class="col-md-6 mb-3">{{ form_row(form.nom) }}</div>
+                </div>
+                <div class="mb-3">{{ form_row(form.email) }}</div>
+                <div class="mb-3">{{ form_row(form.telephone) }}</div>
+
+                <div class="bg-light p-4 rounded mb-3">
+                    {{ form_row(form.typeLieu) }}
+
+                    <div id="adresse-field" style="display: none;" class="mt-3">
+                        {{ form_row(form.adresse) }}
+                    </div>
+                </div>
+
+                <button class="btn btn-primary w-100 py-3 fw-bold rounded-pill">Confirmer la réservation</button>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Logique pour afficher/cacher l'adresse
+        document.querySelectorAll('input[name="booking_form[typeLieu]"]').forEach((input) => {
+            input.addEventListener('change', function() {
+                const adresseField = document.getElementById('adresse-field');
+                if (this.value === 'domicile') {
+                    adresseField.style.display = 'block';
+                } else {
+                    adresseField.style.display = 'none';
+                }
+            });
+        });
+    </script>
+{% endblock %}
