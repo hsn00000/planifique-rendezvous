@@ -90,73 +90,86 @@ class BookingController extends AbstractController
      */
     private function generateSlots(User $user, Evenement $event, RendezVousRepository $rdvRepo, DisponibiliteHebdomadaireRepository $dispoRepo): array
     {
-        $slotsByDay = [];
+        $calendarData = [];
         $duration = $event->getDuree();
-        $today = new \DateTime();
 
-        // 1. On récupère toutes les règles hebdo du conseiller
+        // On commence au 1er du mois actuel
+        $startPeriod = new \DateTime('first day of this month');
+        // On affiche ce mois-ci et le mois suivant (2 mois de visibilité)
+        $endPeriod = (clone $startPeriod)->modify('+2 months')->modify('-1 day');
+
+        // 1. Récupération des règles hebdo du conseiller
         $disposHebdo = $dispoRepo->findBy(['user' => $user]);
-
-        // On les organise par jour de semaine pour un accès rapide (1 => [Dispo1, Dispo2], 2 => ...)
         $rulesByDay = [];
         foreach ($disposHebdo as $dispo) {
-            $rulesByDay[$dispo->getJourSemaine()][] = $dispo;
+            $rulesByDay[$dispo->getJourSemaine()][] = $dispo; // 1 = Lundi, 7 = Dimanche
         }
 
-        // 2. On boucle sur les 30 prochains jours
-        for ($i = 0; $i < 30; $i++) {
-            $date = (clone $today)->modify("+$i days");
-            $dayOfWeek = (int)$date->format('N'); // 1 (Lundi) à 7 (Dimanche)
-            $dayKey = $date->format('Y-m-d');
+        // 2. Boucle jour par jour
+        $currentDate = clone $startPeriod;
 
-            // S'il n'y a aucune règle pour ce jour de la semaine, on passe
-            if (!isset($rulesByDay[$dayOfWeek])) {
-                continue;
+        while ($currentDate <= $endPeriod) {
+            $monthKey = $currentDate->format('F Y'); // Ex: "Janvier 2026"
+            $dayDate = $currentDate->format('Y-m-d');
+            $dayOfWeek = (int)$currentDate->format('N');
+
+            // Initialisation du mois si inexistant
+            if (!isset($calendarData[$monthKey])) {
+                $calendarData[$monthKey] = [
+                    'label' => $monthKey,
+                    'days' => []
+                ];
             }
 
-            $slotsByDay[$dayKey] = [];
+            // Structure du jour
+            $dayData = [
+                'dateObj' => clone $currentDate,
+                'dayNum' => $currentDate->format('d'),
+                'isToday' => $dayDate === (new \DateTime())->format('Y-m-d'),
+                'isPast' => $currentDate < new \DateTime('today'),
+                'slots' => [],
+                'hasAvailability' => false
+            ];
 
-            // 3. Pour chaque plage horaire définie ce jour-là (ex: 9h-12h et 14h-17h)
-            foreach ($rulesByDay[$dayOfWeek] as $rule) {
-                // On crée le DateTime de début et fin pour CE jour spécifique
-                $start = (clone $date)->setTime(
-                    (int)$rule->getHeureDebut()->format('H'),
-                    (int)$rule->getHeureDebut()->format('i')
-                );
-                $end = (clone $date)->setTime(
-                    (int)$rule->getHeureFin()->format('H'),
-                    (int)$rule->getHeureFin()->format('i')
-                );
+            // Si c'est un jour futur et qu'il y a une règle pour ce jour de la semaine
+            if (!$dayData['isPast'] && isset($rulesByDay[$dayOfWeek])) {
+                foreach ($rulesByDay[$dayOfWeek] as $rule) {
+                    if ($rule->isEstBloque()) continue; // On saute si bloqué par l'admin
 
-                // 4. On découpe la plage en créneaux
-                while ($start < $end) {
-                    $slotStart = clone $start;
-                    $slotEnd = (clone $start)->modify("+$duration minutes");
+                    // Création des bornes pour CE jour précis
+                    $start = (clone $currentDate)->setTime(
+                        (int)$rule->getHeureDebut()->format('H'),
+                        (int)$rule->getHeureDebut()->format('i')
+                    );
+                    $end = (clone $currentDate)->setTime(
+                        (int)$rule->getHeureFin()->format('H'),
+                        (int)$rule->getHeureFin()->format('i')
+                    );
 
-                    // Si le créneau dépasse l'heure de fin, on arrête
-                    if ($slotEnd > $end) break;
+                    // Découpage en créneaux
+                    while ($start < $end) {
+                        $slotEnd = (clone $start)->modify("+$duration minutes");
+                        if ($slotEnd > $end) break;
 
-                    // Vérification : est-ce que ce créneau est déjà pris ?
-                    $isBusy = $rdvRepo->findOneBy([
-                        'conseiller' => $user,
-                        'dateDebut' => $slotStart
-                    ]);
+                        // Vérif conflit RDV existant
+                        $isBusy = $rdvRepo->findOneBy([
+                            'conseiller' => $user,
+                            'dateDebut' => $start
+                        ]);
 
-                    if (!$isBusy) {
-                        $slotsByDay[$dayKey][] = $slotStart->format('H:i');
+                        if (!$isBusy) {
+                            $dayData['slots'][] = $start->format('H:i');
+                            $dayData['hasAvailability'] = true;
+                        }
+                        $start = $slotEnd;
                     }
-
-                    // On avance au prochain créneau
-                    $start = $slotEnd;
                 }
             }
 
-            // Si la liste est vide pour ce jour (tout est pris), on supprime la clé
-            if (empty($slotsByDay[$dayKey])) {
-                unset($slotsByDay[$dayKey]);
-            }
+            $calendarData[$monthKey]['days'][] = $dayData;
+            $currentDate->modify('+1 day');
         }
 
-        return $slotsByDay;
+        return $calendarData;
     }
 }

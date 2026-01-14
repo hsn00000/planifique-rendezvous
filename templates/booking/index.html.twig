@@ -3,117 +3,209 @@
 {% block title %}Réserver - {{ event.titre }}{% endblock %}
 
 {% block body %}
-    <div class="container" style="max-width: 1060px;">
-        <div class="card border-0 shadow-calendly fade-in-up overflow-hidden" style="border-radius: 8px; min-height: 650px;">
+    <div class="container d-flex align-items-center justify-content-center min-vh-100 py-5">
+
+        <div class="card border-0 shadow-lg overflow-hidden" style="border-radius: 24px; width: 100%; max-width: 1100px; min-height: 650px;">
             <div class="row g-0 h-100">
 
-                {# --- COLONNE GAUCHE (Récap) --- #}
-                <div class="col-lg-4 p-5 d-flex flex-column border-end bg-white">
-                    <div class="d-flex align-items-center mb-5">
-                        <img src="{{ asset('img/logo.png') }}" width="30" class="me-2">
-                        <span class="fw-bold text-dark text-uppercase ls-1 small">Planifique</span>
+                {# --- COLONNE GAUCHE (INFO) --- #}
+                <div class="col-lg-4 bg-white border-end p-5 d-flex flex-column">
+                    <div class="mb-5">
+                        <a href="{{ path('app_home') }}" class="btn btn-outline-light text-muted btn-sm rounded-circle shadow-sm border">
+                            <i class="fas fa-arrow-left"></i>
+                        </a>
                     </div>
 
-                    <div class="mb-2">
-                        <p class="text-muted small fw-bold mb-1 text-uppercase">Conseiller</p>
-                        <h2 class="h5 fw-bold text-dark mb-0">{{ conseiller.firstName }} {{ conseiller.lastName }}</h2>
-                    </div>
+                    <div class="mb-4">
+                        <div class="text-muted text-uppercase small fw-bold mb-2 ls-1">Conseiller</div>
+                        <h2 class="h5 fw-bold text-dark mb-4">{{ conseiller.firstName }} {{ conseiller.lastName }}</h2>
 
-                    <h1 class="h3 fw-bold text-dark mb-4">{{ event.titre }}</h1>
+                        <h1 class="fw-bold display-6 mb-3 text-dark">{{ event.titre }}</h1>
 
-                    <div class="d-flex flex-column gap-3 text-secondary mt-2">
-                        <div class="d-flex align-items-start">
-                            <div style="width: 24px;" class="me-2 text-center pt-1"><i class="fa-regular fa-clock fs-5"></i></div>
-                            <span class="fw-bold text-dark">
-                            {% set hours = (event.duree / 60)|round(0, 'floor') %}{% set minutes = event.duree % 60 %}
-                                {% if hours > 0 %}{{ hours }} h {% endif %}{{ minutes > 0 ? minutes ~ ' min' : '' }}
-                        </span>
+                        <div class="d-flex align-items-center text-secondary mb-2">
+                            <i class="far fa-clock me-3 fs-5" style="width: 20px;"></i>
+                            <span class="fw-bold">{{ event.duree }} min</span>
                         </div>
+                        <div class="d-flex align-items-center text-secondary">
+                            <i class="fas fa-video me-3 fs-5" style="width: 20px;"></i>
+                            <span class="fw-bold">Visioconférence Teams</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto pt-4 border-top">
+                        <p class="text-muted small mb-0">{{ event.description|striptags }}</p>
                     </div>
                 </div>
 
-                {# --- COLONNE DROITE (Calendrier & Slots) --- #}
-                <div class="col-lg-8 p-5 bg-white d-flex flex-column">
-                    <h3 class="h4 fw-bold text-dark mb-4">Sélectionner une date et heure</h3>
+                {# --- COLONNE DROITE (CALENDRIER) --- #}
+                <div class="col-lg-8 bg-white p-5 position-relative">
+                    <h3 class="h5 fw-bold mb-4">Sélectionnez une date et une heure</h3>
 
-                    <div class="row h-100">
-                        {# Partie Calendrier #}
-                        <div class="col-md-7 border-end pe-4">
-                            <div id="calendar-grid" class="d-grid" style="grid-template-columns: repeat(7, 1fr); gap: 5px;">
-                                {# En-tête jours #}
-                                {% for day in ['L', 'M', 'M', 'J', 'V', 'S', 'D'] %}
-                                    <div class="text-center small fw-bold text-muted pb-2">{{ day }}</div>
-                                {% endfor %}
+                    {# --- VUE CALENDRIER --- #}
+                    <div id="calendar-view">
+                        {% for monthData in slotsByDay %}
+                            <div class="mb-5">
+                                <h4 class="text-center fw-bold text-capitalize mb-3" style="color: #334155;">
+                                    {{ monthData.days|first.dateObj|format_datetime(pattern='MMMM y', locale='fr') }}
+                                </h4>
 
-                                {# Génération des jours cliquables #}
-                                {% for dayKey, slots in slotsByDay %}
-                                    <button type="button"
-                                            class="btn btn-outline-primary border-0 rounded-circle day-btn p-0"
-                                            style="width: 40px; height: 40px; margin: auto;"
-                                            data-day="{{ dayKey }}"
-                                            onclick="showSlots('{{ dayKey }}')">
-                                        {{ dayKey|date('j') }}
-                                    </button>
-                                {% endfor %}
-                            </div>
-                        </div>
+                                {# En-têtes Jours #}
+                                <div class="calendar-grid-header mb-2">
+                                    <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
+                                </div>
 
-                        {# Partie Heures (Cachée par défaut) #}
-                        <div class="col-md-5 ps-4" id="slots-container">
-                            <div class="text-center text-muted mt-5" id="no-day-selected">
-                                <p class="small">Sélectionnez un jour pour voir les créneaux.</p>
-                            </div>
+                                {# Grille Jours #}
+                                <div class="calendar-grid">
+                                    {# Padding pour le 1er jour (décalage) #}
+                                    {% set firstDay = monthData.days|first %}
+                                    {% set startPadding = firstDay.dateObj|date('N') - 1 %}
+                                    {% if startPadding > 0 %}
+                                        {% for i in 1..startPadding %}
+                                            <div></div>
+                                        {% endfor %}
+                                    {% endif %}
 
-                            <div id="slots-list" class="d-none" style="max-height: 400px; overflow-y: auto;">
-                                <h6 class="fw-bold mb-3" id="selected-date-label">Date</h6>
-                                <div id="slots-buttons" class="d-flex flex-column gap-2">
-                                    {# Les boutons d'heures seront injectés ici en JS #}
+                                    {# Jours #}
+                                    {% for day in monthData.days %}
+                                        {% if day.hasAvailability %}
+                                            {# JOUR CLIQUABLE #}
+                                            <button class="btn btn-day {{ day.isToday ? 'today' : '' }}"
+                                                {# On utilise format_date (juste la date) et on précise locale='fr' #}
+                                                    onclick='showTimeSlots({{ day.slots|json_encode|raw }}, "{{ day.dateObj|format_date('full', locale='fr')|capitalize }}", "{{ day.dateObj|date('Y-m-d') }}")'
+                                            </button>
+                                        {% else %}
+                                            {# JOUR VIDE / PASSÉ #}
+                                            <div class="day-empty">
+                                                {{ day.dayNum }}
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
                                 </div>
                             </div>
+                        {% endfor %}
+                    </div>
+
+                    {# --- VUE HEURES (Cachée par défaut) --- #}
+                    <div id="slots-view" class="d-none h-100 w-100 position-absolute top-0 start-0 bg-white p-5 fade-in" style="z-index: 10;">
+                        <div class="d-flex align-items-center mb-4">
+                            <button onclick="backToCalendar()" class="btn btn-light rounded-circle me-3 shadow-sm border">
+                                <i class="fas fa-arrow-left"></i>
+                            </button>
+                            <div>
+                                <h4 class="fw-bold mb-0" id="selected-date-label">Date</h4>
+                                <small class="text-muted">Fuseau horaire : Europe/Paris</small>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));" id="slots-container">
                         </div>
                     </div>
 
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between">
-                        <div class="small text-muted"><i class="fa-solid fa-earth-americas me-1"></i> Europe/Paris</div>
-                    </div>
                 </div>
-
             </div>
         </div>
     </div>
 
     {# SCRIPT DYNAMIQUE #}
     <script>
-        const slotsData = {{ slotsByDay|json_encode|raw }};
+        function showTimeSlots(slots, dateLabel, dateValue) {
+            const calendarView = document.getElementById('calendar-view');
+            const slotsView = document.getElementById('slots-view');
+            const container = document.getElementById('slots-container');
+            const label = document.getElementById('selected-date-label');
 
-        function showSlots(day) {
-            document.getElementById('no-day-selected').classList.add('d-none');
-            document.getElementById('slots-list').classList.remove('d-none');
+            // Mise à jour du titre
+            label.innerText = dateLabel;
+            container.innerHTML = '';
 
-            const label = new Date(day).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-            document.getElementById('selected-date-label').innerText = label;
+            // Génération des boutons d'heures
+            slots.forEach(time => {
+                const btn = document.createElement('a');
+                // Lien vers la confirmation
+                btn.href = `{{ path('app_booking_confirm', {'event': event.id, 'user': conseiller.id}) }}?date=${dateValue} ${time}`;
+                btn.className = 'btn btn-outline-primary fw-bold py-2 slot-anim';
+                btn.innerText = time;
+                container.appendChild(btn);
+            });
 
-            const buttonsContainer = document.getElementById('slots-buttons');
-            buttonsContainer.innerHTML = '';
+            // Transition
+            slotsView.classList.remove('d-none');
+        }
 
-            if (slotsData[day] && slotsData[day].length > 0) {
-                slotsData[day].forEach(time => {
-                    const btn = document.createElement('a');
-                    btn.href = `{{ path('app_booking_confirm', {'event': event.id, 'user': conseiller.id}) }}?date=${day} ${time}`;
-                    btn.className = "btn btn-outline-primary fw-bold py-2";
-                    btn.innerText = time;
-                    buttonsContainer.appendChild(btn);
-                });
-            } else {
-                buttonsContainer.innerHTML = '<p class="text-danger small">Aucun créneau disponible.</p>';
-            }
+        function backToCalendar() {
+            document.getElementById('slots-view').classList.add('d-none');
         }
     </script>
 
+    {# STYLE CSS GRID #}
     <style>
-        .day-btn:hover { background-color: #e0e7ff; color: #2563eb; }
-        .day-btn.active { background-color: #2563eb; color: white; }
-        #slots-list::-webkit-scrollbar { width: 5px; }
-        #slots-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        /* Grille Calendrier */
+        .calendar-grid-header, .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            text-align: center;
+        }
+        .calendar-grid-header div {
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #94a3b8;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        /* Style des Jours */
+        .btn-day {
+            width: 45px;
+            height: 45px;
+            margin: 0 auto;
+            border-radius: 50%;
+            color: {{ event.couleur|default('#2563eb') }};
+            background-color: rgba(37, 99, 235, 0.1); /* Bleu très clair */
+            font-weight: 600;
+            border: none;
+            transition: all 0.2s ease;
+        }
+        .btn-day:hover {
+            background-color: {{ event.couleur|default('#2563eb') }};
+            color: white;
+            transform: scale(1.1);
+        }
+        .btn-day.today {
+            position: relative;
+        }
+        .btn-day.today::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background-color: currentColor;
+            border-radius: 50%;
+        }
+
+        /* Jours vides */
+        .day-empty {
+            width: 45px;
+            height: 45px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #cbd5e1;
+            font-size: 0.9rem;
+        }
+
+        /* Animation d'apparition */
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        .slot-anim { animation: fadeInUp 0.4s ease-out backwards; }
+        .slot-anim:nth-child(1) { animation-delay: 0.05s; }
+        .slot-anim:nth-child(2) { animation-delay: 0.1s; }
+        .slot-anim:nth-child(3) { animation-delay: 0.15s; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 {% endblock %}

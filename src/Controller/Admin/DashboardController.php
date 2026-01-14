@@ -54,7 +54,7 @@ class DashboardController extends AbstractDashboardController
 
         yield MenuItem::section('Gestion');
         yield MenuItem::linkToCrud('Groupes', 'fas fa-users', Groupe::class);
-        yield MenuItem::linkToCrud('Types d\'Événements', 'fas fa-calendar-check', Evenement::class);
+        yield MenuItem::linkToCrud('Événements', 'fas fa-calendar-check', Evenement::class);
         yield MenuItem::linkToCrud('Collaborateurs', 'fas fa-user-tie', User::class);
 
 

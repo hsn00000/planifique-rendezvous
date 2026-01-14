@@ -45,6 +45,7 @@
         "symfony/yaml": "8.0.*",
         "thenetworg/oauth2-azure": "^2.2.3",
         "twig/extra-bundle": "^2.12|^3.0",
+        "twig/intl-extra": "^3.22",
         "twig/twig": "^2.12|^3.0"
     },
     "config": {

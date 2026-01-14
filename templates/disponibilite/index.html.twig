@@ -57,7 +57,7 @@
                                             <div class="badge bg-primary bg-opacity-10 text-primary p-2 d-flex align-items-center gap-2 border border-primary border-opacity-25" style="border-radius: 10px;">
                                                 <span class="fw-bold">{{ dispo.heureDebut|date('H:i') }} - {{ dispo.heureFin|date('H:i') }}</span>
 
-                                                {% if dispo.isBlocked %}
+                                                {% if dispo.estBloque %}
                                                     {# CAS BLOQUÉ : Cadenas + Pas de lien de suppression #}
                                                     <i class="fas fa-lock text-danger" title="Verrouillé par l'administration"></i>
                                                 {% else %}
