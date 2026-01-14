@@ -1,0 +1,114 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    <div class="container py-5">
+        <div class="d-flex justify-content-between align-items-center mb-5">
+            <div>
+                <h1 class="fw-bold h3 mb-1">Planning Hebdomadaire</h1>
+                <p class="text-muted">Définissez vos horaires habituels de travail.</p>
+            </div>
+            <a href="{{ path('app_home') }}" class="btn btn-outline-secondary rounded-pill px-4">Retour</a>
+        </div>
+
+        <div class="row g-4">
+            {# FORMULAIRE DE SAISIE (GAUCHE) #}
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm p-4 sticky-top" style="top: 20px; border-radius: 20px;">
+                    <h5 class="fw-bold mb-3">Ajouter un créneau</h5>
+                    <form action="{{ path('app_dispo_add') }}" method="POST" id="form-add-dispo">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Jour</label>
+                            <select name="jour" id="select-jour" class="form-select border-0 bg-light">
+                                {% for id, nom in libellesJours %}
+                                    <option value="{{ id }}">{{ nom }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Début</label>
+                                <input type="time" name="start" class="form-control border-0 bg-light" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Fin</label>
+                                <input type="time" name="end" class="form-control border-0 bg-light" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold py-2">Enregistrer</button>
+                    </form>
+                </div>
+            </div>
+
+            {# LISTE PAR JOUR (DROITE) #}
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm" style="border-radius: 20px; overflow: hidden;">
+                    <div class="card-body p-0">
+                        {% for id, nom in libellesJours %}
+                            <div class="p-4 {% if not loop.last %}border-bottom{% endif %} d-flex align-items-center">
+                                <div class="fw-bold text-dark" style="width: 120px;">{{ nom }}</div>
+
+                                <div class="flex-grow-1 d-flex flex-wrap align-items-center gap-2">
+                                    {% set active = false %}
+
+                                    {% for dispo in dispos %}
+                                        {% if dispo.jourSemaine == id %}
+                                            {% set active = true %}
+                                            <div class="badge bg-primary bg-opacity-10 text-primary p-2 d-flex align-items-center gap-2 border border-primary border-opacity-25" style="border-radius: 10px;">
+                                                <span class="fw-bold">{{ dispo.heureDebut|date('H:i') }} - {{ dispo.heureFin|date('H:i') }}</span>
+                                                <a href="{{ path('app_dispo_delete', {id: dispo.id}) }}" class="text-primary opacity-50 hover-opacity-100">
+                                                    <i class="fas fa-times-circle"></i>
+                                                </a>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    {% if not active %}
+                                        <span class="text-muted small italic me-2">Indisponible</span>
+                                    {% endif %}
+
+                                    {# 👇 LE BOUTON "+" : Ajouté ici #}
+                                    <button type="button" class="btn btn-link text-primary p-0 border-0 ms-auto"
+                                            title="Ajouter un créneau pour {{ nom }}"
+                                            onclick="preselectDay({{ id }})">
+                                        <i class="fas fa-plus-circle fa-lg shadow-sm"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# SCRIPT JS POUR AMÉLIORER L'EXPÉRIENCE #}
+    <script>
+        function preselectDay(dayId) {
+            // 1. On sélectionne le jour dans le menu déroulant
+            const select = document.getElementById('select-jour');
+            select.value = dayId;
+
+            // 2. On met le focus sur le champ "Heure de début"
+            const startTimeInput = document.querySelector('input[name="start"]');
+            startTimeInput.focus();
+
+            // 3. Petit feedback visuel (effet de pulsation sur le formulaire)
+            const formCard = select.closest('.card');
+            formCard.style.transition = "transform 0.2s ease";
+            formCard.style.transform = "scale(1.02)";
+            setTimeout(() => { formCard.style.transform = "scale(1)"; }, 200);
+        }
+    </script>
+
+    <style>
+        .btn-link:hover { transform: scale(1.1); transition: transform 0.2s; }
+        .hover-opacity-100:hover { opacity: 1 !important; }
+
+        /* Correction du trou blanc en forçant le fond sur toute la page */
+        html, body {
+            height: 100%;
+            background-color: #f8fafc !important;
+            margin: 0;
+        }
+    </style>
+{% endblock %}

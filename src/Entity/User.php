@@ -52,9 +52,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: RendezVous::class, mappedBy: 'conseiller')]
     private Collection $rendezVouses;
 
+    /**
+     * @var Collection<int, DisponibiliteHebdomadaire>
+     */
+    #[ORM\OneToMany(targetEntity: DisponibiliteHebdomadaire::class, mappedBy: 'user')]
+    private Collection $disponibiliteHebdomadaires;
+
+
     public function __construct()
     {
         $this->rendezVouses = new ArrayCollection();
+        $this->disponibiliteHebdomadaires = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -202,6 +210,36 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             // set the owning side to null (unless already changed)
             if ($rendezVouse->getConseiller() === $this) {
                 $rendezVouse->setConseiller(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, DisponibiliteHebdomadaire>
+     */
+    public function getDisponibiliteHebdomadaires(): Collection
+    {
+        return $this->disponibiliteHebdomadaires;
+    }
+
+    public function addDisponibiliteHebdomadaire(DisponibiliteHebdomadaire $disponibiliteHebdomadaire): static
+    {
+        if (!$this->disponibiliteHebdomadaires->contains($disponibiliteHebdomadaire)) {
+            $this->disponibiliteHebdomadaires->add($disponibiliteHebdomadaire);
+            $disponibiliteHebdomadaire->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeDisponibiliteHebdomadaire(DisponibiliteHebdomadaire $disponibiliteHebdomadaire): static
+    {
+        if ($this->disponibiliteHebdomadaires->removeElement($disponibiliteHebdomadaire)) {
+            // set the owning side to null (unless already changed)
+            if ($disponibiliteHebdomadaire->getUser() === $this) {
+                $disponibiliteHebdomadaire->setUser(null);
             }
         }
 

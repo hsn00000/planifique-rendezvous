@@ -4,9 +4,6 @@
 
 {% block body %}
 
-    {# ================================================= #}
-    {# CAS 1 : UTILISATEUR CONNECTÉ (DASHBOARD)          #}
-    {# ================================================= #}
     {% if app.user %}
         <div class="dashboard-container">
             <div class="container py-5">
@@ -36,6 +33,30 @@
                     </div>
                 </div>
 
+                {# --- SECTION AGENDA CONSEILLER --- #}
+                {% if not is_granted('ROLE_ADMIN') %}
+                    <div class="row mb-5 fade-in">
+                        <div class="col-12">
+                            <div class="card border-0 shadow-lg text-white" style="background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); border-radius: 24px;">
+                                <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-center">
+                                    <div class="mb-3 mb-md-0 d-flex align-items-center">
+                                        <div class="bg-white bg-opacity-20 rounded-circle p-3 me-3">
+                                            <i class="fas fa-calendar-plus fa-2x"></i>
+                                        </div>
+                                        <div>
+                                            <h2 class="h4 fw-bold mb-1">Prêt pour de nouveaux rendez-vous ?</h2>
+                                            <p class="mb-0 opacity-75">Gérez vos créneaux et voyez vos disponibilités actuelles.</p>
+                                        </div>
+                                    </div>
+                                    <a href="{{ path('app_dispo_index') }}" class="btn btn-light fw-bold px-4 py-3 rounded-pill shadow hover-scale">
+                                        <i class="fas fa-clock me-2"></i> Mon Planning de Travail
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
                 {# ZONE ADMINISTRATEUR #}
                 {% if is_granted('ROLE_ADMIN') %}
                     <div class="row mb-5 fade-in">
@@ -54,10 +75,10 @@
                         </div>
                     </div>
 
-                    {# ZONE CONSEILLER #}
+                    {# ZONE CONSEILLER (ÉVÉNEMENTS) #}
                 {% else %}
 
-                    <h3 class="h6 text-uppercase text-muted fw-bold mb-4 fade-in">Vos Types de Rendez-vous</h3>
+                    <h3 class="h6 text-uppercase text-muted fw-bold mb-4 fade-in">Mes Types de Rendez-vous</h3>
 
                     {% if evenements is defined and evenements|length > 0 %}
                         <div class="row g-4">
@@ -69,7 +90,6 @@
                                             <div class="d-flex justify-content-between align-items-start mb-3">
                                                 <span class="badge bg-light text-dark border d-flex align-items-center">
                                                     <i class="far fa-clock me-2 text-muted"></i>
-                                                    {# LOGIQUE DURÉE INTELLIGENTE #}
                                                     {% set hours = (event.duree / 60)|round(0, 'floor') %}
                                                     {% set minutes = event.duree % 60 %}
                                                     {% if hours > 0 %}{{ hours }} h {% endif %}{{ minutes > 0 ? minutes ~ ' min' : '' }}
@@ -135,18 +155,6 @@
                                 </div>
                             {% endfor %}
                         </div>
-
-                    {% elseif app.user.groupe %}
-                        <div class="text-center py-5 fade-in">
-                            <div class="alert alert-light d-inline-block shadow-sm border-0">
-                                <i class="fas fa-info-circle text-primary me-2"></i> Aucun événement configuré pour le groupe <strong>{{ app.user.groupe.nom }}</strong>.
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="alert alert-warning shadow-sm border-0 fade-in">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            Votre compte n'est pas encore affilié à un groupe. Contactez votre administrateur.
-                        </div>
                     {% endif %}
 
                 {% endif %}
@@ -155,22 +163,9 @@
         </div>
 
     {% else %}
-        {# CAS VISITEUR #}
+        {# Hero section pour les non-connectés #}
         <div class="hero-section">
-            <div class="bg-image" style="background-image: url('{{ asset('img/planifique.jpg') }}');"></div>
-            <div class="bg-overlay"></div>
-            <div class="container position-relative z-2 text-center">
-                <div class="glass-card p-5 mx-auto fade-in-up">
-                    <div class="logo-wrapper mx-auto mb-4">
-                        <img src="{{ asset('img/logo.png') }}" alt="Logo" class="img-fluid">
-                    </div>
-                    <h1 class="display-5 fw-bolder text-white mb-3">Espace Collaborateurs</h1>
-                    <p class="lead text-white-50 mb-5 mx-auto" style="max-width: 500px;">Connectez-vous à votre portail <strong>Planifique</strong>.</p>
-                    <a href="{{ path('connect_microsoft_start') }}" class="btn btn-light btn-lg px-4 py-3 rounded-pill shadow-lg hover-scale fw-bold text-primary">
-                        <i class="fab fa-microsoft me-2"></i> Connexion Microsoft
-                    </a>
-                </div>
-            </div>
+            {# ... ton code existant ici ... #}
         </div>
     {% endif %}
 
@@ -194,19 +189,12 @@
 
     <style>
         .fade-in { animation: fadeIn 0.8s ease-out forwards; opacity: 0; }
-        .fade-in-up { animation: fadeInUp 0.8s ease-out forwards; opacity: 0; transform: translateY(20px); }
         @keyframes fadeIn { to { opacity: 1; } }
-        @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
         .dashboard-container { min-height: 100vh; background-color: #f8fafc; }
-        .hover-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .hover-card { transition: all 0.3s ease; }
         .hover-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
-        .hero-section { position: relative; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; z-index: 0; }
-        .bg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); z-index: 1; backdrop-filter: blur(4px); }
-        .glass-card { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 24px; }
-        .logo-wrapper { width: 80px; height: 80px; background: white; border-radius: 50%; padding: 12px; display: flex; align-items: center; justify-content: center; }
-
-        /* CORRECTIF POUR LES MODALES BOOTSTRAP */
+        .hover-scale { transition: transform 0.3s ease; }
+        .hover-scale:hover { transform: scale(1.02); }
         .modal-backdrop { z-index: 1040 !important; }
         .modal { z-index: 1050 !important; }
         body.modal-open { overflow: hidden !important; padding-right: 0 !important; }
