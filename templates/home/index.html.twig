@@ -36,9 +36,9 @@
                     </div>
                 </div>
 
-                {# ZONE ADMIN (Visible uniquement par Admin) #}
+                {# ZONE ADMINISTRATEUR #}
                 {% if is_granted('ROLE_ADMIN') %}
-                    <div class="row mb-5 fade-in" style="animation-delay: 0.1s;">
+                    <div class="row mb-5 fade-in">
                         <div class="col-12">
                             <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white;">
                                 <div class="card-body p-5 d-flex flex-column flex-md-row justify-content-between align-items-center">
@@ -54,33 +54,25 @@
                         </div>
                     </div>
 
-                    {# ZONE CONSEILLER (Visible si PAS Admin) #}
+                    {# ZONE CONSEILLER #}
                 {% else %}
 
-                    <h3 class="h6 text-uppercase text-muted fw-bold mb-4 fade-in">Vos Evenements</h3>
+                    <h3 class="h6 text-uppercase text-muted fw-bold mb-4 fade-in">Vos Types de Rendez-vous</h3>
 
                     {% if evenements is defined and evenements|length > 0 %}
                         <div class="row g-4">
                             {% for event in evenements %}
-                                <div class="col-md-4 col-lg-3 fade-in" style="animation-delay: {{ loop.index0 * 0.1 }}s;">
-
-                                    {# CARTE ÉVÉNEMENT #}
-                                    <div class="card h-100 border-0 shadow-sm hover-card event-card">
+                                <div class="col-md-4 col-lg-3">
+                                    <div class="card h-100 border-0 shadow-sm hover-card event-card fade-in" style="animation-delay: {{ loop.index0 * 0.1 }}s;">
                                         <div class="card-body p-4 d-flex flex-column" style="border-top: 5px solid {{ event.couleur|default('#2563eb') }};">
 
-                                            {# En-tête de la carte (Durée & Type) #}
                                             <div class="d-flex justify-content-between align-items-start mb-3">
                                                 <span class="badge bg-light text-dark border d-flex align-items-center">
                                                     <i class="far fa-clock me-2 text-muted"></i>
-                                                    {# --- 🕒 LOGIQUE DURÉE INTELLIGENTE --- #}
+                                                    {# LOGIQUE DURÉE INTELLIGENTE #}
                                                     {% set hours = (event.duree / 60)|round(0, 'floor') %}
                                                     {% set minutes = event.duree % 60 %}
-
-                                                    {% if hours > 0 %}
-                                                        {{ hours }} h {{ minutes > 0 ? minutes ~ ' min' : '' }}
-                                                    {% else %}
-                                                        {{ minutes }} min
-                                                    {% endif %}
+                                                    {% if hours > 0 %}{{ hours }} h {% endif %}{{ minutes > 0 ? minutes ~ ' min' : '' }}
                                                 </span>
                                             </div>
 
@@ -90,74 +82,56 @@
                                                 {{ event.description|default('Aucune description.')|striptags|slice(0, 80) }}...
                                             </p>
 
-                                            {# LOGIQUE DE LIEN INTELLIGENTE #}
+                                            {# LIEN DE PARTAGE #}
                                             {% if event.isRoundRobin %}
-                                                {# Lien d'équipe (Round Robin) #}
-                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_home') }}book/team/{{ event.id }}">
+                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_booking_roundrobin', {'event': event.id}) }}">
                                                 <div class="badge bg-warning text-dark mb-3 w-100 py-2"><i class="fas fa-random me-1"></i> Équipe (Auto)</div>
                                             {% else %}
-                                                {# Lien personnel (Conseiller Spécifique) #}
-                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_home') }}book/{{ app.user.id }}/{{ event.id }}">
+                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_booking_personal', {'user': app.user.id, 'event': event.id}) }}">
                                             {% endif %}
 
-                                            {# Bouton Copier #}
                                             <button class="btn btn-sm btn-outline-primary rounded-pill w-100 mt-auto btn-copy mb-2"
                                                     onclick="copierLien(this, 'link-{{ event.id }}')">
                                                 <span class="icon-text"><i class="far fa-copy me-2"></i> Copier le lien</span>
                                                 <span class="success-text d-none"><i class="fas fa-check me-2"></i> Lien copié !</span>
                                             </button>
 
-                                            {# Bouton Voir Détails #}
-                                            <button type="button" class="btn btn-sm btn-light rounded-pill w-100 text-muted" data-bs-toggle="modal" data-bs-target="#modalEvent{{ event.id }}">
+                                            <button type="button" class="btn btn-sm btn-light rounded-pill w-100 text-muted"
+                                                    data-bs-toggle="modal" data-bs-target="#modalEvent{{ event.id }}">
                                                 <i class="far fa-eye me-1"></i> Détails
                                             </button>
-
                                         </div>
                                     </div>
 
-                                    {# --- FENÊTRE MODALE (Détails) --- #}
+                                    {# MODALE DÉTAILS #}
                                     <div class="modal fade" id="modalEvent{{ event.id }}" tabindex="-1" aria-hidden="true">
                                         <div class="modal-dialog modal-dialog-centered">
                                             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
-
-                                                {# En-tête coloré #}
                                                 <div class="modal-header border-0 text-white" style="background-color: {{ event.couleur|default('#2563eb') }};">
                                                     <h5 class="modal-title fw-bold">{{ event.titre }}</h5>
                                                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                                 </div>
-
                                                 <div class="modal-body p-4">
                                                     <div class="d-flex align-items-center mb-3">
                                                         <span class="badge bg-light text-dark border me-2">
-                                                            <i class="far fa-clock me-1"></i>
-                                                            {# Durée Modale #}
-                                                            {% set hours = (event.duree / 60)|round(0, 'floor') %}
-                                                            {% set minutes = event.duree % 60 %}
-                                                            {% if hours > 0 %}
-                                                                {{ hours }} h {{ minutes > 0 ? minutes ~ ' min' : '' }}
-                                                            {% else %}
-                                                                {{ minutes }} min
-                                                            {% endif %}
+                                                            <i class="far fa-clock me-1 text-muted"></i>
+                                                            {% if hours > 0 %}{{ hours }} h {% endif %}{{ minutes > 0 ? minutes ~ ' min' : '' }}
                                                         </span>
                                                         {% if event.isRoundRobin %}
-                                                            <span class="badge bg-warning text-dark border ms-2"><i class="fas fa-random me-1"></i> Équipe</span>
+                                                            <span class="badge bg-warning text-dark border"><i class="fas fa-random me-1"></i> Équipe</span>
                                                         {% endif %}
                                                     </div>
-
-                                                    <h6 class="fw-bold text-dark mb-2">À propos de ce rendez-vous</h6>
-                                                    <div class="text-muted small mb-4" style="line-height: 1.6;">
-                                                        {{ event.description|default('Aucune description fournie.')|raw }}
+                                                    <h6 class="fw-bold text-dark mb-2">Description</h6>
+                                                    <div class="text-muted small">
+                                                        {{ event.description|default('Pas de description.')|raw }}
                                                     </div>
                                                 </div>
-
-                                                <div class="modal-footer border-0 bg-light p-3">
+                                                <div class="modal-footer border-0 bg-light">
                                                     <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" data-bs-dismiss="modal">Fermer</button>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    {# --- FIN MODALE --- #}
-
                                 </div>
                             {% endfor %}
                         </div>
@@ -165,13 +139,13 @@
                     {% elseif app.user.groupe %}
                         <div class="text-center py-5 fade-in">
                             <div class="alert alert-light d-inline-block shadow-sm border-0">
-                                <i class="fas fa-info-circle text-primary me-2"></i> Aucun type d'événement configuré pour le groupe <strong>{{ app.user.groupe.nom }}</strong>.
+                                <i class="fas fa-info-circle text-primary me-2"></i> Aucun événement configuré pour le groupe <strong>{{ app.user.groupe.nom }}</strong>.
                             </div>
                         </div>
                     {% else %}
                         <div class="alert alert-warning shadow-sm border-0 fade-in">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            Votre compte n'est pas encore affilié à un groupe. Contactez votre administrateur ou vérifiez votre fiche Microsoft Entra.
+                            Votre compte n'est pas encore affilié à un groupe. Contactez votre administrateur.
                         </div>
                     {% endif %}
 
@@ -180,84 +154,62 @@
             </div>
         </div>
 
-        {# ================================================= #}
-        {# CAS 2 : VISITEUR (PAGE D'ACCUEIL)                 #}
-        {# ================================================= #}
     {% else %}
-
+        {# CAS VISITEUR #}
         <div class="hero-section">
             <div class="bg-image" style="background-image: url('{{ asset('img/planifique.jpg') }}');"></div>
             <div class="bg-overlay"></div>
-
             <div class="container position-relative z-2 text-center">
                 <div class="glass-card p-5 mx-auto fade-in-up">
                     <div class="logo-wrapper mx-auto mb-4">
-                        <img src="{{ asset('img/logo.png') }}" alt="Planifique Logo" class="img-fluid">
+                        <img src="{{ asset('img/logo.png') }}" alt="Logo" class="img-fluid">
                     </div>
-
-                    <h1 class="display-5 fw-bolder text-white mb-3 tracking-tight">Espace Collaborateurs</h1>
-                    <p class="lead text-white-50 mb-5 mx-auto" style="max-width: 500px;">
-                        Connectez-vous à votre portail <strong>Planifique</strong> pour accéder à vos outils.
-                    </p>
-
-                    <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
-                        <a href="{{ path('connect_microsoft_start') }}" class="btn btn-light btn-lg px-4 py-3 rounded-pill shadow-lg hover-scale fw-bold text-primary">
-                            <i class="fab fa-microsoft me-2"></i> Connexion Microsoft
-                        </a>
-                    </div>
-                </div>
-                <div class="mt-5 text-white-50 small fade-in" style="animation-delay: 0.5s;">
-                    &copy; {{ 'now'|date('Y') }} Planifique Rendez-vous • Usage interne
+                    <h1 class="display-5 fw-bolder text-white mb-3">Espace Collaborateurs</h1>
+                    <p class="lead text-white-50 mb-5 mx-auto" style="max-width: 500px;">Connectez-vous à votre portail <strong>Planifique</strong>.</p>
+                    <a href="{{ path('connect_microsoft_start') }}" class="btn btn-light btn-lg px-4 py-3 rounded-pill shadow-lg hover-scale fw-bold text-primary">
+                        <i class="fab fa-microsoft me-2"></i> Connexion Microsoft
+                    </a>
                 </div>
             </div>
         </div>
-
     {% endif %}
 
-    {# SCRIPT JAVASCRIPT POUR L'ANIMATION DE COPIE #}
     <script>
         function copierLien(bouton, inputId) {
             var lien = document.getElementById(inputId).value;
             navigator.clipboard.writeText(lien).then(function() {
                 var iconSpan = bouton.querySelector('.icon-text');
                 var successSpan = bouton.querySelector('.success-text');
-
-                bouton.classList.remove('btn-outline-primary');
-                bouton.classList.add('btn-success');
-                bouton.style.transform = "scale(1.05)";
-
+                bouton.classList.replace('btn-outline-primary', 'btn-success');
                 iconSpan.classList.add('d-none');
                 successSpan.classList.remove('d-none');
-
                 setTimeout(function() {
-                    bouton.classList.remove('btn-success');
-                    bouton.classList.add('btn-outline-primary');
-                    bouton.style.transform = "scale(1)";
+                    bouton.classList.replace('btn-success', 'btn-outline-primary');
                     iconSpan.classList.remove('d-none');
                     successSpan.classList.add('d-none');
                 }, 2000);
-            }, function(err) {
-                alert('Erreur lors de la copie : ' + err);
             });
         }
     </script>
 
     <style>
         .fade-in { animation: fadeIn 0.8s ease-out forwards; opacity: 0; }
-        .fade-in-up { animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; transform: translateY(30px); }
+        .fade-in-up { animation: fadeInUp 0.8s ease-out forwards; opacity: 0; transform: translateY(20px); }
         @keyframes fadeIn { to { opacity: 1; } }
         @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
         .dashboard-container { min-height: 100vh; background-color: #f8fafc; }
         .hover-card { transition: transform 0.2s, box-shadow 0.2s; }
         .hover-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
-        .btn-copy { transition: all 0.3s ease; font-weight: 600; }
-        .hero-section { position: relative; height: 100vh; width: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; z-index: 0; transform: scale(1.05); }
-        .bg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%); z-index: 1; backdrop-filter: blur(4px); }
-        .glass-card { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 24px; max-width: 600px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
-        .logo-wrapper { width: 100px; height: 100px; background: white; border-radius: 50%; padding: 15px; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-        .hover-scale { transition: transform 0.3s ease; }
-        .hover-scale:hover { transform: scale(1.05); }
+        .hero-section { position: relative; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; z-index: 0; }
+        .bg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); z-index: 1; backdrop-filter: blur(4px); }
+        .glass-card { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 24px; }
+        .logo-wrapper { width: 80px; height: 80px; background: white; border-radius: 50%; padding: 12px; display: flex; align-items: center; justify-content: center; }
+
+        /* CORRECTIF POUR LES MODALES BOOTSTRAP */
+        .modal-backdrop { z-index: 1040 !important; }
+        .modal { z-index: 1050 !important; }
+        body.modal-open { overflow: hidden !important; padding-right: 0 !important; }
     </style>
 
 {% endblock %}
