@@ -13,7 +13,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\EmailField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use EasyCorp\Bundle\EasyAdminBundle\Filter\EntityFilter;
-use EasyCorp\Bundle\EasyAdminBundle\Filter\TextFilter; // 👈 Pour les filtres
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 
 class UserCrudController extends AbstractCrudController
@@ -50,7 +49,7 @@ class UserCrudController extends AbstractCrudController
     public function configureActions(Actions $actions): Actions
     {
         // Bouton pour aller voir le planning
-        $viewSchedule = Action::new('viewSchedule', 'Voir Planning')
+        $viewSchedule = Action::new('viewSchedule', 'Gérer le planning')
             ->setIcon('fas fa-calendar-alt')
             ->linkToUrl(function (User $user) {
                 return $this->adminUrlGenerator
@@ -59,8 +58,7 @@ class UserCrudController extends AbstractCrudController
                     // On envoie le filtre vers l'autre contrôleur
                     ->set('filters', ['user' => ['value' => $user->getId(), 'comparison' => '=']])
                     ->generateUrl();
-            })
-            ->setCssClass('btn btn-outline-primary');
+            });
 
         return $actions
             ->add(Crud::PAGE_INDEX, $viewSchedule);

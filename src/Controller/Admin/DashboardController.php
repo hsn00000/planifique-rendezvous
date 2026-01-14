@@ -57,8 +57,6 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::linkToCrud('Types d\'Événements', 'fas fa-calendar-check', Evenement::class);
         yield MenuItem::linkToCrud('Collaborateurs', 'fas fa-user-tie', User::class);
 
-        // Lien direct vers les plannings (si le cache est vidé, ça marchera !)
-        yield MenuItem::linkToCrud('Tous les Plannings', 'fas fa-calendar-week', DisponibiliteHebdomadaire::class);
 
         yield MenuItem::section('Liens');
         yield MenuItem::linkToRoute('Retour au site', 'fas fa-arrow-left', 'app_home');
