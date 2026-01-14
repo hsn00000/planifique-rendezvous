@@ -38,6 +38,9 @@ class Evenement
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $visioUrl = null;
 
+    #[ORM\Column]
+    private ?bool $isRoundRobin = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -135,6 +138,18 @@ class Evenement
     public function setVisioUrl(?string $visioUrl): static
     {
         $this->visioUrl = $visioUrl;
+
+        return $this;
+    }
+
+    public function isRoundRobin(): ?bool
+    {
+        return $this->isRoundRobin;
+    }
+
+    public function setIsRoundRobin(bool $isRoundRobin): static
+    {
+        $this->isRoundRobin = $isRoundRobin;
 
         return $this;
     }

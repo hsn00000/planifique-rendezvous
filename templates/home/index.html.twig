@@ -18,7 +18,6 @@
                             Bonjour, <span style="color: #2563eb;">{{ app.user.firstName|default('Utilisateur') }}</span>
                         </h1>
                         <p class="text-muted">
-                            {# LOGIQUE D'AFFICHAGE INTELLIGENTE #}
                             {% if is_granted('ROLE_ADMIN') %}
                                 <span class="badge bg-warning text-dark border-0">
                                     <i class="fas fa-crown me-1"></i> Administrateur Global
@@ -37,9 +36,7 @@
                     </div>
                 </div>
 
-                {# ==================================================== #}
-                {# 👑 ZONE ADMINISTRATEUR (Visible uniquement par Admin) #}
-                {# ==================================================== #}
+                {# ZONE ADMIN (Visible uniquement par Admin) #}
                 {% if is_granted('ROLE_ADMIN') %}
                     <div class="row mb-5 fade-in" style="animation-delay: 0.1s;">
                         <div class="col-12">
@@ -47,10 +44,7 @@
                                 <div class="card-body p-5 d-flex flex-column flex-md-row justify-content-between align-items-center">
                                     <div class="mb-4 mb-md-0">
                                         <h2 class="h4 fw-bold mb-2"><i class="fas fa-user-shield me-2 text-warning"></i> Gestion de l'Application</h2>
-                                        <p class="mb-0 text-white-50">
-                                            Vous n'avez pas besoin d'être affilié à un groupe.<br>
-                                            Accédez au Back-Office pour gérer les équipes et les événements.
-                                        </p>
+                                        <p class="mb-0 text-white-50">Accédez au Back-Office pour gérer les équipes et les événements.</p>
                                     </div>
                                     <a href="{{ path('admin') }}" class="btn btn-warning fw-bold px-5 py-3 rounded-pill shadow-lg hover-scale text-dark">
                                         <i class="fas fa-cogs me-2"></i> Accéder au Back-Office
@@ -60,41 +54,121 @@
                         </div>
                     </div>
 
-                    {# ==================================================== #}
-                    {# 📅 ZONE CONSEILLER (Visible si PAS Admin)            #}
-                    {# ==================================================== #}
+                    {# ZONE CONSEILLER (Visible si PAS Admin) #}
                 {% else %}
 
-                    {# Grille de cartes (Événements du groupe) #}
-                    <h3 class="h6 text-uppercase text-muted fw-bold mb-4 fade-in">Vos Événements de Groupe</h3>
+                    <h3 class="h6 text-uppercase text-muted fw-bold mb-4 fade-in">Vos Evenements</h3>
 
                     {% if evenements is defined and evenements|length > 0 %}
                         <div class="row g-4">
                             {% for event in evenements %}
                                 <div class="col-md-4 col-lg-3 fade-in" style="animation-delay: {{ loop.index0 * 0.1 }}s;">
-                                    <div class="card h-100 border-0 shadow-sm hover-card event-card">
-                                        <div class="card-body p-4 d-flex flex-column" style="border-top: 4px solid {{ event.couleur|default('#2563eb') }};">
 
+                                    {# CARTE ÉVÉNEMENT #}
+                                    <div class="card h-100 border-0 shadow-sm hover-card event-card">
+                                        <div class="card-body p-4 d-flex flex-column" style="border-top: 5px solid {{ event.couleur|default('#2563eb') }};">
+
+                                            {# En-tête de la carte (Durée & Type) #}
                                             <div class="d-flex justify-content-between align-items-start mb-3">
-                                                <span class="badge bg-light text-dark border">{{ event.duree }} min</span>
+                                                <span class="badge bg-light text-dark border d-flex align-items-center">
+                                                    <i class="far fa-clock me-2 text-muted"></i>
+                                                    {# --- 🕒 LOGIQUE DURÉE INTELLIGENTE --- #}
+                                                    {% set hours = (event.duree / 60)|round(0, 'floor') %}
+                                                    {% set minutes = event.duree % 60 %}
+
+                                                    {% if hours > 0 %}
+                                                        {{ hours }} h {{ minutes > 0 ? minutes ~ ' min' : '' }}
+                                                    {% else %}
+                                                        {{ minutes }} min
+                                                    {% endif %}
+                                                </span>
+
                                                 {% if event.visioUrl %}
                                                     <i class="fas fa-video text-primary" title="Visio disponible"></i>
+                                                {% else %}
+                                                    <i class="fas fa-map-marker-alt text-secondary" title="Présentiel"></i>
                                                 {% endif %}
                                             </div>
 
-                                            <h3 class="h6 fw-bold text-dark mb-2">
-                                                {{ event.titre }}
-                                            </h3>
+                                            <h3 class="h6 fw-bold text-dark mb-2">{{ event.titre }}</h3>
 
                                             <p class="text-muted small mb-4 flex-grow-1">
-                                                {{ event.description|default('Aucune description.')|slice(0, 80) }}...
+                                                {{ event.description|default('Aucune description.')|striptags|slice(0, 80) }}...
                                             </p>
 
-                                            <button class="btn btn-sm btn-outline-primary rounded-pill w-100 mt-auto">
-                                                Copier le lien
+                                            {# LOGIQUE DE LIEN INTELLIGENTE #}
+                                            {% if event.isRoundRobin %}
+                                                {# Lien d'équipe (Round Robin) #}
+                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_home') }}book/team/{{ event.id }}">
+                                                <div class="badge bg-warning text-dark mb-3 w-100 py-2"><i class="fas fa-random me-1"></i> Équipe (Auto)</div>
+                                            {% else %}
+                                                {# Lien personnel (Conseiller Spécifique) #}
+                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_home') }}book/{{ app.user.id }}/{{ event.id }}">
+                                            {% endif %}
+
+                                            {# Bouton Copier #}
+                                            <button class="btn btn-sm btn-outline-primary rounded-pill w-100 mt-auto btn-copy mb-2"
+                                                    onclick="copierLien(this, 'link-{{ event.id }}')">
+                                                <span class="icon-text"><i class="far fa-copy me-2"></i> Copier le lien</span>
+                                                <span class="success-text d-none"><i class="fas fa-check me-2"></i> Lien copié !</span>
                                             </button>
+
+                                            {# Bouton Voir Détails #}
+                                            <button type="button" class="btn btn-sm btn-light rounded-pill w-100 text-muted" data-bs-toggle="modal" data-bs-target="#modalEvent{{ event.id }}">
+                                                <i class="far fa-eye me-1"></i> Détails
+                                            </button>
+
                                         </div>
                                     </div>
+
+                                    {# --- FENÊTRE MODALE (Détails) --- #}
+                                    <div class="modal fade" id="modalEvent{{ event.id }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+
+                                                {# En-tête coloré #}
+                                                <div class="modal-header border-0 text-white" style="background-color: {{ event.couleur|default('#2563eb') }};">
+                                                    <h5 class="modal-title fw-bold">{{ event.titre }}</h5>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+
+                                                <div class="modal-body p-4">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <span class="badge bg-light text-dark border me-2">
+                                                            <i class="far fa-clock me-1"></i>
+                                                            {# Durée Modale #}
+                                                            {% set hours = (event.duree / 60)|round(0, 'floor') %}
+                                                            {% set minutes = event.duree % 60 %}
+                                                            {% if hours > 0 %}
+                                                                {{ hours }} h {{ minutes > 0 ? minutes ~ ' min' : '' }}
+                                                            {% else %}
+                                                                {{ minutes }} min
+                                                            {% endif %}
+                                                        </span>
+                                                        {% if event.visioUrl %}
+                                                            <span class="badge bg-light text-primary border"><i class="fas fa-video me-1"></i> Visio</span>
+                                                        {% else %}
+                                                            <span class="badge bg-light text-secondary border"><i class="fas fa-map-marker-alt me-1"></i> Présentiel</span>
+                                                        {% endif %}
+                                                        {% if event.isRoundRobin %}
+                                                            <span class="badge bg-warning text-dark border ms-2"><i class="fas fa-random me-1"></i> Équipe</span>
+                                                        {% endif %}
+                                                    </div>
+
+                                                    <h6 class="fw-bold text-dark mb-2">À propos de ce rendez-vous</h6>
+                                                    <div class="text-muted small mb-4" style="line-height: 1.6;">
+                                                        {{ event.description|default('Aucune description fournie.')|raw }}
+                                                    </div>
+                                                </div>
+
+                                                <div class="modal-footer border-0 bg-light p-3">
+                                                    <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" data-bs-dismiss="modal">Fermer</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {# --- FIN MODALE --- #}
+
                                 </div>
                             {% endfor %}
                         </div>
@@ -106,14 +180,13 @@
                             </div>
                         </div>
                     {% else %}
-                        {# Cas : Pas de groupe (et pas Admin) #}
                         <div class="alert alert-warning shadow-sm border-0 fade-in">
                             <i class="fas fa-exclamation-triangle me-2"></i>
                             Votre compte n'est pas encore affilié à un groupe. Contactez votre administrateur ou vérifiez votre fiche Microsoft Entra.
                         </div>
                     {% endif %}
 
-                {% endif %} {# Fin du bloc Conseiller #}
+                {% endif %}
 
             </div>
         </div>
@@ -133,10 +206,7 @@
                         <img src="{{ asset('img/logo.png') }}" alt="Planifique Logo" class="img-fluid">
                     </div>
 
-                    <h1 class="display-5 fw-bolder text-white mb-3 tracking-tight">
-                        Espace Collaborateurs
-                    </h1>
-
+                    <h1 class="display-5 fw-bolder text-white mb-3 tracking-tight">Espace Collaborateurs</h1>
                     <p class="lead text-white-50 mb-5 mx-auto" style="max-width: 500px;">
                         Connectez-vous à votre portail <strong>Planifique</strong> pour accéder à vos outils.
                     </p>
@@ -147,7 +217,6 @@
                         </a>
                     </div>
                 </div>
-
                 <div class="mt-5 text-white-50 small fade-in" style="animation-delay: 0.5s;">
                     &copy; {{ 'now'|date('Y') }} Planifique Rendez-vous • Usage interne
                 </div>
@@ -155,6 +224,34 @@
         </div>
 
     {% endif %}
+
+    {# SCRIPT JAVASCRIPT POUR L'ANIMATION DE COPIE #}
+    <script>
+        function copierLien(bouton, inputId) {
+            var lien = document.getElementById(inputId).value;
+            navigator.clipboard.writeText(lien).then(function() {
+                var iconSpan = bouton.querySelector('.icon-text');
+                var successSpan = bouton.querySelector('.success-text');
+
+                bouton.classList.remove('btn-outline-primary');
+                bouton.classList.add('btn-success');
+                bouton.style.transform = "scale(1.05)";
+
+                iconSpan.classList.add('d-none');
+                successSpan.classList.remove('d-none');
+
+                setTimeout(function() {
+                    bouton.classList.remove('btn-success');
+                    bouton.classList.add('btn-outline-primary');
+                    bouton.style.transform = "scale(1)";
+                    iconSpan.classList.remove('d-none');
+                    successSpan.classList.add('d-none');
+                }, 2000);
+            }, function(err) {
+                alert('Erreur lors de la copie : ' + err);
+            });
+        }
+    </script>
 
     <style>
         .fade-in { animation: fadeIn 0.8s ease-out forwards; opacity: 0; }
@@ -164,6 +261,7 @@
         .dashboard-container { min-height: 100vh; background-color: #f8fafc; }
         .hover-card { transition: transform 0.2s, box-shadow 0.2s; }
         .hover-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
+        .btn-copy { transition: all 0.3s ease; font-weight: 600; }
         .hero-section { position: relative; height: 100vh; width: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; z-index: 0; transform: scale(1.05); }
         .bg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%); z-index: 1; backdrop-filter: blur(4px); }

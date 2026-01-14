@@ -1,0 +1,147 @@
+{% extends 'base_public.html.twig' %}
+
+{% block title %}
+    {{ isRoundRobin ? "Rendez-vous d'équipe" : "Rendez-vous avec " ~ conseiller.firstName }}
+{% endblock %}
+
+{% block body %}
+
+    <div class="container" style="max-width: 1060px;">
+        <div class="card border-0 shadow-calendly fade-in-up overflow-hidden" style="border-radius: 8px; min-height: 650px;">
+            <div class="row g-0 h-100">
+
+                {# ======================================================== #}
+                {# 1. BARRE LATÉRALE (Détails du RDV)                       #}
+                {# ======================================================== #}
+                <div class="col-lg-4 p-5 d-flex flex-column border-end bg-white position-relative">
+
+                    {# --- A. LOGO & MARQUE (Rassure le client) --- #}
+                    <div class="d-flex align-items-center mb-5">
+                        <img src="{{ asset('img/logo.png') }}" alt="Logo" width="30" class="me-2">
+                        <span class="fw-bold text-dark text-uppercase ls-1 small">Planifique</span>
+                    </div>
+
+                    {# --- B. QUI ? (Conseiller ou Équipe) --- #}
+                    <div class="mb-2">
+                        <p class="text-muted small fw-bold mb-1 text-uppercase">
+                            {% if isRoundRobin %}
+                                <i class="fas fa-users me-1"></i> Équipe
+                            {% else %}
+                                <i class="fas fa-user me-1"></i> Conseiller
+                            {% endif %}
+                        </p>
+
+                        <h2 class="h5 fw-bold text-dark mb-0">
+                            {% if isRoundRobin %}
+                                {{ event.groupe.nom }}
+                            {% else %}
+                                {{ conseiller.firstName }} {{ conseiller.lastName }}
+                            {% endif %}
+                        </h2>
+                    </div>
+
+                    {# --- C. QUOI ? (Titre de l'événement) --- #}
+                    <h1 class="h3 fw-bold text-dark mb-4 mt-3">{{ event.titre }}</h1>
+
+                    {# --- D. DÉTAILS (Icônes Calendly) --- #}
+                    <div class="d-flex flex-column gap-3 text-secondary mt-2">
+
+                        {# 1. Durée #}
+                        <div class="d-flex align-items-start">
+                            <div style="width: 24px;" class="me-2 text-center pt-1">
+                                <i class="fa-regular fa-clock fs-5"></i>
+                            </div>
+                            <span class="fw-bold text-dark">
+                                {% set hours = (event.duree / 60)|round(0, 'floor') %}
+                                {% set minutes = event.duree % 60 %}
+                                {% if hours > 0 %}{{ hours }} h {% endif %}{{ minutes > 0 ? minutes ~ ' min' : '' }}
+                            </span>
+                        </div>
+
+                        {# 2. Lieu / Visio #}
+                        <div class="d-flex align-items-start">
+                            <div style="width: 24px;" class="me-2 text-center pt-1">
+                                {% if event.visioUrl %}
+                                    <i class="fa-solid fa-video fs-5"></i>
+                                {% else %}
+                                    <i class="fa-solid fa-location-dot fs-5"></i>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <span class="text-dark d-block fw-bold">
+                                    {% if event.visioUrl %}
+                                        Visioconférence
+                                    {% else %}
+                                        Présentiel
+                                    {% endif %}
+                                </span>
+                                <span class="small text-muted">
+                                    {% if event.visioUrl %}
+                                        Les détails de connexion seront fournis après confirmation.
+                                    {% else %}
+                                        L'adresse exacte vous sera communiquée par email.
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+
+                        {# 3. Description #}
+                        {% if event.description %}
+                            <div class="d-flex align-items-start mt-2">
+                                <div style="width: 24px;" class="me-2 text-center pt-1">
+                                    <i class="fa-solid fa-align-left fs-5"></i>
+                                </div>
+                                <div class="text-break small text-muted" style="line-height: 1.5;">
+                                    {{ event.description|striptags }}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    {# Pied de page discret #}
+                    <div class="mt-auto pt-5">
+                        <small class="text-muted" style="font-size: 0.7rem;">
+                            &copy; {{ 'now'|date('Y') }} Planifique Rendez-vous
+                        </small>
+                    </div>
+                </div>
+
+                {# ======================================================== #}
+                {# 2. ZONE CALENDRIER (Droite)                              #}
+                {# ======================================================== #}
+                <div class="col-lg-8 p-5 bg-white">
+                    <h3 class="h4 fw-bold text-dark mb-4">Sélectionner une date et heure</h3>
+
+                    {# Simulation Calendrier #}
+                    <div class="calendar-wrapper border-top pt-4">
+                        <div class="d-flex justify-content-center align-items-center bg-light rounded-3" style="height: 450px; border: 1px dashed #cbd5e1;">
+                            <div class="text-center text-muted">
+                                <div class="mb-3">
+                                    <i class="fa-regular fa-calendar-check fa-4x text-primary opacity-25"></i>
+                                </div>
+                                <h5 class="fw-bold text-dark">Calendrier de disponibilités</h5>
+                                <p class="small text-muted mb-0">Le module interactif s'affichera ici.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {# Fuseau horaire #}
+                    <div class="mt-4 pt-3 border-top">
+                        <button class="btn btn-link text-dark text-decoration-none p-0 fw-bold small">
+                            <i class="fa-solid fa-earth-americas me-2 text-muted"></i>
+                            Heure d'Europe centrale (Paris)
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .ls-1 { letter-spacing: 1px; }
+        /* Style spécifique pour aligner les icônes parfaitement */
+        .fa-regular, .fa-solid { color: #64748b; /* Couleur gris-bleu pro */ }
+    </style>
+
+{% endblock %}
