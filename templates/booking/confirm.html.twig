@@ -22,14 +22,16 @@
                     <h1 class="h4 fw-bold mb-2">{{ event.titre }}</h1>
                     <p class="opacity-75 small text-uppercase ls-1 mb-5">Récapitulatif de la réservation</p>
 
-                    {# Initiale Conseiller (Rond Blanc, Texte Bleu) #}
+                    {# Initiale Conseiller #}
                     <div class="mb-5">
                         <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-white text-primary fw-bold mb-3 shadow-sm"
                              style="width: 70px; height: 70px; font-size: 1.8rem;">
                             {{ conseiller.firstName|first }}{{ conseiller.lastName|first }}
                         </div>
+
+                        {# MODIFICATION ICI : "Votre conseiller" est passé au-dessus #}
+                        <div class="small opacity-75 text-uppercase ls-1 mb-1">Votre conseiller</div>
                         <div class="fs-5 fw-bold">{{ conseiller.firstName }} {{ conseiller.lastName }}</div>
-                        <div class="small opacity-75">Votre conseiller</div>
                     </div>
 
                     {# Détails Texte Pur (Sans Icônes) #}
@@ -65,7 +67,7 @@
                     {# Titre Centré #}
                     <div class="text-center mb-5">
                         <h2 class="h3 fw-bold text-dark">Vos coordonnées</h2>
-                        <p class="text-muted small">Merci de compléter ce formulaire.</p>
+                        <p class="text-muted small">Merci de compléter ce formulaire pour valider le rendez-vous.</p>
                     </div>
 
                     {{ form_start(form, {'attr': {'data-turbo': 'false', 'id': 'booking-form', 'class': 'needs-validation'}}) }}
@@ -84,7 +86,7 @@
                     </div>
 
                     <div class="mb-4">
-                        {{ form_label(form.email, 'Email', {'label_attr': {'class': 'form-label fw-bold small text-secondary'}}) }}
+                        {{ form_label(form.email, 'Email professionnel', {'label_attr': {'class': 'form-label fw-bold small text-secondary'}}) }}
                         {{ form_widget(form.email, {'attr': {'class': 'form-control form-control-lg', 'placeholder': ''}}) }}
                         {{ form_errors(form.email) }}
                     </div>
@@ -107,7 +109,7 @@
                     <div id="field-adresse-container" class="d-none mb-4">
                         <label class="form-label fw-bold small text-secondary">Adresse complète</label>
                         {{ form_widget(form.adresse, {'attr': {'class': 'form-control form-control-lg', 'placeholder': 'N°, Rue, Code Postal, Ville'}}) }}
-                        <div class="form-text small text-muted mt-2">Ce lieu sera confirmé par email.</div>
+                        <div class="form-text small text-muted mt-2">Ce lieu sera confirmé par email au conseiller.</div>
                         {{ form_errors(form.adresse) }}
                     </div>
 
