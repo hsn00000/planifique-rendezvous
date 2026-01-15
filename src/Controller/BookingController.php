@@ -31,11 +31,11 @@ class BookingController extends AbstractController
         ]);
     }
 
-    #[Route('/book/confirm/{event}/{user?}', name: 'app_booking_confirm')]
+    #[Route('/book/confirm/{event}/{user}', name: 'app_booking_confirm', defaults: ['user' => null])]
     public function confirm(
         Request $request,
         Evenement $event,
-        ?User $user,
+        ?User $user, // Symfony cherche l'user par l'ID dans l'URL. S'il n'y a rien, il sera null.
         EntityManagerInterface $em,
         MailerInterface $mailer,
         OutlookService $outlookService
@@ -45,7 +45,7 @@ class BookingController extends AbstractController
         $rendezVous->setEvenement($event);
         if ($user) $rendezVous->setConseiller($user);
 
-        // Valeur par défaut obligatoire pour ton entité
+        // Valeur par défaut
         $rendezVous->setTypeLieu('Visioconférence');
 
         // Gestion de la date depuis l'URL
@@ -54,26 +54,15 @@ class BookingController extends AbstractController
             try {
                 $startDate = new \DateTime($dateParam);
                 $rendezVous->setDateDebut($startDate);
-
-                // CRUCIAL : Calculer la date de fin pour la validation de l'entité
                 $endDate = (clone $startDate)->modify('+' . $event->getDuree() . ' minutes');
                 $rendezVous->setDateFin($endDate);
-
             } catch (\Exception $e) {
-                // Si la date est invalide, retour à l'accueil
                 return $this->redirectToRoute('app_home');
             }
         }
 
         $form = $this->createForm(BookingFormType::class, $rendezVous);
         $form->handleRequest($request);
-
-        if ($form->isSubmitted() && !$form->isValid()) {
-            // Cela affichera toutes les erreurs dans la barre de debug de Symfony (en bas)
-            foreach ($form->getErrors(true) as $error) {
-                $this->addFlash('error', $error->getOrigin()->getName() . ' : ' . $error->getMessage());
-            }
-        }
 
         // Si le formulaire est soumis et valide
         if ($form->isSubmitted() && $form->isValid()) {
@@ -82,43 +71,20 @@ class BookingController extends AbstractController
             $em->persist($rendezVous);
             $em->flush();
 
-            // 2. Synchronisation Outlook (Sécurisée par un try/catch)
+            // 2. Synchronisation Outlook
             try {
                 if ($rendezVous->getConseiller()) {
                     $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
                 }
-            } catch (\Exception $e) {
-                // On continue même si Outlook échoue
-            }
+            } catch (\Exception $e) {}
 
-            // 3. Email Client
-            $emailClient = new TemplatedEmail()
-                ->from('no-reply@planifique.com')
-                ->to($rendezVous->getEmail())
-                ->subject('Confirmation RDV : ' . $event->getTitre())
-                ->htmlTemplate('emails/booking_confirmation_client.html.twig')
-                ->context(['rdv' => $rendezVous]);
+            // 3. Envoi des Emails
+            $this->sendEmails($rendezVous, $event, $mailer);
 
-            try { $mailer->send($emailClient); } catch (\Exception $e) {}
-
-            // 4. Email Conseiller
-            if ($rendezVous->getConseiller()) {
-                $emailConseiller = new TemplatedEmail()
-                    ->from('no-reply@planifique.com')
-                    ->to($rendezVous->getConseiller()->getEmail())
-                    ->subject('Nouveau RDV : ' . $rendezVous->getNom() . ' ' . $rendezVous->getPrenom())
-                    ->htmlTemplate('emails/booking_notification_conseiller.html.twig')
-                    ->context(['rdv' => $rendezVous]);
-
-                try { $mailer->send($emailConseiller); } catch (\Exception $e) {}
-            }
-
-            return $this->render('booking/success.html.twig', [
-                'rendezVous' => $rendezVous
-            ]);
+            // 4. REDIRECTION VERS LA PAGE DE SUCCÈS (Utilise l'ID du RDV)
+            return $this->redirectToRoute('app_booking_success', ['id' => $rendezVous->getId()]);
         }
 
-        // Affichage du formulaire (si pas soumis ou erreurs)
         return $this->render('booking/confirm.html.twig', [
             'form' => $form->createView(),
             'event' => $event,
@@ -127,8 +93,40 @@ class BookingController extends AbstractController
         ]);
     }
 
+    // Nouvelle méthode pour afficher la page de succès sans renvoyer le formulaire
+    #[Route('/book/success/{id}', name: 'app_booking_success')]
+    public function success(RendezVous $rendezVous): Response
+    {
+        return $this->render('booking/success.html.twig', [
+            'rendezVous' => $rendezVous
+        ]);
+    }
+
+    private function sendEmails(RendezVous $rdv, Evenement $event, MailerInterface $mailer): void
+    {
+        $emailClient = (new TemplatedEmail())
+            ->from('no-reply@planifique.com')
+            ->to($rdv->getEmail())
+            ->subject('Confirmation RDV : ' . $event->getTitre())
+            ->htmlTemplate('emails/booking_confirmation_client.html.twig')
+            ->context(['rdv' => $rdv]);
+
+        try { $mailer->send($emailClient); } catch (\Exception $e) {}
+
+        if ($rdv->getConseiller()) {
+            $emailConseiller = (new TemplatedEmail())
+                ->from('no-reply@planifique.com')
+                ->to($rdv->getConseiller()->getEmail())
+                ->subject('Nouveau RDV : ' . $rdv->getNom() . ' ' . $rdv->getPrenom())
+                ->htmlTemplate('emails/booking_notification_conseiller.html.twig')
+                ->context(['rdv' => $rdv]);
+
+            try { $mailer->send($emailConseiller); } catch (\Exception $e) {}
+        }
+    }
+
     /**
-     * Génère les créneaux horaires disponibles
+     * Ta méthode originale de génération des créneaux (Calendrier)
      */
     private function generateSlots(User $user, Evenement $event, RendezVousRepository $rdvRepo, DisponibiliteHebdomadaireRepository $dispoRepo): array
     {
@@ -157,7 +155,7 @@ class BookingController extends AbstractController
             $dayData = [
                 'dateObj' => clone $currentDate,
                 'dayNum' => $currentDate->format('d'),
-                'isToday' => $currentDate->format('Y-m-d') === (new \DateTime())->format('Y-m-d'),
+                'isToday' => $currentDate->format('Y-m-d') === new \DateTime()->format('Y-m-d'),
                 'isPast' => $currentDate < new \DateTime('today'),
                 'slots' => [],
                 'hasAvailability' => false
