@@ -45,7 +45,7 @@ class BookingController extends AbstractController
         $rendezVous->setEvenement($event);
         if ($user) $rendezVous->setConseiller($user);
 
-        // Valeur par défaut pour le type de lieu (obligatoire dans ton entité)
+        // Valeur par défaut obligatoire pour ton entité
         $rendezVous->setTypeLieu('Visioconférence');
 
         // Gestion de la date depuis l'URL
@@ -54,6 +54,7 @@ class BookingController extends AbstractController
             try {
                 $rendezVous->setDateDebut(new \DateTime($dateParam));
             } catch (\Exception $e) {
+                // Si la date est invalide, retour à l'accueil
                 return $this->redirectToRoute('app_home');
             }
         }
@@ -61,43 +62,47 @@ class BookingController extends AbstractController
         $form = $this->createForm(BookingFormType::class, $rendezVous);
         $form->handleRequest($request);
 
+        // Si le formulaire est soumis et valide
         if ($form->isSubmitted() && $form->isValid()) {
 
+            // 1. Sauvegarde en Base de Données
             $em->persist($rendezVous);
             $em->flush();
 
-            // --- SYNCHRO OUTLOOK ---
+            // 2. Synchronisation Outlook
             if ($rendezVous->getConseiller()) {
                 $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
             }
 
-            // --- EMAIL CLIENT (Adapté à ton entité: getEmail, getPrenom) ---
+            // 3. Email Client
             $emailClient = (new TemplatedEmail())
                 ->from('no-reply@planifique.com')
-                ->to($rendezVous->getEmail()) // <-- Changement ici
+                ->to($rendezVous->getEmail())
                 ->subject('Confirmation RDV : ' . $event->getTitre())
                 ->htmlTemplate('emails/booking_confirmation_client.html.twig')
                 ->context(['rdv' => $rendezVous]);
 
             try { $mailer->send($emailClient); } catch (\Exception $e) {}
 
-            // --- EMAIL CONSEILLER ---
+            // 4. Email Conseiller
             if ($rendezVous->getConseiller()) {
                 $emailConseiller = (new TemplatedEmail())
                     ->from('no-reply@planifique.com')
                     ->to($rendezVous->getConseiller()->getEmail())
-                    ->subject('Nouveau RDV : ' . $rendezVous->getNom() . ' ' . $rendezVous->getPrenom()) // <-- Changement ici
+                    ->subject('Nouveau RDV : ' . $rendezVous->getNom() . ' ' . $rendezVous->getPrenom())
                     ->htmlTemplate('emails/booking_notification_conseiller.html.twig')
                     ->context(['rdv' => $rendezVous]);
 
                 try { $mailer->send($emailConseiller); } catch (\Exception $e) {}
             }
 
+            // 5. Redirection vers la page de succès
             return $this->render('booking/success.html.twig', [
                 'rendezVous' => $rendezVous
             ]);
         }
 
+        // Affichage du formulaire (si pas soumis ou erreurs)
         return $this->render('booking/confirm.html.twig', [
             'form' => $form->createView(),
             'event' => $event,
@@ -106,11 +111,11 @@ class BookingController extends AbstractController
         ]);
     }
 
-    // ... (Garde la fonction generateSlots inchangée, elle fonctionne bien) ...
+    /**
+     * Génère les créneaux horaires disponibles
+     */
     private function generateSlots(User $user, Evenement $event, RendezVousRepository $rdvRepo, DisponibiliteHebdomadaireRepository $dispoRepo): array
     {
-        // ... (Ton code de génération de slots ici, copier-coller de la réponse précédente)
-        // Je ne le remets pas pour ne pas surcharger, c'est exactement le même
         $calendarData = [];
         $duration = $event->getDuree();
         $startPeriod = new \DateTime('first day of this month');

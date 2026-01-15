@@ -1,5 +1,7 @@
 {% extends 'base_public.html.twig' %}
 
+{% block title %}Finaliser le RDV{% endblock %}
+
 {% block body %}
     <div class="container py-5">
         <div class="card shadow-sm border-0 mx-auto" style="max-width: 800px; border-radius: 15px;">
@@ -8,6 +10,12 @@
                 <p class="text-muted">Type : <strong>{{ event.titre }}</strong> ({{ event.duree }} min)</p>
 
                 {{ form_start(form) }}
+
+                {# 1. AFFICHER LES ERREURS GLOBALES (Important pour le debug) #}
+                <div class="text-danger mb-3">
+                    {{ form_errors(form) }}
+                </div>
+
                 <div class="row">
                     <div class="col-md-6 mb-3">{{ form_row(form.prenom) }}</div>
                     <div class="col-md-6 mb-3">{{ form_row(form.nom) }}</div>
@@ -16,30 +24,54 @@
                 <div class="mb-3">{{ form_row(form.telephone) }}</div>
 
                 <div class="bg-light p-4 rounded mb-3">
-                    {{ form_row(form.typeLieu) }}
+                    {# Ce champ doit exister dans ton BookingFormType #}
+                    {{ form_row(form.typeLieu, {'attr': {'class': 'form-select type-lieu-selector'}}) }}
 
-                    <div id="adresse-field" style="display: none;" class="mt-3">
+                    <div id="adresse-field" class="mt-3 d-none">
                         {{ form_row(form.adresse) }}
                     </div>
                 </div>
 
-                <button class="btn btn-primary w-100 py-3 fw-bold rounded-pill">Confirmer la réservation</button>
+                {# 2. AJOUT DE TYPE="SUBMIT" #}
+                <button type="submit" class="btn btn-primary w-100 py-3 fw-bold rounded-pill">
+                    Confirmer la réservation
+                </button>
+
                 {{ form_end(form) }}
             </div>
         </div>
     </div>
 
     <script>
-        // Logique pour afficher/cacher l'adresse
-        document.querySelectorAll('input[name="booking_form[typeLieu]"]').forEach((input) => {
-            input.addEventListener('change', function() {
-                const adresseField = document.getElementById('adresse-field');
-                if (this.value === 'domicile') {
-                    adresseField.style.display = 'block';
-                } else {
-                    adresseField.style.display = 'none';
+        document.addEventListener('DOMContentLoaded', function() {
+            // On cible le SELECT (liste déroulante) généré par Symfony
+            // L'ID est généralement booking_form_typeLieu, on utilise l'attribut id finissant par typeLieu
+            const lieuSelect = document.querySelector('[id$="typeLieu"]');
+            const adresseField = document.getElementById('adresse-field');
+
+            if (lieuSelect) {
+                // Fonction pour gérer l'affichage
+                function toggleAdresse() {
+                    // Vérifie la valeur (adapte 'domicile' selon ce que tu as mis dans ton FormType : 'Présentiel', 'Domicile', etc.)
+                    // Convertit en minuscule pour éviter les erreurs de casse
+                    const val = lieuSelect.value.toLowerCase();
+
+                    if (val.includes('domicile') || val.includes('presentiel') || val.includes('physique')) {
+                        adresseField.classList.remove('d-none');
+                    } else {
+                        adresseField.classList.add('d-none');
+                        // Optionnel : vider le champ adresse si on repasse en visio
+                        const adresseInput = adresseField.querySelector('input');
+                        if(adresseInput) adresseInput.value = '';
+                    }
                 }
-            });
+
+                // Écouteur d'événement
+                lieuSelect.addEventListener('change', toggleAdresse);
+
+                // Lancer au chargement (au cas où il y a une erreur et que la page se recharge)
+                toggleAdresse();
+            }
         });
     </script>
 {% endblock %}

@@ -4,7 +4,7 @@ namespace App\Form;
 
 use App\Entity\RendezVous;
 use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType; // Important
 use Symfony\Component\Form\Extension\Core\Type\EmailType;
 use Symfony\Component\Form\Extension\Core\Type\TelType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -20,21 +20,24 @@ class BookingFormType extends AbstractType
             ->add('nom', TextType::class, ['label' => 'Nom'])
             ->add('email', EmailType::class, ['label' => 'Email'])
             ->add('telephone', TelType::class, ['label' => 'Téléphone'])
+
+            // 👇 AJOUTE CES CHAMPS POUR QUE TON TEMPLATE FONCTIONNE
             ->add('typeLieu', ChoiceType::class, [
-                'label' => 'Où souhaitez-vous le rendez-vous ?',
-                'choices'  => [
-                    'Au cabinet (Présentiel)' => 'cabinet',
-                    'En visioconférence' => 'visio',
-                    'À mon domicile / Chez le bénéficiaire' => 'domicile',
+                'label' => 'Lieu du rendez-vous',
+                'choices' => [
+                    'Visioconférence' => 'Visioconférence',
+                    'A domicile' => 'Domicile', // Le JS réagira au mot 'Domicile'
+                    'Au bureau' => 'Bureau'
                 ],
-                'expanded' => true, // Boutons radio
+                'expanded' => false, // false = Liste déroulante (Select)
                 'multiple' => false,
             ])
             ->add('adresse', TextType::class, [
-                'label' => 'Adresse du domicile',
-                'required' => false,
-                'attr' => ['placeholder' => 'Saisir votre adresse complète']
-            ]);
+                'label' => 'Adresse complète',
+                'required' => false, // Important : false car masqué si Visio
+                'attr' => ['placeholder' => '10 rue de la paix...']
+            ])
+        ;
     }
 
     public function configureOptions(OptionsResolver $resolver): void
