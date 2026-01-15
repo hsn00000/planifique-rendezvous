@@ -18,30 +18,42 @@ class OutlookService
     ) {}
 
     /**
-     * Ajoute l'événement directement dans le calendrier Outlook du Conseiller
+     * Adapté de la méthode Approve() de ton collègue
      */
     public function addEventToCalendar(User $conseiller, RendezVous $rdv): void
     {
+        // 1. Récupération du compte Microsoft du conseiller
         $microsoftAccount = $conseiller->getMicrosoftAccount();
 
-        // Si le conseiller n'a pas lié son compte Microsoft, on ne peut rien faire
+        // Sécurité : Si le conseiller n'a jamais connecté son compte, on arrête (comme le "return NotFound" en C#)
         if (!$microsoftAccount) {
+            // Optionnel : Logger cette erreur ou envoyer une alerte admin
             return;
         }
 
-        // 1. Vérifier et rafraîchir le token si nécessaire
+        // 2. Obtention d'un Token valide (Refresh automatique si besoin)
         $accessToken = $this->getValidAccessToken($microsoftAccount);
         if (!$accessToken) {
-            return; // Impossible d'obtenir un token valide
+            return; // Impossible d'agir sans token valide
         }
 
-        // 2. Préparer les données pour l'API Microsoft Graph
+        // 3. Préparation des données pour Microsoft Graph
+        // Correspond à "ComputeEventUtcRange" et la création de l'objet événement en C#
         $eventData = [
-            'subject' => 'RDV Planifique : ' . $rdv->getEvenement()->getTitre(),
+            'subject' => 'RDV Client : ' . $rdv->getPrenom() . ' ' . $rdv->getNom(),
             'body' => [
                 'contentType' => 'HTML',
-                'content' => "Rendez-vous avec " . $rdv->getPrenom() . " " . $rdv->getNom() . "<br>Tel: " . $rdv->getTelephone()
+                'content' => sprintf(
+                    "<b>Client :</b> %s %s<br><b>Tel :</b> %s<br><b>Email :</b> %s<br><b>Lieu :</b> %s<br><b>Adresse :</b> %s",
+                    $rdv->getPrenom(),
+                    $rdv->getNom(),
+                    $rdv->getTelephone(),
+                    $rdv->getEmail(),
+                    $rdv->getTypeLieu(),
+                    $rdv->getAdresse() ?? 'Non précisée'
+                )
             ],
+            // On force le fuseau horaire pour éviter les décalages (Europe/Paris)
             'start' => [
                 'dateTime' => $rdv->getDateDebut()->format('Y-m-d\TH:i:s'),
                 'timeZone' => 'Europe/Paris'
@@ -53,7 +65,7 @@ class OutlookService
             'location' => [
                 'displayName' => $rdv->getTypeLieu()
             ],
-            // On ajoute le client comme "invité" pour qu'il reçoive aussi l'invit Outlook (Optionnel)
+            // On invite le client pour qu'il ait aussi l'event (optionnel mais pro)
             'attendees' => [
                 [
                     'emailAddress' => [
@@ -62,52 +74,69 @@ class OutlookService
                     ],
                     'type' => 'required'
                 ]
-            ]
+            ],
+            'allowNewTimeProposals' => false, // Comme c'est un RDV ferme
+            'showAs' => 'busy' // Marque le créneau comme "Occupé"
         ];
 
-        // 3. Envoyer la requête à Microsoft
+        // 4. Envoi à l'API (L'équivalent de _graph.CreateOutOfOfficeEventAsync)
         try {
-            $this->httpClient->request('POST', 'https://graph.microsoft.com/v1.0/me/events', [
+            $response = $this->httpClient->request('POST', 'https://graph.microsoft.com/v1.0/me/events', [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $accessToken,
                     'Content-Type' => 'application/json'
                 ],
                 'json' => $eventData
             ]);
+
+            // Si ça marche (Code 201 Created), on peut récupérer l'ID de l'event Outlook si on veut le stocker
+            // $data = $response->toArray();
+            // $outlookId = $data['id'];
+            // $rdv->setOutlookId($outlookId); $this->em->flush();
+
         } catch (\Exception $e) {
-            // Tu pourrais logger l'erreur ici
+            // Log l'erreur mais ne plante pas l'application pour le client
+            // error_log("Erreur Outlook : " . $e->getMessage());
         }
     }
 
     /**
-     * Gère la magie du Refresh Token
+     * Méthode technique pour gérer le Token (Refresh Token)
+     * C'est la mécanique invisible que la librairie C# gérait toute seule.
      */
     private function getValidAccessToken($microsoftAccount): ?string
     {
         $token = $microsoftAccount->getAccessToken();
-        $expiresAt = $microsoftAccount->getExpiresAt(); // Assure-toi d'avoir ce champ en base (timestamp)
+        $expiresAt = $microsoftAccount->getExpiresAt(); // Timestamp ou DateTime
+
+        // Conversion si nécessaire (selon ton entité, si c'est un timestamp int)
+        $expirationTimestamp = ($expiresAt instanceof \DateTimeInterface) ? $expiresAt->getTimestamp() : $expiresAt;
 
         // Si le token est encore valide (avec une marge de 5 min), on l'utilise
-        if ($expiresAt && $expiresAt > (time() + 300)) {
+        if ($expirationTimestamp && $expirationTimestamp > (time() + 300)) {
             return $token;
         }
 
-        // Sinon, on essaie de le rafraîchir
+        // Sinon, on utilise le Refresh Token pour en avoir un nouveau
         $refreshToken = $microsoftAccount->getRefreshToken();
         if (!$refreshToken) {
-            return null; // Pas de refresh token, l'utilisateur doit se reconnecter manuellement
+            return null; // Plus de refresh token, connexion manuelle requise
         }
 
         try {
-            // On appelle le client OAuth pour rafraîchir
-            $oauthClient = $this->clientRegistry->getClient('microsoft');
+            // Attention : 'azure' doit matcher le nom dans knpu_oauth2_client.yaml
+            $oauthClient = $this->clientRegistry->getClient('azure');
+
             $newToken = $oauthClient->getOAuth2Provider()->getAccessToken('refresh_token', [
                 'refresh_token' => $refreshToken
             ]);
 
-            // On sauvegarde le nouveau token en base
+            // Mise à jour en base
             $microsoftAccount->setAccessToken($newToken->getToken());
             $microsoftAccount->setRefreshToken($newToken->getRefreshToken());
+
+            // CORRECTION ICI : On passe directement l'entier (timestamp)
+            // car votre entité attend un ?int
             $microsoftAccount->setExpiresAt($newToken->getExpires());
 
             $this->em->flush();

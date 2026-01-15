@@ -16,6 +16,30 @@ class RendezVousRepository extends ServiceEntityRepository
         parent::__construct($registry, RendezVous::class);
     }
 
+    /**
+     * Vérifie s'il existe un chevauchement pour ce conseiller sur cette plage horaire.
+     * Exclut le rendez-vous actuel (en cas de modification).
+     */
+    public function countOverlapping(RendezVous $rdv): int
+    {
+        $qb = $this->createQueryBuilder('r')
+            ->select('count(r.id)')
+            ->where('r.conseiller = :conseiller')
+            ->andWhere('r.dateDebut < :fin')  // Commence avant la fin du nouveau
+            ->andWhere('r.dateFin > :debut')  // Finit après le début du nouveau
+            ->setParameter('conseiller', $rdv->getConseiller())
+            ->setParameter('debut', $rdv->getDateDebut())
+            ->setParameter('fin', $rdv->getDateFin());
+
+        // Si le RDV existe déjà (il a un ID), on l'exclut de la recherche pour ne pas qu'il se bloque lui-même
+        if ($rdv->getId()) {
+            $qb->andWhere('r.id != :id')
+                ->setParameter('id', $rdv->getId());
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
     //    /**
     //     * @return RendezVous[] Returns an array of RendezVous objects
     //     */

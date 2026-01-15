@@ -4,8 +4,12 @@ namespace App\Entity;
 
 use App\Repository\RendezVousRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Doctrine\DBAL\Types\Types;
+use App\Validator as AcmeAssert; // On importe ton validateur perso
+use Symfony\Component\Validator\Constraints as Assert; // Pour les validations standards
 
 #[ORM\Entity(repositoryClass: RendezVousRepository::class)]
+#[AcmeAssert\NoOverlap]
 class RendezVous
 {
     #[ORM\Id]

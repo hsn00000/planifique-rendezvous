@@ -47,7 +47,10 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
 
     public function authenticate(Request $request): Passport
     {
+        // Attention: Assurez-vous que le nom ici ('azure') correspond bien à config/packages/knpu_oauth2_client.yaml
         $client = $this->clientRegistry->getClient('azure');
+
+        // 1. C'EST ICI QUE LE CODE EST CONSOMMÉ (Une seule fois !)
         $accessToken = $this->fetchAccessToken($client);
 
         return new SelfValidatingPassport(
@@ -56,7 +59,7 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
                 /** @var AzureResourceOwner $microsoftUser */
                 $microsoftUser = $client->fetchUserFromToken($accessToken);
 
-                // 1. Récupération de l'email
+                // --- 1. Récupération de l'email ---
                 $email = $microsoftUser->getUpn();
                 if (empty($email) && method_exists($microsoftUser, 'getMail')) {
                     $email = $microsoftUser->getMail();
@@ -70,14 +73,14 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
                     throw new CustomUserMessageAuthenticationException('Email introuvable.');
                 }
 
-                // 2. Restriction Domaine
+                // --- 2. Restriction Domaine ---
                 if (!str_ends_with($email, '@planifique.com')) {
                     throw new CustomUserMessageAuthenticationException(
                         'Accès refusé. Seules les adresses @planifique.com sont autorisées.'
                     );
                 }
 
-                // 3. Gestion User
+                // --- 3. Gestion User ---
                 $user = $this->userRepository->findOneBy(['email' => $email]);
                 if (!$user) {
                     $user = new User();
@@ -87,11 +90,8 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
                     $this->entityManager->persist($user);
                 }
 
-                // ====================================================
-                // 4. LOGIQUE DÉPARTEMENT (Correctement implémentée)
-                // ====================================================
+                // --- 4. Logique Département / Groupe ---
                 try {
-                    // On récupère le département depuis Microsoft Graph
                     $provider = $client->getOAuth2Provider();
                     $request = $provider->getAuthenticatedRequest(
                         'GET',
@@ -104,44 +104,46 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
                     $departmentName = $data['department'] ?? null;
 
                     if ($departmentName) {
-                        // On cherche un groupe existant avec ce NOM
                         $groupe = $this->entityManager->getRepository(Groupe::class)->findOneBy(['nom' => $departmentName]);
 
-                        // S'il n'existe pas, on le crée
                         if (!$groupe) {
                             $groupe = new Groupe();
                             $groupe->setNom($departmentName);
-                            $groupe->setSlug(strtolower(str_replace(' ', '-', $departmentName))); // Génération slug simple
-
-                            // ✅ CORRECTION : On utilise la bonne méthode de ton entité Groupe
+                            $groupe->setSlug(strtolower(str_replace(' ', '-', $departmentName)));
                             $groupe->setMicrosoftIdGroupe('AUTO_' . strtoupper(str_replace(' ', '_', $departmentName)));
-
                             $this->entityManager->persist($groupe);
-                            // On flush immédiatement pour que le groupe existe pour l'assignation
                             $this->entityManager->flush();
                         }
-
                         $user->setGroupe($groupe);
                     }
-
                 } catch (\Exception $e) {
-                    // En cas d'erreur API ou SQL sur le groupe, on logue mais on ne plante pas le login user
-                    // Le flush global se fera quand même si l'EntityManager n'est pas fermé
+                    // On continue même si l'API groupe échoue
                 }
 
-                // 5. Compte Microsoft lié
+                // --- 5. Gestion Compte Microsoft & Tokens (CORRIGÉ) ---
+                // On fait tout ici car on a accès à la variable $accessToken valide
+
                 $microsoftAccount = $user->getMicrosoftAccount();
                 if (!$microsoftAccount) {
                     $microsoftAccount = new MicrosoftAccount();
                     $microsoftAccount->setUser($user);
                 }
+
+                // Infos de base
                 $microsoftAccount->setMicrosoftId($microsoftUser->getId());
                 $microsoftAccount->setMicrosoftEmail($email);
 
-                $this->entityManager->persist($microsoftAccount);
+                // 🔥 SAUVEGARDE DES TOKENS ICI 🔥
+                $microsoftAccount->setAccessToken($accessToken->getToken());
+                $microsoftAccount->setRefreshToken($accessToken->getRefreshToken());
 
-                // Flush final pour sauvegarder l'utilisateur et son lien
-                $this->entityManager->flush();
+                // Gestion de l'expiration (timestamp vers DateTime si nécessaire, selon votre Entité)
+                if ($accessToken->getExpires()) {
+                    $microsoftAccount->setExpiresAt($accessToken->getExpires());
+                }
+
+                $this->entityManager->persist($microsoftAccount);
+                $this->entityManager->flush(); // Sauvegarde tout (User + Groupe + Tokens)
 
                 return $user;
             })
@@ -150,24 +152,7 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
     {
-        $user = $token->getUser();
-
-        // On récupère le paquet complet de clés Microsoft
-        $client = $this->clientRegistry->getClient('azure');
-        $accessToken = $client->getAccessToken();
-
-        // 🚀 SAUVEGARDE PRO : On stocke les clés dans la BDD
-        if ($user && $user->getMicrosoftAccount()) {
-            $msAccount = $user->getMicrosoftAccount();
-
-            $msAccount->setAccessToken($accessToken->getToken());
-            $msAccount->setRefreshToken($accessToken->getRefreshToken());
-            $msAccount->setExpiresAt($accessToken->getExpires()); // Tu as bien fait de créer ce champ !
-
-            $this->entityManager->persist($msAccount);
-            $this->entityManager->flush();
-        }
-
+        // Plus aucune logique de token ici, on redirige simplement !
         return new RedirectResponse($this->router->generate('app_home'));
     }
 
