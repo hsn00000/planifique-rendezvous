@@ -210,11 +210,11 @@ class BookingController extends AbstractController
                         while ($start < $end) {
                             $slotEnd = (clone $start)->modify("+$duration minutes");
                             if ($slotEnd > $end) break;
-                            if (!$rdvRepo->findOneBy(['conseiller' => $user, 'dateDebut' => $start])) {
+                            if ($rdvRepo->isSlotAvailable($user, $start, $slotEnd)) {
                                 $dayData['slots'][] = $start->format('H:i');
                                 $dayData['hasAvailability'] = true;
                             }
-                            $start = $slotEnd;
+                            $start = $slotEnd; // On avance au prochain slot
                         }
                     }
                 }

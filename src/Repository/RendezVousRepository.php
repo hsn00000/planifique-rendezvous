@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\RendezVous;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -17,21 +18,21 @@ class RendezVousRepository extends ServiceEntityRepository
     }
 
     /**
-     * Vérifie s'il existe un chevauchement pour ce conseiller sur cette plage horaire.
-     * Exclut le rendez-vous actuel (en cas de modification).
+     * Utilisé par le VALIDATEUR (Entité)
+     * Vérifie si un RDV chevauche, en excluant le RDV lui-même s'il est déjà en base (modification).
      */
     public function countOverlapping(RendezVous $rdv): int
     {
         $qb = $this->createQueryBuilder('r')
             ->select('count(r.id)')
             ->where('r.conseiller = :conseiller')
-            ->andWhere('r.dateDebut < :fin')  // Commence avant la fin du nouveau
-            ->andWhere('r.dateFin > :debut')  // Finit après le début du nouveau
+            ->andWhere('r.dateDebut < :fin')  // Le RDV en base commence AVANT la fin du nouveau
+            ->andWhere('r.dateFin > :debut')  // Le RDV en base finit APRÈS le début du nouveau
             ->setParameter('conseiller', $rdv->getConseiller())
             ->setParameter('debut', $rdv->getDateDebut())
             ->setParameter('fin', $rdv->getDateFin());
 
-        // Si le RDV existe déjà (il a un ID), on l'exclut de la recherche pour ne pas qu'il se bloque lui-même
+        // Si c'est une modification, on exclut l'ID actuel pour ne pas qu'il se bloque lui-même
         if ($rdv->getId()) {
             $qb->andWhere('r.id != :id')
                 ->setParameter('id', $rdv->getId());
@@ -40,28 +41,23 @@ class RendezVousRepository extends ServiceEntityRepository
         return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
-    //    /**
-    //     * @return RendezVous[] Returns an array of RendezVous objects
-    //     */
-    //    public function findByExampleField($value): array
-    //    {
-    //        return $this->createQueryBuilder('r')
-    //            ->andWhere('r.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->orderBy('r.id', 'ASC')
-    //            ->setMaxResults(10)
-    //            ->getQuery()
-    //            ->getResult()
-    //        ;
-    //    }
+    /**
+     * Utilisé par le CALENDRIER (Controller)
+     * Vérifie si une plage horaire brute est libre pour un conseiller.
+     */
+    public function isSlotAvailable(User $conseiller, \DateTimeInterface $start, \DateTimeInterface $end): bool
+    {
+        $count = $this->createQueryBuilder('r')
+            ->select('count(r.id)')
+            ->where('r.conseiller = :conseiller')
+            ->andWhere('r.dateDebut < :end')
+            ->andWhere('r.dateFin > :start')
+            ->setParameter('conseiller', $conseiller)
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->getQuery()
+            ->getSingleScalarResult();
 
-    //    public function findOneBySomeField($value): ?RendezVous
-    //    {
-    //        return $this->createQueryBuilder('r')
-    //            ->andWhere('r.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->getQuery()
-    //            ->getOneOrNullResult()
-    //        ;
-    //    }
+        return $count == 0;
+    }
 }
