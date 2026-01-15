@@ -1,31 +1,87 @@
 {# templates/emails/booking_confirmation_client.html.twig #}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Confirmation de rendez-vous</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
 
-<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-    <h2 style="color: #2563eb;">Confirmation de votre rendez-vous</h2>
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; margin-top: 40px; margin-bottom: 40px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
 
-    <p>Bonjour <strong>{{ rdv.prenom }}</strong>,</p>
+    {# --- EN-TÊTE : BLEU PLANIFIQUE --- #}
+    <tr>
+        <td align="center" style="padding: 40px; background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: #ffffff;">
+            {# LOGO (Utilise absolute_url pour que l'image s'affiche dans Gmail) #}
+            <img src="{{ absolute_url(asset('img/logo.png')) }}" alt="Planifique" style="height: 35px; filter: brightness(0) invert(1); margin-bottom: 20px; display: block;">
 
-    <p>Votre rendez-vous est bien confirmé. Voici les détails :</p>
+            <h1 style="margin: 0; font-size: 24px; font-weight: bold;">Rendez-vous confirmé</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.8; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Récapitulatif</p>
+        </td>
+    </tr>
 
-    <div style="background-color: #f3f4f6; padding: 20px; border-radius: 10px; margin: 20px 0;">
-        <p style="margin: 5px 0;"><strong>📅 Date :</strong> {{ rdv.dateDebut|date('d/m/Y') }}</p>
-        <p style="margin: 5px 0;"><strong>⏰ Heure :</strong> {{ rdv.dateDebut|date('H:i') }}</p>
-        <p style="margin: 5px 0;"><strong>👤 Conseiller :</strong> {{ rdv.conseiller.firstName }} {{ rdv.conseiller.lastName }}</p>
-        <p style="margin: 5px 0;"><strong>📍 Lieu :</strong> {{ rdv.typeLieu }}</p>
-    </div>
+    {# --- CORPS DU MESSAGE --- #}
+    <tr>
+        <td style="padding: 40px;">
+            <p style="color: #333; font-size: 16px; line-height: 1.5; margin-bottom: 30px; text-align: center;">
+                Bonjour <strong>{{ rdv.prenom }}</strong>,<br>
+                Votre demande a été validée avec succès. Voici les détails de votre entretien.
+            </p>
 
-    <p>Un événement a également été ajouté à l'agenda de votre conseiller.</p>
+            {# CADRE GRIS CLAIR #}
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8f9fa; border-radius: 12px; border: 1px solid #e9ecef;">
+                <tr>
+                    <td style="padding: 25px;">
 
-    <br>
+                        {# TYPE D'ÉVÉNEMENT #}
+                        <div style="margin-bottom: 20px; text-align: center;">
+                            <div style="font-size: 12px; color: #6c757d; text-transform: uppercase; margin-bottom: 5px;">Type de rendez-vous</div>
+                            <div style="font-size: 18px; font-weight: bold; color: #2563eb;">{{ rdv.evenement.titre }}</div>
+                        </div>
 
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="https://www.planifique-sa.com"
-           style="background-color: #2563eb; color: white; padding: 15px 25px; text-decoration: none; border-radius: 50px; font-weight: bold; display: inline-block;">
-            Accéder à PLANIFIQUE SA
-        </a>
-    </div>
+                        <hr style="border: 0; border-top: 1px solid #e9ecef; margin: 20px 0;">
 
-    <p style="font-size: 12px; color: #666; text-align: center; margin-top: 40px;">
-        Ceci est un email automatique, merci de ne pas y répondre.
-    </p>
-</div>
+                        {# DÉTAILS TEXTE (Sans Icônes) #}
+                        <table width="100%">
+                            <tr>
+                                <td style="padding-bottom: 15px; color: #6c757d; font-size: 14px;">Date</td>
+                                <td style="padding-bottom: 15px; text-align: right; font-weight: bold; color: #333; text-transform: capitalize;">
+                                    {{ rdv.dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr') }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-bottom: 15px; color: #6c757d; font-size: 14px;">Horaire</td>
+                                <td style="padding-bottom: 15px; text-align: right; font-weight: bold; color: #333;">
+                                    {{ rdv.dateDebut|date('H:i') }} - {{ rdv.dateFin|date('H:i') }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-bottom: 15px; color: #6c757d; font-size: 14px;">Conseiller</td>
+                                <td style="padding-bottom: 15px; text-align: right; font-weight: bold; color: #333;">
+                                    {{ rdv.conseiller.firstName }} {{ rdv.conseiller.lastName }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color: #6c757d; font-size: 14px;">Lieu</td>
+                                <td style="text-align: right; font-weight: bold; color: #333;">
+                                    {{ rdv.typeLieu }}
+                                    {% if rdv.adresse %}
+                                        <br><span style="font-size: 12px; font-weight: normal; color: #666;">{{ rdv.adresse }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+
+                    </td>
+                </tr>
+            </table>
+
+            <div style="margin-top: 40px; text-align: center; font-size: 12px; color: #999;">
+                <p style="margin: 0;">Ceci est un message automatique, merci de ne pas y répondre.</p>
+                <p style="margin: 5px 0 0 0;">&copy; {{ 'now'|date('Y') }} Planifique SA</p>
+            </div>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
