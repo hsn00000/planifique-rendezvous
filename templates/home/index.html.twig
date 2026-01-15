@@ -108,7 +108,7 @@
                                                 <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_booking_roundrobin', {'event': event.id}) }}">
                                                 <div class="badge bg-warning text-dark mb-3 w-100 py-2"><i class="fas fa-random me-1"></i> Équipe (Auto)</div>
                                             {% else %}
-                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_booking_personal', {'user': app.user.id, 'event': event.id}) }}">
+                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_booking_personal', {'userId': app.user.id, 'eventId': event.id}) }}">
                                             {% endif %}
 
                                             <button class="btn btn-sm btn-outline-primary rounded-pill w-100 mt-auto btn-copy mb-2"

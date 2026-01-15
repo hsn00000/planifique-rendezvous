@@ -9,7 +9,7 @@
                 <h2 class="fw-bold mb-4">Finaliser votre rendez-vous</h2>
                 <p class="text-muted">Type : <strong>{{ event.titre }}</strong> ({{ event.duree }} min)</p>
 
-                {{ form_start(form) }}
+                {{ form_start(form, {'attr': {'data-turbo': 'false'}}) }}
 
                 {# 1. AFFICHER LES ERREURS GLOBALES (Important pour le debug) #}
                 <div class="text-danger mb-3">

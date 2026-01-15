@@ -7,8 +7,9 @@ use App\Entity\RendezVous;
 use App\Entity\User;
 use App\Form\BookingFormType;
 use App\Repository\DisponibiliteHebdomadaireRepository;
+use App\Repository\EvenementRepository;
 use App\Repository\RendezVousRepository;
-use App\Repository\UserRepository; // On ajoute le repository
+use App\Repository\UserRepository;
 use App\Service\OutlookService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,9 +21,124 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class BookingController extends AbstractController
 {
-    #[Route('/book/{user}/{event}', name: 'app_booking_personal')]
-    public function bookPersonal(User $user, Evenement $event, RendezVousRepository $rdvRepo, DisponibiliteHebdomadaireRepository $dispoRepo): Response
+    /**
+     * ÉTAPE 1 : Confirmation et Enregistrement
+     * Doit être placée AVANT la route générique pour éviter les conflits.
+     */
+    #[Route('/book/confirm/{eventId}/{userId?}', name: 'app_booking_confirm')]
+    public function confirm(
+        Request $request,
+        string $eventId, // On récupère l'ID brut pour éviter le crash 404 automatique
+        ?string $userId,
+        EvenementRepository $eventRepo,
+        UserRepository $userRepo,
+        EntityManagerInterface $em,
+        MailerInterface $mailer,
+        OutlookService $outlookService
+    ): Response
     {
+        // 1. Recherche manuelle des entités
+        $event = $eventRepo->find($eventId);
+        $user = $userId ? $userRepo->find($userId) : null;
+
+        // Si l'événement n'existe pas, retour à l'accueil
+        if (!$event) {
+            return $this->redirectToRoute('app_home');
+        }
+
+        // 2. Préparation du Rendez-vous
+        $rendezVous = new RendezVous();
+        $rendezVous->setEvenement($event);
+        if ($user) {
+            $rendezVous->setConseiller($user);
+        }
+        $rendezVous->setTypeLieu('Visioconférence');
+
+        // 3. Gestion de la date depuis l'URL (ex: ?date=2026-05-20 14:00)
+        $dateParam = $request->query->get('date');
+        if ($dateParam) {
+            try {
+                $startDate = new \DateTime($dateParam);
+                $rendezVous->setDateDebut($startDate);
+                $endDate = (clone $startDate)->modify('+' . $event->getDuree() . ' minutes');
+                $rendezVous->setDateFin($endDate);
+            } catch (\Exception $e) {
+                // Si la date est invalide dans l'URL, on redirige
+                return $this->redirectToRoute('app_home');
+            }
+        }
+
+        // 4. Création et traitement du formulaire
+        $form = $this->createForm(BookingFormType::class, $rendezVous);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+
+            // Enregistrement en base
+            $em->persist($rendezVous);
+            $em->flush();
+
+            // Synchro Outlook (Optionnel, on capture les erreurs pour ne pas bloquer)
+            try {
+                if ($rendezVous->getConseiller()) {
+                    $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
+                }
+            } catch (\Exception $e) {
+                // Log l'erreur si besoin
+            }
+
+            // Envoi des emails
+            $this->sendConfirmationEmails($mailer, $rendezVous, $event);
+
+            // REDIRECTION CRUCIALE (Code 303 pour Turbo)
+            return $this->redirectToRoute('app_booking_success', [
+                'id' => $rendezVous->getId()
+            ], Response::HTTP_SEE_OTHER);
+        }
+
+        // Affichage de la vue si pas soumis ou invalide
+        return $this->render('booking/confirm.html.twig', [
+            'form' => $form->createView(),
+            'event' => $event,
+            'conseiller' => $user,
+            'dateChoisie' => $rendezVous->getDateDebut()
+        ]);
+    }
+
+    /**
+     * ÉTAPE 2 : Page de Succès
+     * Accessible uniquement après redirection.
+     */
+    #[Route('/book/success/{id}', name: 'app_booking_success')]
+    public function success(RendezVous $rendezVous): Response
+    {
+        return $this->render('booking/success.html.twig', [
+            'rendezVous' => $rendezVous
+        ]);
+    }
+
+    /**
+     * ÉTAPE 3 : Calendrier de Réservation (Route Générique)
+     * Placée EN DERNIER car elle contient des {paramètres} qui captent tout.
+     */
+    #[Route('/book/{userId}/{eventId}', name: 'app_booking_personal', requirements: ['userId' => '\d+', 'eventId' => '\d+'])]
+    public function bookPersonal(
+        string $userId,
+        string $eventId,
+        UserRepository $userRepo,
+        EvenementRepository $eventRepo,
+        RendezVousRepository $rdvRepo,
+        DisponibiliteHebdomadaireRepository $dispoRepo
+    ): Response
+    {
+        // Recherche manuelle
+        $user = $userRepo->find($userId);
+        $event = $eventRepo->find($eventId);
+
+        if (!$user || !$event) {
+            throw $this->createNotFoundException("Conseiller ou événement introuvable.");
+        }
+
         $slotsByDay = $this->generateSlots($user, $event, $rdvRepo, $dispoRepo);
 
         return $this->render('booking/index.html.twig', [
@@ -32,73 +148,7 @@ class BookingController extends AbstractController
         ]);
     }
 
-    // On utilise {userId} au lieu de {user} pour éviter que Symfony ne plante s'il ne le trouve pas
-    #[Route('/book/confirm/{event}/{userId?}', name: 'app_booking_confirm')]
-    public function confirm(
-        Request $request,
-        Evenement $event,
-        ?string $userId, // On récupère l'ID comme une simple chaîne
-        UserRepository $userRepo, // On injecte le repo pour chercher l'user nous-mêmes
-        EntityManagerInterface $em,
-        MailerInterface $mailer,
-        OutlookService $outlookService
-    ): Response
-    {
-        // On cherche l'utilisateur. S'il n'existe pas, $user sera null mais le code NE PLANTERA PAS.
-        $user = $userId ? $userRepo->find($userId) : null;
-
-        $rendezVous = new RendezVous();
-        $rendezVous->setEvenement($event);
-        if ($user) $rendezVous->setConseiller($user);
-        $rendezVous->setTypeLieu('Visioconférence');
-
-        $dateParam = $request->query->get('date');
-        if ($dateParam) {
-            try {
-                $startDate = new \DateTime($dateParam);
-                $rendezVous->setDateDebut($startDate);
-                $endDate = (clone $startDate)->modify('+' . $event->getDuree() . ' minutes');
-                $rendezVous->setDateFin($endDate);
-            } catch (\Exception $e) {
-                return $this->redirectToRoute('app_home');
-            }
-        }
-
-        $form = $this->createForm(BookingFormType::class, $rendezVous);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($rendezVous);
-            $em->flush();
-
-            // Synchro Outlook + Emails
-            try {
-                if ($rendezVous->getConseiller()) {
-                    $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
-                }
-            } catch (\Exception $e) {}
-
-            $this->sendConfirmationEmails($mailer, $rendezVous, $event);
-
-            // REDIRECTION REELLE : On va vers une page de succès
-            return $this->redirectToRoute('app_booking_success', ['id' => $rendezVous->getId()]);
-        }
-
-        return $this->render('booking/confirm.html.twig', [
-            'form' => $form->createView(),
-            'event' => $event,
-            'conseiller' => $user,
-            'dateChoisie' => $rendezVous->getDateDebut()
-        ]);
-    }
-
-    #[Route('/book/success/{id}', name: 'app_booking_success')]
-    public function success(RendezVous $rendezVous): Response
-    {
-        return $this->render('booking/success.html.twig', [
-            'rendezVous' => $rendezVous
-        ]);
-    }
+    // --- MÉTHODES PRIVÉES ---
 
     private function sendConfirmationEmails($mailer, $rdv, $event): void
     {
@@ -109,10 +159,11 @@ class BookingController extends AbstractController
             ->htmlTemplate('emails/booking_confirmation_client.html.twig')
             ->context(['rdv' => $rdv]);
 
-        try { $mailer->send($emailClient); } catch (\Exception $e) {}
+        try {
+            $mailer->send($emailClient);
+        } catch (\Exception $e) {}
     }
 
-    // Ta méthode generateSlots (calendrier) reste inchangée ici...
     private function generateSlots(User $user, Evenement $event, RendezVousRepository $rdvRepo, DisponibiliteHebdomadaireRepository $dispoRepo): array
     {
         $calendarData = [];
@@ -129,12 +180,16 @@ class BookingController extends AbstractController
 
         $disposHebdo = $dispoRepo->findBy(['user' => $user]);
         $rulesByDay = [];
-        foreach ($disposHebdo as $dispo) { $rulesByDay[$dispo->getJourSemaine()][] = $dispo; }
+        foreach ($disposHebdo as $dispo) {
+            $rulesByDay[$dispo->getJourSemaine()][] = $dispo;
+        }
 
         $currentDate = clone $startPeriod;
         while ($currentDate <= $endPeriod) {
             $sortKey = $currentDate->format('Y-m');
-            if (!isset($calendarData[$sortKey])) { $calendarData[$sortKey] = ['label' => clone $currentDate, 'days' => []]; }
+            if (!isset($calendarData[$sortKey])) {
+                $calendarData[$sortKey] = ['label' => clone $currentDate, 'days' => []];
+            }
             $dayOfWeek = (int)$currentDate->format('N');
             $dayData = [
                 'dateObj' => clone $currentDate,

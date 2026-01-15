@@ -162,7 +162,7 @@
 
             slots.forEach(time => {
                 const link = document.createElement('a');
-                link.href = `{{ path('app_booking_confirm', {'event': event.id, 'user': conseiller.id}) }}?date=${dateValue} ${time}`;
+                link.href = `{{ path('app_booking_confirm', {'eventId': event.id, 'userId': conseiller.id}) }}?date=${dateValue} ${time}`;
                 link.className = 'btn btn-outline-primary fw-bold w-100 py-3 mb-2 slot-btn';
                 link.textContent = time;
                 list.appendChild(link);
