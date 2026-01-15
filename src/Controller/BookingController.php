@@ -52,7 +52,13 @@ class BookingController extends AbstractController
         $dateParam = $request->query->get('date');
         if ($dateParam) {
             try {
-                $rendezVous->setDateDebut(new \DateTime($dateParam));
+                $startDate = new \DateTime($dateParam);
+                $rendezVous->setDateDebut($startDate);
+
+                // CRUCIAL : Calculer la date de fin pour la validation de l'entité
+                $endDate = (clone $startDate)->modify('+' . $event->getDuree() . ' minutes');
+                $rendezVous->setDateFin($endDate);
+
             } catch (\Exception $e) {
                 // Si la date est invalide, retour à l'accueil
                 return $this->redirectToRoute('app_home');
@@ -62,6 +68,13 @@ class BookingController extends AbstractController
         $form = $this->createForm(BookingFormType::class, $rendezVous);
         $form->handleRequest($request);
 
+        if ($form->isSubmitted() && !$form->isValid()) {
+            // Cela affichera toutes les erreurs dans la barre de debug de Symfony (en bas)
+            foreach ($form->getErrors(true) as $error) {
+                $this->addFlash('error', $error->getOrigin()->getName() . ' : ' . $error->getMessage());
+            }
+        }
+
         // Si le formulaire est soumis et valide
         if ($form->isSubmitted() && $form->isValid()) {
 
@@ -69,13 +82,17 @@ class BookingController extends AbstractController
             $em->persist($rendezVous);
             $em->flush();
 
-            // 2. Synchronisation Outlook
-            if ($rendezVous->getConseiller()) {
-                $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
+            // 2. Synchronisation Outlook (Sécurisée par un try/catch)
+            try {
+                if ($rendezVous->getConseiller()) {
+                    $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
+                }
+            } catch (\Exception $e) {
+                // On continue même si Outlook échoue
             }
 
             // 3. Email Client
-            $emailClient = (new TemplatedEmail())
+            $emailClient = new TemplatedEmail()
                 ->from('no-reply@planifique.com')
                 ->to($rendezVous->getEmail())
                 ->subject('Confirmation RDV : ' . $event->getTitre())
@@ -86,7 +103,7 @@ class BookingController extends AbstractController
 
             // 4. Email Conseiller
             if ($rendezVous->getConseiller()) {
-                $emailConseiller = (new TemplatedEmail())
+                $emailConseiller = new TemplatedEmail()
                     ->from('no-reply@planifique.com')
                     ->to($rendezVous->getConseiller()->getEmail())
                     ->subject('Nouveau RDV : ' . $rendezVous->getNom() . ' ' . $rendezVous->getPrenom())
@@ -96,7 +113,6 @@ class BookingController extends AbstractController
                 try { $mailer->send($emailConseiller); } catch (\Exception $e) {}
             }
 
-            // 5. Redirection vers la page de succès
             return $this->render('booking/success.html.twig', [
                 'rendezVous' => $rendezVous
             ]);

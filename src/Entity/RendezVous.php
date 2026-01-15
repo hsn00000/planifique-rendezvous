@@ -28,6 +28,9 @@ class RendezVous
     #[ORM\Column]
     private ?\DateTime $dateDebut = null;
 
+    #[ORM\Column(nullable: true)]
+    private ?\DateTime $dateFin = null;
+
     #[ORM\Column(length: 20)]
     private ?string $typeLieu = null;
 
@@ -102,6 +105,19 @@ class RendezVous
     {
         $this->dateDebut = $dateDebut;
 
+        return $this;
+    }
+
+    // Ajout du Getter pour dateFin
+    public function getDateFin(): ?\DateTime
+    {
+        return $this->dateFin;
+    }
+
+    // Ajout du Setter pour dateFin
+    public function setDateFin(\DateTime $dateFin): static
+    {
+        $this->dateFin = $dateFin;
         return $this;
     }
 
