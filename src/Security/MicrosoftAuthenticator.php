@@ -153,7 +153,7 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
         $user = $token->getUser();
 
         // On récupère le paquet complet de clés Microsoft
-        $client = $this->clientRegistry->getClient('microsoft');
+        $client = $this->clientRegistry->getClient('azure');
         $accessToken = $client->getAccessToken();
 
         // 🚀 SAUVEGARDE PRO : On stocke les clés dans la BDD
