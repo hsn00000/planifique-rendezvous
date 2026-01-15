@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Form\BookingFormType;
 use App\Repository\DisponibiliteHebdomadaireRepository;
 use App\Repository\RendezVousRepository;
+use App\Repository\UserRepository; // On ajoute le repository
 use App\Service\OutlookService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -31,24 +32,26 @@ class BookingController extends AbstractController
         ]);
     }
 
-    #[Route('/book/confirm/{event}/{user}', name: 'app_booking_confirm', defaults: ['user' => null])]
+    // On utilise {userId} au lieu de {user} pour éviter que Symfony ne plante s'il ne le trouve pas
+    #[Route('/book/confirm/{event}/{userId?}', name: 'app_booking_confirm')]
     public function confirm(
         Request $request,
         Evenement $event,
-        ?User $user, // Symfony cherche l'user par l'ID dans l'URL. S'il n'y a rien, il sera null.
+        ?string $userId, // On récupère l'ID comme une simple chaîne
+        UserRepository $userRepo, // On injecte le repo pour chercher l'user nous-mêmes
         EntityManagerInterface $em,
         MailerInterface $mailer,
         OutlookService $outlookService
     ): Response
     {
+        // On cherche l'utilisateur. S'il n'existe pas, $user sera null mais le code NE PLANTERA PAS.
+        $user = $userId ? $userRepo->find($userId) : null;
+
         $rendezVous = new RendezVous();
         $rendezVous->setEvenement($event);
         if ($user) $rendezVous->setConseiller($user);
-
-        // Valeur par défaut
         $rendezVous->setTypeLieu('Visioconférence');
 
-        // Gestion de la date depuis l'URL
         $dateParam = $request->query->get('date');
         if ($dateParam) {
             try {
@@ -64,24 +67,20 @@ class BookingController extends AbstractController
         $form = $this->createForm(BookingFormType::class, $rendezVous);
         $form->handleRequest($request);
 
-        // Si le formulaire est soumis et valide
         if ($form->isSubmitted() && $form->isValid()) {
-
-            // 1. Sauvegarde en Base de Données
             $em->persist($rendezVous);
             $em->flush();
 
-            // 2. Synchronisation Outlook
+            // Synchro Outlook + Emails
             try {
                 if ($rendezVous->getConseiller()) {
                     $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
                 }
             } catch (\Exception $e) {}
 
-            // 3. Envoi des Emails
-            $this->sendEmails($rendezVous, $event, $mailer);
+            $this->sendConfirmationEmails($mailer, $rendezVous, $event);
 
-            // 4. REDIRECTION VERS LA PAGE DE SUCCÈS (Utilise l'ID du RDV)
+            // REDIRECTION REELLE : On va vers une page de succès
             return $this->redirectToRoute('app_booking_success', ['id' => $rendezVous->getId()]);
         }
 
@@ -93,7 +92,6 @@ class BookingController extends AbstractController
         ]);
     }
 
-    // Nouvelle méthode pour afficher la page de succès sans renvoyer le formulaire
     #[Route('/book/success/{id}', name: 'app_booking_success')]
     public function success(RendezVous $rendezVous): Response
     {
@@ -102,7 +100,7 @@ class BookingController extends AbstractController
         ]);
     }
 
-    private function sendEmails(RendezVous $rdv, Evenement $event, MailerInterface $mailer): void
+    private function sendConfirmationEmails($mailer, $rdv, $event): void
     {
         $emailClient = (new TemplatedEmail())
             ->from('no-reply@planifique.com')
@@ -112,22 +110,9 @@ class BookingController extends AbstractController
             ->context(['rdv' => $rdv]);
 
         try { $mailer->send($emailClient); } catch (\Exception $e) {}
-
-        if ($rdv->getConseiller()) {
-            $emailConseiller = (new TemplatedEmail())
-                ->from('no-reply@planifique.com')
-                ->to($rdv->getConseiller()->getEmail())
-                ->subject('Nouveau RDV : ' . $rdv->getNom() . ' ' . $rdv->getPrenom())
-                ->htmlTemplate('emails/booking_notification_conseiller.html.twig')
-                ->context(['rdv' => $rdv]);
-
-            try { $mailer->send($emailConseiller); } catch (\Exception $e) {}
-        }
     }
 
-    /**
-     * Ta méthode originale de génération des créneaux (Calendrier)
-     */
+    // Ta méthode generateSlots (calendrier) reste inchangée ici...
     private function generateSlots(User $user, Evenement $event, RendezVousRepository $rdvRepo, DisponibiliteHebdomadaireRepository $dispoRepo): array
     {
         $calendarData = [];
@@ -149,20 +134,18 @@ class BookingController extends AbstractController
         $currentDate = clone $startPeriod;
         while ($currentDate <= $endPeriod) {
             $sortKey = $currentDate->format('Y-m');
-            if (!isset($calendarData[$sortKey])) {
-                $calendarData[$sortKey] = ['label' => clone $currentDate, 'days' => []];
-            }
+            if (!isset($calendarData[$sortKey])) { $calendarData[$sortKey] = ['label' => clone $currentDate, 'days' => []]; }
+            $dayOfWeek = (int)$currentDate->format('N');
             $dayData = [
                 'dateObj' => clone $currentDate,
                 'dayNum' => $currentDate->format('d'),
-                'isToday' => $currentDate->format('Y-m-d') === new \DateTime()->format('Y-m-d'),
+                'isToday' => $currentDate->format('Y-m-d') === (new \DateTime())->format('Y-m-d'),
                 'isPast' => $currentDate < new \DateTime('today'),
                 'slots' => [],
                 'hasAvailability' => false
             ];
 
             if (!$dayData['isPast']) {
-                $dayOfWeek = (int)$currentDate->format('N');
                 if (isset($rulesByDay[$dayOfWeek])) {
                     foreach ($rulesByDay[$dayOfWeek] as $rule) {
                         if ($rule->isEstBloque()) continue;
@@ -171,8 +154,7 @@ class BookingController extends AbstractController
                         while ($start < $end) {
                             $slotEnd = (clone $start)->modify("+$duration minutes");
                             if ($slotEnd > $end) break;
-                            $isBusy = $rdvRepo->findOneBy(['conseiller' => $user, 'dateDebut' => $start]);
-                            if (!$isBusy) {
+                            if (!$rdvRepo->findOneBy(['conseiller' => $user, 'dateDebut' => $start])) {
                                 $dayData['slots'][] = $start->format('H:i');
                                 $dayData['hasAvailability'] = true;
                             }
