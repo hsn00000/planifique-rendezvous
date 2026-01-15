@@ -101,7 +101,8 @@ class BookingController extends AbstractController
             'form' => $form->createView(),
             'event' => $event,
             'conseiller' => $user,
-            'dateChoisie' => $rendezVous->getDateDebut()
+            'dateChoisie' => $rendezVous->getDateDebut(),
+            'rendezvous' => $rendezVous
         ]);
     }
 
@@ -113,7 +114,7 @@ class BookingController extends AbstractController
     public function success(RendezVous $rendezVous): Response
     {
         return $this->render('booking/success.html.twig', [
-            'rendezVous' => $rendezVous
+            'rendezvous' => $rendezVous
         ]);
     }
 
@@ -152,7 +153,7 @@ class BookingController extends AbstractController
 
     private function sendConfirmationEmails($mailer, $rdv, $event): void
     {
-        $emailClient = (new TemplatedEmail())
+        $emailClient = new TemplatedEmail()
             ->from('no-reply@planifique.com')
             ->to($rdv->getEmail())
             ->subject('Confirmation RDV : ' . $event->getTitre())

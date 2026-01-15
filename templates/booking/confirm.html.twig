@@ -1,77 +1,133 @@
+{# templates/booking/confirm.html.twig #}
 {% extends 'base_public.html.twig' %}
 
 {% block title %}Finaliser le RDV{% endblock %}
 
 {% block body %}
-    <div class="container py-5">
-        <div class="card shadow-sm border-0 mx-auto" style="max-width: 800px; border-radius: 15px;">
-            <div class="card-body p-5">
-                <h2 class="fw-bold mb-4">Finaliser votre rendez-vous</h2>
-                <p class="text-muted">Type : <strong>{{ event.titre }}</strong> ({{ event.duree }} min)</p>
+    <div class="container py-5 d-flex justify-content-center align-items-center min-vh-100">
 
-                {{ form_start(form, {'attr': {'data-turbo': 'false'}}) }}
+        <div class="card border-0 shadow-lg overflow-hidden" style="max-width: 900px; width: 100%; border-radius: 16px;">
+            <div class="row g-0">
 
-                {# 1. AFFICHER LES ERREURS GLOBALES (Important pour le debug) #}
-                <div class="text-danger mb-3">
-                    {{ form_errors(form) }}
-                </div>
+                {# --- COLONNE GAUCHE : RÉCAPITULATIF --- #}
+                <div class="col-md-5 bg-white border-end p-4 p-md-5">
+                    <div class="text-muted small text-uppercase fw-bold ls-1 mb-2">Rendez-vous avec</div>
+                    <div class="fw-bold text-dark h5 mb-4">{{ conseiller.firstName }} {{ conseiller.lastName }}</div>
 
-                <div class="row">
-                    <div class="col-md-6 mb-3">{{ form_row(form.prenom) }}</div>
-                    <div class="col-md-6 mb-3">{{ form_row(form.nom) }}</div>
-                </div>
-                <div class="mb-3">{{ form_row(form.email) }}</div>
-                <div class="mb-3">{{ form_row(form.telephone) }}</div>
+                    <h2 class="h4 fw-bold mb-3">{{ event.titre }}</h2>
 
-                <div class="bg-light p-4 rounded mb-3">
-                    {# Ce champ doit exister dans ton BookingFormType #}
-                    {{ form_row(form.typeLieu, {'attr': {'class': 'form-select type-lieu-selector'}}) }}
-
-                    <div id="adresse-field" class="mt-3 d-none">
-                        {{ form_row(form.adresse) }}
+                    <div class="d-flex flex-column gap-3 text-secondary">
+                        <div class="d-flex align-items-center">
+                            <i class="far fa-clock me-3 fs-5 text-primary" style="width: 25px;"></i>
+                            <span class="fw-bold text-dark">
+                                {{ event.duree }} min
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <i class="far fa-calendar-alt me-3 fs-5 text-success" style="width: 25px;"></i>
+                            <span class="fw-bold text-dark text-capitalize">
+                                {{ dateChoisie|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr') }}
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <i class="far fa-clock me-3 fs-5 text-success" style="width: 25px;"></i>
+                            <span class="fw-bold text-dark">
+                                {{ dateChoisie|date('H:i') }}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
-                {# 2. AJOUT DE TYPE="SUBMIT" #}
-                <button type="submit" class="btn btn-primary w-100 py-3 fw-bold rounded-pill">
-                    Confirmer la réservation
-                </button>
+                {# --- COLONNE DROITE : FORMULAIRE --- #}
+                <div class="col-md-7 bg-white p-4 p-md-5">
+                    <h3 class="h5 fw-bold mb-4">Vos coordonnées</h3>
 
-                {{ form_end(form) }}
+                    {# IMPORTANT : data-turbo="false" pour éviter les bugs de script avec Turbo #}
+                    {{ form_start(form, {'attr': {'data-turbo': 'false', 'id': 'booking-form'}}) }}
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">{{ form_row(form.prenom) }}</div>
+                        <div class="col-md-6 mb-3">{{ form_row(form.nom) }}</div>
+                    </div>
+
+                    <div class="mb-3">{{ form_row(form.email) }}</div>
+                    <div class="mb-3">{{ form_row(form.telephone) }}</div>
+
+                    <hr class="my-4 text-muted opacity-25">
+
+                    {# SÉLECTION DU LIEU #}
+                    <div class="mb-3">
+                        {{ form_label(form.typeLieu) }}
+                        {# On ajoute un ID spécifique pour le cibler facilement en JS #}
+                        {{ form_widget(form.typeLieu, {'attr': {'class': 'form-select', 'id': 'select-lieu'}}) }}
+                        {{ form_errors(form.typeLieu) }}
+                    </div>
+
+                    {# CHAMP ADRESSE (Masqué par défaut) #}
+                    <div id="field-adresse-container" class="mb-4 d-none">
+                        {{ form_label(form.adresse) }}
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0"><i class="fas fa-map-marker-alt text-danger"></i></span>
+                            {{ form_widget(form.adresse, {'attr': {'class': 'form-control border-start-0 ps-0'}}) }}
+                        </div>
+                        <div class="form-text text-muted">Indiquez l'adresse exacte où le conseiller doit se rendre.</div>
+                        {{ form_errors(form.adresse) }}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-3 rounded-pill fw-bold mt-2 shadow-sm">
+                        Confirmer le rendez-vous
+                    </button>
+
+                    {{ form_end(form) }}
+                </div>
+
             </div>
         </div>
     </div>
 
+    {# --- SCRIPT JS POUR GÉRER L'AFFICHAGE DE L'ADRESSE --- #}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // On cible le SELECT (liste déroulante) généré par Symfony
-            // L'ID est généralement booking_form_typeLieu, on utilise l'attribut id finissant par typeLieu
-            const lieuSelect = document.querySelector('[id$="typeLieu"]');
-            const adresseField = document.getElementById('adresse-field');
+            const selectLieu = document.getElementById('select-lieu');
+            const containerAdresse = document.getElementById('field-adresse-container');
+            const inputAdresse = containerAdresse ? containerAdresse.querySelector('input') : null;
 
-            if (lieuSelect) {
-                // Fonction pour gérer l'affichage
-                function toggleAdresse() {
-                    // Vérifie la valeur (adapte 'domicile' selon ce que tu as mis dans ton FormType : 'Présentiel', 'Domicile', etc.)
-                    // Convertit en minuscule pour éviter les erreurs de casse
-                    const val = lieuSelect.value.toLowerCase();
+            function toggleAdresse() {
+                if (!selectLieu || !containerAdresse) return;
 
-                    if (val.includes('domicile') || val.includes('presentiel') || val.includes('physique')) {
-                        adresseField.classList.remove('d-none');
-                    } else {
-                        adresseField.classList.add('d-none');
-                        // Optionnel : vider le champ adresse si on repasse en visio
-                        const adresseInput = adresseField.querySelector('input');
-                        if(adresseInput) adresseInput.value = '';
+                const valeur = selectLieu.value;
+
+                // Si la valeur contient "Domicile" (vérifie bien la valeur définie dans BookingFormType)
+                if (valeur === 'Domicile') {
+                    containerAdresse.classList.remove('d-none');
+                    containerAdresse.classList.add('fade-in'); // Animation optionnelle
+                    if(inputAdresse) inputAdresse.required = true; // On rend le champ requis HTML5
+                } else {
+                    containerAdresse.classList.add('d-none');
+                    containerAdresse.classList.remove('fade-in');
+                    if(inputAdresse) {
+                        inputAdresse.value = ''; // On vide le champ pour éviter d'envoyer une adresse fantôme
+                        inputAdresse.required = false;
                     }
                 }
+            }
 
-                // Écouteur d'événement
-                lieuSelect.addEventListener('change', toggleAdresse);
-
-                // Lancer au chargement (au cas où il y a une erreur et que la page se recharge)
+            // Écouter le changement
+            if (selectLieu) {
+                selectLieu.addEventListener('change', toggleAdresse);
+                // Lancer une fois au chargement (en cas d'erreur de formulaire, pour réafficher le champ)
                 toggleAdresse();
             }
         });
     </script>
+
+    <style>
+        .fade-in {
+            animation: fadeIn 0.4s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 {% endblock %}
