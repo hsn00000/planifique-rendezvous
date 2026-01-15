@@ -1,0 +1,8 @@
+<h1>Bonjour {{ rdv.prenom }},</h1>
+<p>Votre rendez-vous est confirmé avec {{ rdv.conseiller.firstName }} {{ rdv.conseiller.lastName }}.</p>
+<ul>
+    <li>Date : {{ rdv.dateDebut|date('d/m/Y à H:i') }}</li>
+    <li>Sujet : {{ rdv.evenement.titre }}</li>
+    <li>Lieu : {{ rdv.typeLieu }}</li>
+</ul>
+<p>Merci d'avoir utilisé Planifique !</p>

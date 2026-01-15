@@ -150,17 +150,21 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
     {
-        // Récupération du user connecté
         $user = $token->getUser();
 
-        // On récupère le token Microsoft depuis le client OAuth
+        // On récupère le paquet complet de clés Microsoft
         $client = $this->clientRegistry->getClient('microsoft');
-        $accessToken = $client->getAccessToken(); // C'est un objet AccessToken
+        $accessToken = $client->getAccessToken();
 
-        // Sauvegarde en base
-        if ($user->getMicrosoftAccount()) {
-            $user->getMicrosoftAccount()->setAccessToken($accessToken->getToken());
-            $user->getMicrosoftAccount()->setRefreshToken($accessToken->getRefreshToken());
+        // 🚀 SAUVEGARDE PRO : On stocke les clés dans la BDD
+        if ($user && $user->getMicrosoftAccount()) {
+            $msAccount = $user->getMicrosoftAccount();
+
+            $msAccount->setAccessToken($accessToken->getToken());
+            $msAccount->setRefreshToken($accessToken->getRefreshToken());
+            $msAccount->setExpiresAt($accessToken->getExpires()); // Tu as bien fait de créer ce champ !
+
+            $this->entityManager->persist($msAccount);
             $this->entityManager->flush();
         }
 

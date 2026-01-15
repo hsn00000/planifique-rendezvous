@@ -1,0 +1,8 @@
+<h1>Nouveau Rendez-vous !</h1>
+<p>Un client vient de réserver un créneau.</p>
+<ul>
+    <li>Client : {{ rdv.prenom }} {{ rdv.nom }}</li>
+    <li>Email : {{ rdv.email }}</li>
+    <li>Téléphone : {{ rdv.telephone }}</li>
+    <li>Date : {{ rdv.dateDebut|date('d/m/Y à H:i') }}</li>
+</ul>
