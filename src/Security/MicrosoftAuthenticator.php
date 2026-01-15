@@ -150,6 +150,20 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
     {
+        // Récupération du user connecté
+        $user = $token->getUser();
+
+        // On récupère le token Microsoft depuis le client OAuth
+        $client = $this->clientRegistry->getClient('microsoft');
+        $accessToken = $client->getAccessToken(); // C'est un objet AccessToken
+
+        // Sauvegarde en base
+        if ($user->getMicrosoftAccount()) {
+            $user->getMicrosoftAccount()->setAccessToken($accessToken->getToken());
+            $user->getMicrosoftAccount()->setRefreshToken($accessToken->getRefreshToken());
+            $this->entityManager->flush();
+        }
+
         return new RedirectResponse($this->router->generate('app_home'));
     }
 

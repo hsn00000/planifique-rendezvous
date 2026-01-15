@@ -22,7 +22,8 @@ class MicrosoftAuthController extends AbstractController
             'openid',
             'profile',
             'email',
-            'offline_access',
+            'Calendars.ReadWrite', // Pour ajouter le RDV
+            'offline_access',      // Pour garder l'accès quand il dort (Refresh Token).
             'GroupMember.Read.All'
         ]);
     }
