@@ -1,0 +1,11 @@
+framework:
+    messenger:
+        transports:
+            sync: 'sync://'
+
+        routing:
+            Symfony\Component\Mailer\Messenger\SendEmailMessage: sync
+
+
+            # Route your messages to the transports
+            # 'App\Message\YourMessage': async
