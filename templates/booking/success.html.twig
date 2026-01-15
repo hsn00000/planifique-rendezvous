@@ -47,12 +47,10 @@
             </div>
 
             <div class="d-grid gap-2">
-                <a href="{{ path('app_home') }}" class="btn btn-primary fw-bold py-3">
-                    Retour à l'accueil
-                </a>
-                <a href="https://outlook.office.com/calendar/0/deeplink/compose?subject={{ 'RDV : ' ~ rendezVous.evenement.titre }}&startdt={{ rendezVous.dateDebut|date('Y-m-d\\TH:i:s') }}&enddt={{ rendezVous.dateDebut|date_modify('+' ~ rendezVous.evenement.duree ~ ' minutes')|date('Y-m-d\\TH:i:s') }}&body=Rendez-vous confirmé via Planifique"
-                   target="_blank" class="btn btn-outline-secondary fw-bold py-3">
-                    <i class="fab fa-microsoft me-2"></i> Ajouter à mon agenda
+                {# BOUTON VERS LE SITE VITRINE PLANIFIQUE SA #}
+                {# Pensez à remplacer l'URL par la vraie URL de votre site #}
+                <a href="https://www.planifique.com/" class="btn btn-primary fw-bold py-3 rounded-pill shadow-sm">
+                    Accéder au site PLANIFIQUE SA
                 </a>
             </div>
 
