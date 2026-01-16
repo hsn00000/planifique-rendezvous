@@ -147,4 +147,44 @@ class OutlookService
             return null;
         }
     }
+
+    public function getOutlookBusyPeriods(User $conseiller, \DateTimeInterface $date): array
+    {
+        $microsoftAccount = $conseiller->getMicrosoftAccount();
+        if (!$microsoftAccount) return [];
+
+        $accessToken = $this->getValidAccessToken($microsoftAccount);
+        if (!$accessToken) return [];
+
+        // On regarde la journée entière
+        $startStr = $date->format('Y-m-d') . 'T00:00:00';
+        $endStr = $date->format('Y-m-d') . 'T23:59:59';
+
+        try {
+            // On demande à Microsoft : "Donne-moi tous les événements de cette journée"
+            // On force le TimeZone Europe/Paris pour être synchro
+            $response = $this->httpClient->request('GET', "https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=$startStr&endDateTime=$endStr", [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Prefer' => 'outlook.timezone="Europe/Paris"'
+                ]
+            ]);
+
+            $data = $response->toArray();
+            $busySlots = [];
+
+            foreach ($data['value'] as $event) {
+                // On stocke les périodes occupées
+                $busySlots[] = [
+                    'start' => new \DateTime($event['start']['dateTime']),
+                    'end' => new \DateTime($event['end']['dateTime'])
+                ];
+            }
+
+            return $busySlots;
+
+        } catch (\Exception $e) {
+            return []; // En cas d'erreur, on considère que c'est libre (ou bloqué par sécurité, à toi de voir)
+        }
+    }
 }

@@ -60,4 +60,21 @@ class RendezVousRepository extends ServiceEntityRepository
 
         return $count == 0;
     }
+
+    public function countRendezVousForUserOnDate(User $user, \DateTimeInterface $date): int
+    {
+        // On définit le début et la fin de la journée (00:00:00 à 23:59:59)
+        $start = (clone $date)->setTime(0, 0, 0);
+        $end = (clone $date)->setTime(23, 59, 59);
+
+        return $this->createQueryBuilder('r')
+            ->select('count(r.id)')
+            ->where('r.conseiller = :user')
+            ->andWhere('r.dateDebut BETWEEN :start AND :end')
+            ->setParameter('user', $user)
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

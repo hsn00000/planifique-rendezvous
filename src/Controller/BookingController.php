@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Evenement;
+use App\Entity\Groupe;
 use App\Entity\RendezVous;
 use App\Entity\User;
 use App\Form\BookingFormType;
@@ -21,6 +22,39 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class BookingController extends AbstractController
 {
+
+    /**
+     * Logique de sélection intelligente (Helper)
+     */
+    private function findAvailableConseiller($groupe, \DateTime $start, int $duree, $rdvRepo, $outlookService): ?User
+    {
+        $conseillers = $groupe->getUsers()->toArray();
+        shuffle($conseillers); // Pour l'équité du Round Robin
+        $slotEnd = (clone $start)->modify("+$duree minutes");
+
+        foreach ($conseillers as $conseiller) {
+            // 1. Limite de 3 RDV par jour
+            if ($rdvRepo->countRendezVousForUserOnDate($conseiller, $start) >= 3) continue;
+
+            // 2. Disponibilité interne (BDD)
+            if (!$rdvRepo->isSlotAvailable($conseiller, $start, $slotEnd)) continue;
+
+            // 3. Disponibilité externe (Outlook)
+            $busy = $outlookService->getOutlookBusyPeriods($conseiller, $start);
+            $freeOnOutlook = true;
+            foreach ($busy as $period) {
+                if ($start < $period['end'] && $slotEnd > $period['start']) {
+                    $freeOnOutlook = false;
+                    break;
+                }
+            }
+
+            if ($freeOnOutlook) return $conseiller;
+        }
+
+        return null;
+    }
+
     /**
      * ÉTAPE 1 : Confirmation et Enregistrement
      * Doit être placée AVANT la route générique pour éviter les conflits.
@@ -28,75 +62,74 @@ class BookingController extends AbstractController
     #[Route('/book/confirm/{eventId}/{userId?}', name: 'app_booking_confirm')]
     public function confirm(
         Request $request,
-        string $eventId, // On récupère l'ID brut pour éviter le crash 404 automatique
+        string $eventId,
         ?string $userId,
         EvenementRepository $eventRepo,
         UserRepository $userRepo,
+        RendezVousRepository $rdvRepo,
         EntityManagerInterface $em,
         MailerInterface $mailer,
         OutlookService $outlookService
     ): Response
     {
-        // 1. Recherche manuelle des entités
         $event = $eventRepo->find($eventId);
+        if (!$event) return $this->redirectToRoute('app_home');
+
         $user = $userId ? $userRepo->find($userId) : null;
-
-        // Si l'événement n'existe pas, retour à l'accueil
-        if (!$event) {
-            return $this->redirectToRoute('app_home');
-        }
-
-        // 2. Préparation du Rendez-vous
         $rendezVous = new RendezVous();
         $rendezVous->setEvenement($event);
-        if ($user) {
-            $rendezVous->setConseiller($user);
-        }
-        $rendezVous->setTypeLieu('Visioconférence');
 
-        // 3. Gestion de la date depuis l'URL (ex: ?date=2026-05-20 14:00)
+        // Gestion de la date
         $dateParam = $request->query->get('date');
+        $startDate = null;
         if ($dateParam) {
             try {
                 $startDate = new \DateTime($dateParam);
                 $rendezVous->setDateDebut($startDate);
-                $endDate = (clone $startDate)->modify('+' . $event->getDuree() . ' minutes');
-                $rendezVous->setDateFin($endDate);
+                $rendezVous->setDateFin((clone $startDate)->modify('+' . $event->getDuree() . ' minutes'));
             } catch (\Exception $e) {
-                // Si la date est invalide dans l'URL, on redirige
                 return $this->redirectToRoute('app_home');
             }
         }
 
-        // 4. Création et traitement du formulaire
+        // --- LOGIQUE ROUND ROBIN & CONTRAINTES ---
+        // Si pas de conseiller sélectionné et que l'événement est en Round Robin
+        if (!$user && $event->isRoundRobin() && $startDate) {
+            $user = $this->findAvailableConseiller(
+                $event->getGroupe(),
+                $startDate,
+                $event->getDuree(),
+                $rdvRepo,
+                $outlookService
+            );
+
+            if (!$user) {
+                $this->addFlash('danger', 'Aucun conseiller n\'est disponible pour ce créneau (limite de 3 RDV atteinte ou agenda plein).');
+                return $this->redirectToRoute('app_home');
+            }
+        }
+
+        if ($user) $rendezVous->setConseiller($user);
+        $rendezVous->setTypeLieu('Visioconférence');
+
         $form = $this->createForm(BookingFormType::class, $rendezVous);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-
-            // Enregistrement en base
             $em->persist($rendezVous);
             $em->flush();
 
-            // Synchro Outlook (Optionnel, on capture les erreurs pour ne pas bloquer)
             try {
                 if ($rendezVous->getConseiller()) {
                     $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
                 }
-            } catch (\Exception $e) {
-                // Log l'erreur si besoin
-            }
+            } catch (\Exception $e) {}
 
-            // Envoi des emails
             $this->sendConfirmationEmails($mailer, $rendezVous, $event);
 
-            // REDIRECTION CRUCIALE (Code 303 pour Turbo)
-            return $this->redirectToRoute('app_booking_success', [
-                'id' => $rendezVous->getId()
-            ], Response::HTTP_SEE_OTHER);
+            return $this->redirectToRoute('app_booking_success', ['id' => $rendezVous->getId()], Response::HTTP_SEE_OTHER);
         }
 
-        // Affichage de la vue si pas soumis ou invalide
         return $this->render('booking/confirm.html.twig', [
             'form' => $form->createView(),
             'event' => $event,
