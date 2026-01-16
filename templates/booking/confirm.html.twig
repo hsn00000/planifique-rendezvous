@@ -10,11 +10,10 @@
         <div class="card border-0 shadow-lg overflow-hidden w-100" style="max-width: 1000px; border-radius: 16px;">
             <div class="row g-0">
 
-                {# --- COLONNE GAUCHE : RÉCAPITULATIF (BLEU PLANIFIQUE) --- #}
+                {# --- COLONNE GAUCHE : RÉCAPITULATIF --- #}
                 <div class="col-lg-5 text-white p-5 d-flex flex-column justify-content-center text-center"
                      style="background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);">
 
-                    {# Logo Planifique (Blanc) #}
                     <div class="mb-4">
                         <img src="{{ asset('img/logo.png') }}" alt="Planifique" style="height: 40px; filter: brightness(0) invert(1); opacity: 0.9;">
                     </div>
@@ -22,19 +21,30 @@
                     <h1 class="h4 fw-bold mb-2">{{ event.titre }}</h1>
                     <p class="opacity-75 small text-uppercase ls-1 mb-5">Récapitulatif de la réservation</p>
 
-                    {# Initiale Conseiller #}
+                    {# --- CORRECTION ICI : GESTION DU CONSEILLER NULL --- #}
                     <div class="mb-5">
                         <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-white text-primary fw-bold mb-3 shadow-sm"
                              style="width: 70px; height: 70px; font-size: 1.8rem;">
-                            {{ conseiller.firstName|first }}{{ conseiller.lastName|first }}
+                            {% if conseiller %}
+                                {{ conseiller.firstName|first }}{{ conseiller.lastName|first }}
+                            {% else %}
+                                <i class="fas fa-users"></i>
+                            {% endif %}
                         </div>
 
-                        {# MODIFICATION ICI : "Votre conseiller" est passé au-dessus #}
-                        <div class="small opacity-75 text-uppercase ls-1 mb-1">Votre conseiller</div>
-                        <div class="fs-5 fw-bold">{{ conseiller.firstName }} {{ conseiller.lastName }}</div>
+                        <div class="small opacity-75 text-uppercase ls-1 mb-1">
+                            {% if conseiller %}Votre conseiller{% else %}Votre équipe{% endif %}
+                        </div>
+                        <div class="fs-5 fw-bold">
+                            {% if conseiller %}
+                                {{ conseiller.firstName }} {{ conseiller.lastName }}
+                            {% else %}
+                                {{ event.groupe.nom|default('Planifique') }}
+                            {% endif %}
+                        </div>
                     </div>
+                    {# --------------------------------------------------- #}
 
-                    {# Détails Texte Pur (Sans Icônes) #}
                     <div class="vstack gap-4 opacity-90">
                         <div>
                             <span class="opacity-50 text-uppercase small d-block mb-1">Date</span>
@@ -64,7 +74,6 @@
                 {# --- COLONNE DROITE : FORMULAIRE --- #}
                 <div class="col-lg-7 bg-white p-5">
 
-                    {# Titre Centré #}
                     <div class="text-center mb-5">
                         <h2 class="h3 fw-bold text-dark">Vos coordonnées</h2>
                         <p class="text-muted small">Merci de compléter ce formulaire pour valider le rendez-vous.</p>
@@ -75,37 +84,45 @@
                     <div class="row g-4 mb-4">
                         <div class="col-md-6">
                             {{ form_label(form.prenom, 'Prénom', {'label_attr': {'class': 'form-label fw-bold small text-secondary'}}) }}
-                            {{ form_widget(form.prenom, {'attr': {'class': 'form-control form-control-lg', 'placeholder': ''}}) }}
+                            {{ form_widget(form.prenom, {'attr': {'class': 'form-control form-control-lg'}}) }}
                             {{ form_errors(form.prenom) }}
                         </div>
                         <div class="col-md-6">
                             {{ form_label(form.nom, 'Nom', {'label_attr': {'class': 'form-label fw-bold small text-secondary'}}) }}
-                            {{ form_widget(form.nom, {'attr': {'class': 'form-control form-control-lg', 'placeholder': ''}}) }}
+                            {{ form_widget(form.nom, {'attr': {'class': 'form-control form-control-lg'}}) }}
                             {{ form_errors(form.nom) }}
                         </div>
                     </div>
 
                     <div class="mb-4">
                         {{ form_label(form.email, 'Email professionnel', {'label_attr': {'class': 'form-label fw-bold small text-secondary'}}) }}
-                        {{ form_widget(form.email, {'attr': {'class': 'form-control form-control-lg', 'placeholder': ''}}) }}
+                        {{ form_widget(form.email, {'attr': {'class': 'form-control form-control-lg'}}) }}
                         {{ form_errors(form.email) }}
                     </div>
 
                     <div class="mb-4">
                         {{ form_label(form.telephone, 'Téléphone mobile', {'label_attr': {'class': 'form-label fw-bold small text-secondary'}}) }}
-                        {{ form_widget(form.telephone, {'attr': {'class': 'form-control form-control-lg', 'placeholder': ''}}) }}
+                        {{ form_widget(form.telephone, {'attr': {'class': 'form-control form-control-lg'}}) }}
                         {{ form_errors(form.telephone) }}
                     </div>
 
+                    {# AJOUT DU CHAMP CONSEILLER ICI SI TU VEUX L'AFFICHER #}
+                    {# Si l'admin a activé le Round Robin, ce champ est optionnel #}
+                    {% if form.conseiller is defined %}
+                        <div class="mb-4">
+                            {{ form_label(form.conseiller, null, {'label_attr': {'class': 'form-label fw-bold small text-secondary'}}) }}
+                            {{ form_widget(form.conseiller, {'attr': {'class': 'form-select form-select-lg'}}) }}
+                            {{ form_errors(form.conseiller) }}
+                        </div>
+                    {% endif %}
+
                     <hr class="my-5 opacity-10">
 
-                    {# Lieu #}
                     <div class="mb-4">
                         <label class="form-label fw-bold small text-secondary">Lieu du rendez-vous</label>
                         {{ form_widget(form.typeLieu, {'attr': {'class': 'form-select form-select-lg', 'id': 'select-lieu'}}) }}
                     </div>
 
-                    {# Champ Adresse (Apparaît si Domicile) #}
                     <div id="field-adresse-container" class="d-none mb-4">
                         <label class="form-label fw-bold small text-secondary">Adresse complète</label>
                         {{ form_widget(form.adresse, {'attr': {'class': 'form-control form-control-lg', 'placeholder': 'N°, Rue, Code Postal, Ville'}}) }}
@@ -129,22 +146,17 @@
         </div>
     </div>
 
-    {# SCRIPT ADRESSE #}
     <script>
         function initAddressLogic() {
-            // Recherche robuste
             let selectLieu = document.getElementById('select-lieu');
             if (!selectLieu) selectLieu = document.querySelector('select[id$="typeLieu"]');
-
             const containerAdresse = document.getElementById('field-adresse-container');
 
             if (!selectLieu || !containerAdresse) return;
 
             const inputAdresse = containerAdresse.querySelector('input');
-
             const toggleAdresse = () => {
                 const val = selectLieu.value;
-                // Si la valeur contient 'domicile' (majuscule ou minuscule)
                 if (val && val.toLowerCase().includes('domicile')) {
                     containerAdresse.classList.remove('d-none');
                     if(inputAdresse) inputAdresse.required = true;
@@ -156,7 +168,6 @@
                     }
                 }
             };
-
             selectLieu.removeEventListener('change', toggleAdresse);
             selectLieu.addEventListener('change', toggleAdresse);
             toggleAdresse();
@@ -169,15 +180,13 @@
     <style>
         .ls-1 { letter-spacing: 1px; }
         .form-control-lg, .form-select-lg {
-            font-size: 1rem;
-            padding: 0.8rem 1rem;
+            font-size: 1rem; padding: 0.8rem 1rem;
             border-radius: 8px;
-            background-color: #f8f9fa; /* Fond gris très léger pour les champs */
+            background-color: #f8f9fa;
             border: 1px solid #dee2e6;
         }
         .form-control-lg:focus, .form-select-lg:focus {
-            background-color: #fff;
-            border-color: #2563eb;
+            background-color: #fff; border-color: #2563eb;
             box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
         }
     </style>

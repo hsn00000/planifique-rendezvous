@@ -2,7 +2,11 @@
 
 namespace App\Form;
 
+use App\Entity\Groupe;
 use App\Entity\RendezVous;
+use App\Entity\User;
+use Doctrine\ORM\EntityRepository;
+use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\EmailType;
@@ -15,6 +19,10 @@ class BookingFormType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        $groupe = $options['groupe'];
+        $isRoundRobin = $options['is_round_robin'];
+        $cacherConseiller = $options['cacher_conseiller']; // Nouvelle option
+
         $builder
             ->add('prenom', TextType::class, [
                 'label' => 'Prénom',
@@ -31,14 +39,36 @@ class BookingFormType extends AbstractType
             ->add('telephone', TelType::class, [
                 'label' => 'Téléphone mobile',
                 'attr' => ['class' => 'form-control-lg', 'placeholder' => '06 12 34 56 78']
-            ])
+            ]);
+
+        // --- LOGIQUE D'AFFICHAGE DU CONSEILLER ---
+        // On affiche la liste SEULEMENT SI on n'est pas en mode "Lien Perso" (cacher_conseiller = false)
+        if (!$cacherConseiller) {
+            $builder->add('conseiller', EntityType::class, [
+                'class' => User::class,
+                // Si Round Robin activé -> Optionnel. Sinon -> Obligatoire.
+                'required' => !$isRoundRobin,
+                'label' => $isRoundRobin ? 'Choisir un conseiller (Optionnel)' : 'Choisir un conseiller *',
+                'placeholder' => $isRoundRobin ? 'Peu importe (Premier disponible)' : 'Veuillez sélectionner...',
+                'attr' => ['class' => 'form-select-lg'],
+                'choice_label' => fn (User $user) => $user->getFirstName() . ' ' . $user->getLastName(),
+                'query_builder' => function (EntityRepository $er) use ($groupe) {
+                    return $er->createQueryBuilder('u')
+                        ->where('u.groupe = :groupe')
+                        ->setParameter('groupe', $groupe)
+                        ->orderBy('u.firstName', 'ASC');
+                },
+            ]);
+        }
+        // ------------------------------------------
+
+        $builder
             ->add('typeLieu', ChoiceType::class, [
                 'label' => 'Préférence de lieu',
                 'choices'  => [
                     'Visioconférence (Teams/Zoom)' => 'Visioconférence',
                     'A mon domicile / Bureau' => 'Domicile',
                     'Au cabinet de Genève' => 'Cabinet-geneve',
-                    // Correction ici : utilisez des guillemets doubles ou échappez l'apostrophe
                     "Au cabinet d'Archamps" => 'Cabinet-archamps',
                 ],
                 'expanded' => false,
@@ -61,6 +91,13 @@ class BookingFormType extends AbstractType
     {
         $resolver->setDefaults([
             'data_class' => RendezVous::class,
+            'groupe' => null,
+            'is_round_robin' => true,
+            'cacher_conseiller' => false, // Par défaut, on affiche le choix
         ]);
+
+        $resolver->setAllowedTypes('groupe', ['null', Groupe::class]);
+        $resolver->setAllowedTypes('is_round_robin', 'bool');
+        $resolver->setAllowedTypes('cacher_conseiller', 'bool');
     }
 }

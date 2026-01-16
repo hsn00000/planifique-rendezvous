@@ -103,13 +103,16 @@
                                                 {{ event.description|default('Aucune description.')|striptags|slice(0, 80) }}...
                                             </p>
 
-                                            {# LIEN DE PARTAGE #}
+                                            {# --- CORRECTION DES LIENS ICI --- #}
                                             {% if event.isRoundRobin %}
-                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_booking_roundrobin', {'event': event.id}) }}">
+                                                {# Lien générique (sans ID user) => Le client choisira ou Round Robin auto #}
+                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_booking_calendar', {'eventId': event.id}) }}">
                                                 <div class="badge bg-warning text-dark mb-3 w-100 py-2"><i class="fas fa-random me-1"></i> Équipe (Auto)</div>
                                             {% else %}
-                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_booking_personal', {'userId': app.user.id, 'eventId': event.id}) }}">
+                                                {# Lien personnel (avec ID user) => Le client réserve avec CE conseiller #}
+                                                <input type="hidden" id="link-{{ event.id }}" value="{{ url('app_booking_calendar', {'eventId': event.id, 'userId': app.user.id}) }}">
                                             {% endif %}
+                                            {# -------------------------------- #}
 
                                             <button class="btn btn-sm btn-outline-primary rounded-pill w-100 mt-auto btn-copy mb-2"
                                                     onclick="copierLien(this, 'link-{{ event.id }}')">

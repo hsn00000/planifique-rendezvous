@@ -3,7 +3,6 @@
 namespace App\Controller;
 
 use App\Entity\Evenement;
-use App\Entity\Groupe;
 use App\Entity\RendezVous;
 use App\Entity\User;
 use App\Form\BookingFormType;
@@ -22,19 +21,53 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class BookingController extends AbstractController
 {
-
     /**
-     * ÉTAPE 1 : Confirmation et Enregistrement
-     * Doit être placée AVANT la route générique pour éviter les conflits.
+     * ROUTE 1 : Affichage du calendrier
+     * Permet de voir les disponibilités.
      */
-    #[Route('/book/confirm/{eventId}/{userId?}', name: 'app_booking_confirm')]
-    public function confirm(
-        Request $request,
-        string $eventId,
-        ?string $userId,
+    #[Route('/book/event/{eventId}/{userId?}', name: 'app_booking_calendar', requirements: ['eventId' => '\d+', 'userId' => '\d+'])]
+    public function calendar(
+        int $eventId,
+        ?int $userId,
         EvenementRepository $eventRepo,
         UserRepository $userRepo,
         RendezVousRepository $rdvRepo,
+        DisponibiliteHebdomadaireRepository $dispoRepo
+    ): Response
+    {
+        $event = $eventRepo->find($eventId);
+        if (!$event) throw $this->createNotFoundException("Événement introuvable.");
+
+        $targetUser = $userId ? $userRepo->find($userId) : null;
+
+        // Si aucun user ciblé, on prend le premier du groupe pour l'affichage par défaut
+        // (Note : Pour une V2, tu pourrais fusionner les dispos de tout le groupe)
+        $displayUser = $targetUser ?? $event->getGroupe()->getUsers()->first();
+
+        if (!$displayUser) {
+            throw $this->createNotFoundException("Aucun conseiller dans ce groupe.");
+        }
+
+        $slotsByDay = $this->generateSlots($displayUser, $event, $rdvRepo, $dispoRepo);
+
+        return $this->render('booking/index.html.twig', [
+            'conseiller' => $targetUser,
+            'event' => $event,
+            'slotsByDay' => $slotsByDay
+        ]);
+    }
+
+    /**
+     * ROUTE 2 : Confirmation et Finalisation du RDV
+     * Gère le formulaire, le Round Robin et l'enregistrement.
+     */
+    #[Route('/book/confirm/{eventId}', name: 'app_booking_confirm')]
+    public function confirm(
+        Request $request,
+        int $eventId,
+        EvenementRepository $eventRepo,
+        RendezVousRepository $rdvRepo,
+        UserRepository $userRepo,
         EntityManagerInterface $em,
         MailerInterface $mailer,
         OutlookService $outlookService
@@ -43,13 +76,11 @@ class BookingController extends AbstractController
         $event = $eventRepo->find($eventId);
         if (!$event) return $this->redirectToRoute('app_home');
 
-        $user = $userId ? $userRepo->find($userId) : null;
         $rendezVous = new RendezVous();
         $rendezVous->setEvenement($event);
 
-        // Gestion de la date
+        // 1. Récupération de la date depuis l'URL
         $dateParam = $request->query->get('date');
-        $startDate = null;
         if ($dateParam) {
             try {
                 $startDate = new \DateTime($dateParam);
@@ -60,86 +91,178 @@ class BookingController extends AbstractController
             }
         }
 
-        // --- LOGIQUE ROUND ROBIN & CONTRAINTES ---
-        // Si pas de conseiller sélectionné et que l'événement est en Round Robin
-        if (!$user && $event->isRoundRobin() && $startDate) {
-            $user = $this->findAvailableConseiller(
-                $event->getGroupe(),
-                $startDate,
-                $event->getDuree(),
-                $rdvRepo,
-                $outlookService
-            );
+        // 2. Gestion du Lien Personnel (Conseiller Imposé)
+        $userIdParam = $request->query->get('user');
+        $conseillerImpose = null;
 
-            if (!$user) {
-                $this->addFlash('danger', 'Aucun conseiller n\'est disponible pour ce créneau (limite de 3 RDV atteinte ou agenda plein).');
-                return $this->redirectToRoute('app_home');
+        if ($userIdParam) {
+            $conseillerImpose = $userRepo->find($userIdParam);
+            if ($conseillerImpose) {
+                // On force le conseiller dans l'entité
+                $rendezVous->setConseiller($conseillerImpose);
             }
         }
 
-        if ($user) $rendezVous->setConseiller($user);
-        $rendezVous->setTypeLieu('Visioconférence');
+        // 3. Création du Formulaire
+        $form = $this->createForm(BookingFormType::class, $rendezVous, [
+            'groupe' => $event->getGroupe(),
+            'is_round_robin' => $event->isRoundRobin(),
+            // Si un conseiller est imposé, on cache le sélecteur dans le formulaire
+            'cacher_conseiller' => ($conseillerImpose !== null)
+        ]);
 
-        $form = $this->createForm(BookingFormType::class, $rendezVous);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+
+            // Si le formulaire contient un choix utilisateur explicite, on le prend
+            if ($form->has('conseiller')) {
+                $choixFormulaire = $form->get('conseiller')->getData();
+                if ($choixFormulaire) {
+                    $rendezVous->setConseiller($choixFormulaire);
+                }
+            }
+
+            // À ce stade, le conseiller est soit :
+            // - Imposé (via URL)
+            // - Choisi (via Formulaire)
+            // - Null (via "Peu importe" / Round Robin)
+            $conseillerFinal = $rendezVous->getConseiller();
+
+            if ($conseillerFinal) {
+                // CAS A : Conseiller DÉFINI (Imposé ou Choisi)
+                // On vérifie s'il est toujours libre
+                if (!$this->isConseillerDispo($conseillerFinal, $rendezVous->getDateDebut(), $event->getDuree(), $rdvRepo, $outlookService)) {
+                    $this->addFlash('danger', 'Oups ! Ce conseiller n\'est plus disponible à cette heure. Veuillez choisir un autre créneau.');
+                    return $this->redirectToRoute('app_booking_calendar', [
+                        'eventId' => $eventId,
+                        'userId' => $conseillerImpose ? $conseillerImpose->getId() : null
+                    ]);
+                }
+            } else {
+                // CAS B : Conseiller NON DÉFINI (Round Robin)
+                // Le client a choisi "Peu importe"
+                $conseillerTrouve = $this->findAvailableConseiller(
+                    $event->getGroupe(),
+                    $rendezVous->getDateDebut(),
+                    $event->getDuree(),
+                    $rdvRepo,
+                    $outlookService
+                );
+
+                // --- GESTION ERREUR CLIENT ---
+                if (!$conseillerTrouve) {
+                    $this->addFlash('danger', 'Oups ! Ce créneau n\'est plus disponible (tous nos conseillers sont pris). Veuillez en choisir un autre.');
+                    return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
+                }
+                // -----------------------------
+
+                $rendezVous->setConseiller($conseillerTrouve);
+            }
+
+            // Enregistrement
+            $rendezVous->setTypeLieu('Visioconférence'); // Ou valeur du form
             $em->persist($rendezVous);
             $em->flush();
 
+            // Synchro Outlook (sécurisée)
             try {
                 if ($rendezVous->getConseiller()) {
                     $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
                 }
-            } catch (\Exception $e) {}
+            } catch (\Exception $e) {
+                // On log l'erreur mais on ne bloque pas le client
+            }
 
+            // Envoi des emails
             $this->sendConfirmationEmails($mailer, $rendezVous, $event);
 
-            return $this->redirectToRoute('app_booking_success', ['id' => $rendezVous->getId()], Response::HTTP_SEE_OTHER);
+            return $this->redirectToRoute('app_booking_success', ['id' => $rendezVous->getId()]);
         }
 
         return $this->render('booking/confirm.html.twig', [
             'form' => $form->createView(),
             'event' => $event,
-            'conseiller' => $user,
             'dateChoisie' => $rendezVous->getDateDebut(),
-            'rendezvous' => $rendezVous
+            'conseiller' => $rendezVous->getConseiller(), // Pour afficher la photo/nom
         ]);
     }
 
+    // --- ALGORITHMES & OUTILS ---
+
+    /**
+     * Vérifie la disponibilité d'un conseiller précis (BDD + Outlook + Quota)
+     */
+    private function isConseillerDispo(User $user, \DateTime $start, int $duree, $rdvRepo, $outlookService): bool
+    {
+        $slotEnd = (clone $start)->modify("+$duree minutes");
+
+        // 1. Quota journalier (3 RDV max)
+        if ($rdvRepo->countRendezVousForUserOnDate($user, $start) >= 3) return false;
+
+        // 2. BDD Interne
+        if (!$rdvRepo->isSlotAvailable($user, $start, $slotEnd)) return false;
+
+        // 3. Outlook
+        try {
+            $busyPeriods = $outlookService->getOutlookBusyPeriods($user, $start);
+            foreach ($busyPeriods as $period) {
+                if ($start < $period['end'] && $slotEnd > $period['start']) return false;
+            }
+        } catch (\Exception $e) {
+            // Si Outlook ne répond pas, on peut décider de bloquer ou laisser passer.
+            // Ici, par sécurité, on laisse passer (true) ou on bloque (false) selon ta politique.
+            // return true;
+        }
+
+        return true;
+    }
+
+    /**
+     * Trouve un conseiller disponible dans le groupe (Round Robin)
+     */
     private function findAvailableConseiller($groupe, \DateTime $start, int $duree, $rdvRepo, $outlookService): ?User
     {
         $conseillers = $groupe->getUsers()->toArray();
-        shuffle($conseillers); // Pour l'équité du Round Robin
+        shuffle($conseillers); // Mélange pour équité
+
+        // Tri : Celui qui a le MOINS de RDV passe en premier
+        usort($conseillers, function ($userA, $userB) use ($rdvRepo, $start) {
+            $countA = $rdvRepo->countRendezVousForUserOnDate($userA, $start);
+            $countB = $rdvRepo->countRendezVousForUserOnDate($userB, $start);
+            return $countA <=> $countB;
+        });
+
         $slotEnd = (clone $start)->modify("+$duree minutes");
 
         foreach ($conseillers as $conseiller) {
-            // 1. Limite de 3 RDV par jour
+
+            // 1. Limite 3 RDV
+            // (Tu peux commenter cette ligne si tu veux faire des tests intensifs)
             if ($rdvRepo->countRendezVousForUserOnDate($conseiller, $start) >= 3) continue;
 
-            // 2. Disponibilité interne (BDD)
+            // 2. Dispo BDD Interne (OBLIGATOIRE)
             if (!$rdvRepo->isSlotAvailable($conseiller, $start, $slotEnd)) continue;
 
-            // 3. Disponibilité externe (Outlook)
-            $busy = $outlookService->getOutlookBusyPeriods($conseiller, $start);
-            $freeOnOutlook = true;
-            foreach ($busy as $period) {
-                if ($start < $period['end'] && $slotEnd > $period['start']) {
-                    $freeOnOutlook = false;
-                    break;
+            // 3. Outlook (Avec gestion d'erreur)
+            try {
+                $busyPeriods = $outlookService->getOutlookBusyPeriods($conseiller, $start);
+                foreach ($busyPeriods as $period) {
+                    if ($start < $period['end'] && $slotEnd > $period['start']) {
+                        continue 2; // Occupé sur Outlook
+                    }
                 }
+            } catch (\Exception $e) {
+                // On ignore les erreurs Outlook pour ne pas bloquer l'app
             }
 
-            if ($freeOnOutlook) return $conseiller;
+            // Si on arrive ici, le conseiller est validé !
+            return $conseiller;
         }
 
         return null;
     }
 
-    /**
-     * ÉTAPE 2 : Page de Succès
-     * Accessible uniquement après redirection.
-     */
     #[Route('/book/success/{id}', name: 'app_booking_success')]
     public function success(RendezVous $rendezVous): Response
     {
@@ -148,55 +271,9 @@ class BookingController extends AbstractController
         ]);
     }
 
-    /**
-     * ÉTAPE 3 : Calendrier de Réservation (Route Générique)
-     * Placée EN DERNIER car elle contient des {paramètres} qui captent tout.
-     */
-    #[Route('/book/{userId}/{eventId}', name: 'app_booking_personal', requirements: ['userId' => '\d+', 'eventId' => '\d+'])]
-    public function bookPersonal(
-        string $userId,
-        string $eventId,
-        UserRepository $userRepo,
-        EvenementRepository $eventRepo,
-        RendezVousRepository $rdvRepo,
-        DisponibiliteHebdomadaireRepository $dispoRepo
-    ): Response
-    {
-        // Recherche manuelle
-        $user = $userRepo->find($userId);
-        $event = $eventRepo->find($eventId);
+    // --- OUTILS CALENDRIER ---
 
-        if (!$user || !$event) {
-            throw $this->createNotFoundException("Conseiller ou événement introuvable.");
-        }
-
-        $slotsByDay = $this->generateSlots($user, $event, $rdvRepo, $dispoRepo);
-
-        return $this->render('booking/index.html.twig', [
-            'conseiller' => $user,
-            'event' => $event,
-            'slotsByDay' => $slotsByDay
-        ]);
-    }
-
-    // --- MÉTHODES PRIVÉES ---
-
-    private function sendConfirmationEmails($mailer, $rdv, $event): void
-    {
-        $emailClient = new TemplatedEmail()
-            ->from('no-reply@planifique.com')
-            ->to($rdv->getEmail())
-            ->subject('Confirmation RDV : ' . $event->getTitre())
-            ->htmlTemplate('emails/booking_confirmation_client.html.twig')
-            ->context(['rdv' => $rdv]);
-
-        try {
-            $mailer->send($emailClient);
-        } catch (\Exception $e) {}
-    }
-
-    private function generateSlots(User $user, Evenement $event, RendezVousRepository $rdvRepo, DisponibiliteHebdomadaireRepository $dispoRepo): array
-    {
+    private function generateSlots($user, $event, $rdvRepo, $dispoRepo): array {
         $calendarData = [];
         $duration = $event->getDuree();
         $startPeriod = new \DateTime('first day of this month');
@@ -244,7 +321,7 @@ class BookingController extends AbstractController
                                 $dayData['slots'][] = $start->format('H:i');
                                 $dayData['hasAvailability'] = true;
                             }
-                            $start = $slotEnd; // On avance au prochain slot
+                            $start = $slotEnd;
                         }
                     }
                 }
@@ -254,5 +331,19 @@ class BookingController extends AbstractController
         }
         ksort($calendarData);
         return array_values($calendarData);
+    }
+
+    private function sendConfirmationEmails($mailer, $rdv, $event): void
+    {
+        $emailClient = new TemplatedEmail()
+            ->from('no-reply@planifique.com')
+            ->to($rdv->getEmail())
+            ->subject('Confirmation RDV : ' . $event->getTitre())
+            ->htmlTemplate('emails/booking_confirmation_client.html.twig')
+            ->context(['rdv' => $rdv]);
+
+        try {
+            $mailer->send($emailClient);
+        } catch (\Exception $e) {}
     }
 }
