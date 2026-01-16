@@ -24,38 +24,6 @@ class BookingController extends AbstractController
 {
 
     /**
-     * Logique de sélection intelligente (Helper)
-     */
-    private function findAvailableConseiller($groupe, \DateTime $start, int $duree, $rdvRepo, $outlookService): ?User
-    {
-        $conseillers = $groupe->getUsers()->toArray();
-        shuffle($conseillers); // Pour l'équité du Round Robin
-        $slotEnd = (clone $start)->modify("+$duree minutes");
-
-        foreach ($conseillers as $conseiller) {
-            // 1. Limite de 3 RDV par jour
-            if ($rdvRepo->countRendezVousForUserOnDate($conseiller, $start) >= 3) continue;
-
-            // 2. Disponibilité interne (BDD)
-            if (!$rdvRepo->isSlotAvailable($conseiller, $start, $slotEnd)) continue;
-
-            // 3. Disponibilité externe (Outlook)
-            $busy = $outlookService->getOutlookBusyPeriods($conseiller, $start);
-            $freeOnOutlook = true;
-            foreach ($busy as $period) {
-                if ($start < $period['end'] && $slotEnd > $period['start']) {
-                    $freeOnOutlook = false;
-                    break;
-                }
-            }
-
-            if ($freeOnOutlook) return $conseiller;
-        }
-
-        return null;
-    }
-
-    /**
      * ÉTAPE 1 : Confirmation et Enregistrement
      * Doit être placée AVANT la route générique pour éviter les conflits.
      */
@@ -137,6 +105,35 @@ class BookingController extends AbstractController
             'dateChoisie' => $rendezVous->getDateDebut(),
             'rendezvous' => $rendezVous
         ]);
+    }
+
+    private function findAvailableConseiller($groupe, \DateTime $start, int $duree, $rdvRepo, $outlookService): ?User
+    {
+        $conseillers = $groupe->getUsers()->toArray();
+        shuffle($conseillers); // Pour l'équité du Round Robin
+        $slotEnd = (clone $start)->modify("+$duree minutes");
+
+        foreach ($conseillers as $conseiller) {
+            // 1. Limite de 3 RDV par jour
+            if ($rdvRepo->countRendezVousForUserOnDate($conseiller, $start) >= 3) continue;
+
+            // 2. Disponibilité interne (BDD)
+            if (!$rdvRepo->isSlotAvailable($conseiller, $start, $slotEnd)) continue;
+
+            // 3. Disponibilité externe (Outlook)
+            $busy = $outlookService->getOutlookBusyPeriods($conseiller, $start);
+            $freeOnOutlook = true;
+            foreach ($busy as $period) {
+                if ($start < $period['end'] && $slotEnd > $period['start']) {
+                    $freeOnOutlook = false;
+                    break;
+                }
+            }
+
+            if ($freeOnOutlook) return $conseiller;
+        }
+
+        return null;
     }
 
     /**
