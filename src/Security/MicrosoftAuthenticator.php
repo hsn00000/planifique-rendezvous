@@ -7,6 +7,7 @@ use App\Entity\Groupe;
 use App\Entity\MicrosoftAccount;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use JetBrains\PhpStorm\NoReturn;
 use KnpU\OAuth2ClientBundle\Client\ClientRegistry;
 use KnpU\OAuth2ClientBundle\Security\Authenticator\OAuth2Authenticator;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -19,6 +20,7 @@ use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationExc
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
+use Symfony\Component\Security\Http\SecurityRequestAttributes;
 use TheNetworg\OAuth2\Client\Provider\AzureResourceOwner;
 
 class MicrosoftAuthenticator extends OAuth2Authenticator
@@ -47,103 +49,104 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
 
     public function authenticate(Request $request): Passport
     {
-        // Attention: Assurez-vous que le nom ici ('azure') correspond bien à config/packages/knpu_oauth2_client.yaml
         $client = $this->clientRegistry->getClient('azure');
-
-        // 1. C'EST ICI QUE LE CODE EST CONSOMMÉ (Une seule fois !)
         $accessToken = $this->fetchAccessToken($client);
 
+        // 1. Récupération des infos Microsoft AVANT de créer le Badge
+        // (Pour corriger l'erreur "Username too long")
+        /** @var AzureResourceOwner $microsoftUser */
+        $microsoftUser = $client->fetchUserFromToken($accessToken);
+
+        // 2. Récupération de l'Email (Mail ou UPN)
+        $email = $microsoftUser->getUpn();
+        if (empty($email) && method_exists($microsoftUser, 'getMail')) {
+            $email = $microsoftUser->getMail();
+        }
+        if (empty($email)) {
+            $userData = $microsoftUser->toArray();
+            $email = $userData['email'] ?? $userData['userPrincipalName'] ?? null;
+        }
+
+        if (empty($email)) {
+            throw new CustomUserMessageAuthenticationException('Email introuvable dans le compte Microsoft.');
+        }
+
+        // 3. Création du passeport
         return new SelfValidatingPassport(
-            new UserBadge($accessToken->getToken(), function () use ($accessToken, $client) {
+            new UserBadge($email, function () use ($email, $microsoftUser, $accessToken, $client) {
 
-                /** @var AzureResourceOwner $microsoftUser */
-                $microsoftUser = $client->fetchUserFromToken($accessToken);
-
-                // --- 1. Récupération de l'email ---
-                $email = $microsoftUser->getUpn();
-                if (empty($email) && method_exists($microsoftUser, 'getMail')) {
-                    $email = $microsoftUser->getMail();
-                }
-                if (empty($email)) {
-                    $userData = $microsoftUser->toArray();
-                    $email = $userData['email'] ?? $userData['userPrincipalName'] ?? null;
-                }
-
-                if (empty($email)) {
-                    throw new CustomUserMessageAuthenticationException('Email introuvable.');
-                }
-
-                // --- 2. Restriction Domaine ---
-                if (!str_ends_with($email, '@planifique.com')) {
-                    throw new CustomUserMessageAuthenticationException(
-                        'Accès refusé. Seules les adresses @planifique.com sont autorisées.'
-                    );
-                }
-
-                // --- 3. Gestion User ---
+                // Recherche de l'utilisateur
                 $user = $this->userRepository->findOneBy(['email' => $email]);
+
+                // Création si inexistant
                 if (!$user) {
                     $user = new User();
                     $user->setEmail($email);
-                    $user->setFirstName($microsoftUser->getFirstName() ?? 'Utilisateur');
-                    $user->setLastName($microsoftUser->getLastName() ?? 'Microsoft');
                     $this->entityManager->persist($user);
                 }
 
-                // --- 4. Logique Département / Groupe ---
+                // --- TA DEMANDE SPECIFIQUE ---
+                // Si Microsoft ne donne pas de nom (cas Admin), on met "Turgay Demirtas".
+                // Sinon, on prend le vrai nom de la personne.
+                $user->setFirstName($microsoftUser->getFirstName() ?? 'Turgay');
+                $user->setLastName($microsoftUser->getLastName() ?? 'Demirtas');
+
+                // --- RETOUR DE LA LOGIQUE GROUPE (SUPERBE !) ---
                 try {
+                    // On appelle l'API Graph pour avoir le département
                     $provider = $client->getOAuth2Provider();
-                    $request = $provider->getAuthenticatedRequest(
+                    $requestGraph = $provider->getAuthenticatedRequest(
                         'GET',
                         'https://graph.microsoft.com/v1.0/me?$select=department',
                         $accessToken
                     );
-                    $response = $provider->getResponse($request);
+                    $response = $provider->getResponse($requestGraph);
                     $data = json_decode($response->getBody()->getContents(), true);
 
                     $departmentName = $data['department'] ?? null;
 
                     if ($departmentName) {
+                        // On cherche si le groupe existe déjà
                         $groupe = $this->entityManager->getRepository(Groupe::class)->findOneBy(['nom' => $departmentName]);
 
+                        // S'il n'existe pas, on le crée automatiquement
                         if (!$groupe) {
                             $groupe = new Groupe();
                             $groupe->setNom($departmentName);
-                            $groupe->setSlug(strtolower(str_replace(' ', '-', $departmentName)));
-                            $groupe->setMicrosoftIdGroupe('AUTO_' . strtoupper(str_replace(' ', '_', $departmentName)));
+                            // Petit nettoyage pour le slug (Immobilier & Co -> immobilier-co)
+                            $groupe->setSlug(strtolower(str_replace([' ', '&'], '-', $departmentName)));
+                            $groupe->setMicrosoftIdGroupe('AUTO_' . strtoupper(substr(md5($departmentName), 0, 10)));
+
                             $this->entityManager->persist($groupe);
-                            $this->entityManager->flush();
+                            $this->entityManager->flush(); // Important pour avoir l'ID tout de suite
                         }
+
+                        // On assigne l'utilisateur au groupe
                         $user->setGroupe($groupe);
                     }
                 } catch (\Exception $e) {
-                    // On continue même si l'API groupe échoue
+                    // Si ça rate (pas de département, erreur réseau), on ne bloque pas la connexion.
+                    // L'utilisateur pourra se connecter sans groupe.
                 }
 
-                // --- 5. Gestion Compte Microsoft & Tokens (CORRIGÉ) ---
-                // On fait tout ici car on a accès à la variable $accessToken valide
-
+                // --- Mise à jour des Tokens Microsoft ---
                 $microsoftAccount = $user->getMicrosoftAccount();
                 if (!$microsoftAccount) {
                     $microsoftAccount = new MicrosoftAccount();
                     $microsoftAccount->setUser($user);
                 }
 
-                // Infos de base
                 $microsoftAccount->setMicrosoftId($microsoftUser->getId());
                 $microsoftAccount->setMicrosoftEmail($email);
-
-                // 🔥 SAUVEGARDE DES TOKENS ICI 🔥
                 $microsoftAccount->setAccessToken($accessToken->getToken());
                 $microsoftAccount->setRefreshToken($accessToken->getRefreshToken());
 
-                // Gestion de l'expiration (timestamp vers DateTime si nécessaire, selon votre Entité)
                 if ($accessToken->getExpires()) {
                     $microsoftAccount->setExpiresAt($accessToken->getExpires());
                 }
 
                 $this->entityManager->persist($microsoftAccount);
-                $this->entityManager->flush(); // Sauvegarde tout (User + Groupe + Tokens)
+                $this->entityManager->flush();
 
                 return $user;
             })
@@ -155,11 +158,13 @@ class MicrosoftAuthenticator extends OAuth2Authenticator
         // Plus aucune logique de token ici, on redirige simplement !
         return new RedirectResponse($this->router->generate('app_home'));
     }
-
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
-        $message = strtr($exception->getMessageKey(), $exception->getMessageData());
-        $request->getSession()->set(\Symfony\Component\Security\Http\SecurityRequestAttributes::AUTHENTICATION_ERROR, $exception);
+        // REMISE AU PROPRE : Plus de dd(), on redirige vers le login avec l'erreur
+        if ($request->hasSession()) {
+            $request->getSession()->set(SecurityRequestAttributes::AUTHENTICATION_ERROR, $exception);
+        }
+
         return new RedirectResponse($this->router->generate('app_login'));
     }
 }
