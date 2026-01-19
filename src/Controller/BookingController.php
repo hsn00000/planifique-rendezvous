@@ -29,6 +29,7 @@ class BookingController extends AbstractController
         UserRepository $userRepo,
         RendezVousRepository $rdvRepo,
         DisponibiliteHebdomadaireRepository $dispoRepo
+        , OutlookService $outlookService
     ): Response
     {
         $event = $eventRepo->find($eventId);
@@ -38,6 +39,8 @@ class BookingController extends AbstractController
         $displayUser = $targetUser ?? $event->getGroupe()->getUsers()->first();
 
         if (!$displayUser) throw $this->createNotFoundException("Aucun conseiller dans ce groupe.");
+
+        $outlookService->synchronizeCalendar($displayUser);
 
         $slotsByDay = $this->generateSlots($displayUser, $event, $rdvRepo, $dispoRepo);
 

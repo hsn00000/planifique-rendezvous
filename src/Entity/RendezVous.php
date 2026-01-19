@@ -41,6 +41,9 @@ class RendezVous
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $adresse = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $outlookId = null;
+
     #[ORM\ManyToOne(inversedBy: 'rendezVouses')]
     private ?Evenement $evenement = null;
 
@@ -170,6 +173,17 @@ class RendezVous
     {
         $this->conseiller = $conseiller;
 
+        return $this;
+    }
+
+    public function getOutlookId(): ?string
+    {
+        return $this->outlookId;
+    }
+
+    public function setOutlookId(?string $outlookId): static
+    {
+        $this->outlookId = $outlookId;
         return $this;
     }
 }
