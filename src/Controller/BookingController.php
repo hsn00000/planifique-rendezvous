@@ -5,7 +5,9 @@ namespace App\Controller;
 use App\Entity\Evenement;
 use App\Entity\RendezVous;
 use App\Entity\User;
+use App\Entity\Bureau;
 use App\Form\BookingFormType;
+use App\Repository\BureauRepository; // NOUVEAU
 use App\Repository\DisponibiliteHebdomadaireRepository;
 use App\Repository\EvenementRepository;
 use App\Repository\RendezVousRepository;
@@ -18,20 +20,80 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType; // Pour le form étape 1
 
 class BookingController extends AbstractController
 {
-    #[Route('/book/event/{eventId}/{userId?}', name: 'app_booking_calendar', requirements: ['eventId' => '\d+', 'userId' => '\d+'])]
+    /**
+     * ÉTAPE 1 : Choix du Lieu (Nouveau Point d'Entrée)
+     */
+    #[Route('/book/start/{eventId}', name: 'app_booking_start', requirements: ['eventId' => '\d+'])]
+    public function start(
+        int $eventId,
+        Request $request,
+        EvenementRepository $eventRepo
+    ): Response
+    {
+        $event = $eventRepo->find($eventId);
+        if (!$event) throw $this->createNotFoundException("Événement introuvable.");
+
+        // Formulaire simple pour le choix du lieu
+        $form = $this->createFormBuilder()
+            ->add('typeLieu', ChoiceType::class, [
+                'label' => 'Où souhaitez-vous réaliser ce rendez-vous ?',
+                'choices'  => [
+                    'Visioconférence (Teams/Zoom)' => 'Visioconférence',
+                    'A mon domicile / Bureau' => 'Domicile',
+                    'Au cabinet de Genève' => 'Cabinet-geneve',
+                    "Au cabinet d'Archamps" => 'Cabinet-archamps',
+                ],
+                'expanded' => true, // Boutons radios
+                'multiple' => false,
+                'attr' => ['class' => 'form-select-lg']
+            ])
+            ->getForm();
+
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $data = $form->getData();
+            // On redirige vers le calendrier en passant le LIEU choisi
+            return $this->redirectToRoute('app_booking_calendar', [
+                'eventId' => $eventId,
+                'lieu' => $data['typeLieu']
+            ]);
+        }
+
+        return $this->render('booking/start.html.twig', [
+            'event' => $event,
+            'form' => $form->createView()
+        ]);
+    }
+
+    /**
+     * ÉTAPE 2 : Affichage du calendrier (Filtré par Lieu + Bureau)
+     */
+    #[Route('/book/calendar/{eventId}/{userId?}', name: 'app_booking_calendar', requirements: ['eventId' => '\d+', 'userId' => '\d+'])]
     public function calendar(
+        Request $request,
         int $eventId,
         ?int $userId,
         EvenementRepository $eventRepo,
         UserRepository $userRepo,
         RendezVousRepository $rdvRepo,
-        DisponibiliteHebdomadaireRepository $dispoRepo
-        , OutlookService $outlookService
+        DisponibiliteHebdomadaireRepository $dispoRepo,
+        BureauRepository $bureauRepo, // Injection du repo Bureau
+        OutlookService $outlookService
     ): Response
     {
+        // On récupère le lieu depuis l'URL
+        $lieuChoisi = $request->query->get('lieu');
+
+        // Si pas de lieu, on renvoie à l'étape 1
+        if (!$lieuChoisi) {
+            return $this->redirectToRoute('app_booking_start', ['eventId' => $eventId]);
+        }
+
         $event = $eventRepo->find($eventId);
         if (!$event) throw $this->createNotFoundException("Événement introuvable.");
 
@@ -42,15 +104,20 @@ class BookingController extends AbstractController
 
         $outlookService->synchronizeCalendar($displayUser);
 
-        $slotsByDay = $this->generateSlots($displayUser, $event, $rdvRepo, $dispoRepo);
+        // On passe le BureauRepo et le Lieu à la fonction de génération
+        $slotsByDay = $this->generateSlots($displayUser, $event, $rdvRepo, $dispoRepo, $bureauRepo, $lieuChoisi);
 
         return $this->render('booking/index.html.twig', [
             'conseiller' => $targetUser,
             'event' => $event,
-            'slotsByDay' => $slotsByDay
+            'slotsByDay' => $slotsByDay,
+            'lieuChoisi' => $lieuChoisi // Important pour les liens "Suivant"
         ]);
     }
 
+    /**
+     * ÉTAPE 3 : Confirmation et Finalisation
+     */
     #[Route('/book/confirm/{eventId}', name: 'app_booking_confirm')]
     public function confirm(
         Request $request,
@@ -58,6 +125,7 @@ class BookingController extends AbstractController
         EvenementRepository $eventRepo,
         RendezVousRepository $rdvRepo,
         UserRepository $userRepo,
+        BureauRepository $bureauRepo, // Injection du repo Bureau
         EntityManagerInterface $em,
         MailerInterface $mailer,
         OutlookService $outlookService
@@ -66,8 +134,13 @@ class BookingController extends AbstractController
         $event = $eventRepo->find($eventId);
         if (!$event) return $this->redirectToRoute('app_home');
 
+        // Récupération du lieu depuis l'URL
+        $lieuChoisi = $request->query->get('lieu');
+        if (!$lieuChoisi) return $this->redirectToRoute('app_booking_start', ['eventId' => $eventId]);
+
         $rendezVous = new RendezVous();
         $rendezVous->setEvenement($event);
+        $rendezVous->setTypeLieu($lieuChoisi); // On force le lieu choisi
 
         // 1. Date
         $dateParam = $request->query->get('date');
@@ -76,7 +149,7 @@ class BookingController extends AbstractController
                 $startDate = new \DateTime($dateParam);
                 if ($event->getDateLimite() && $startDate > $event->getDateLimite()) {
                     $this->addFlash('danger', 'La date limite pour cet événement est dépassée.');
-                    return $this->redirectToRoute('app_booking_calendar', ['eventId' => $event->getId()]);
+                    return $this->redirectToRoute('app_booking_calendar', ['eventId' => $event->getId(), 'lieu' => $lieuChoisi]);
                 }
                 $rendezVous->setDateDebut($startDate);
                 $rendezVous->setDateFin((clone $startDate)->modify('+' . $event->getDuree() . ' minutes'));
@@ -109,19 +182,19 @@ class BookingController extends AbstractController
                 if ($choixFormulaire) $rendezVous->setConseiller($choixFormulaire);
             }
 
+            // --- A. GESTION DU CONSEILLER (Logique existante) ---
             $conseillerFinal = $rendezVous->getConseiller();
 
             if ($conseillerFinal) {
-                // VERIFICATION DU CONSEILLER (Avec Tampons)
                 if (!$this->checkDispoWithBuffers($conseillerFinal, $rendezVous->getDateDebut(), $event->getDuree(), $rdvRepo, $outlookService)) {
                     $this->addFlash('danger', 'Ce conseiller n\'est plus disponible (conflit avec les temps de pause/trajet).');
                     return $this->redirectToRoute('app_booking_calendar', [
                         'eventId' => $eventId,
-                        'userId' => $conseillerImpose ? $conseillerImpose->getId() : null
+                        'userId' => $conseillerImpose ? $conseillerImpose->getId() : null,
+                        'lieu' => $lieuChoisi
                     ]);
                 }
             } else {
-                // ROUND ROBIN (Avec Tampons)
                 $conseillerTrouve = $this->findAvailableConseiller(
                     $event->getGroupe(),
                     $rendezVous->getDateDebut(),
@@ -131,16 +204,38 @@ class BookingController extends AbstractController
                 );
 
                 if (!$conseillerTrouve) {
-                    $this->addFlash('danger', 'Aucun conseiller n\'est disponible sur ce créneau (temps de pause/trajet inclus).');
-                    return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
+                    $this->addFlash('danger', 'Aucun conseiller n\'est disponible sur ce créneau.');
+                    return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId, 'lieu' => $lieuChoisi]);
                 }
                 $rendezVous->setConseiller($conseillerTrouve);
             }
 
-            $rendezVous->setTypeLieu('Visioconférence');
+            // --- B. GESTION DU BUREAU (NOUVEAU) ---
+            // Si c'est Genève ou Archamps, on DOIT trouver un bureau libre maintenant
+            if (in_array($lieuChoisi, ['Cabinet-geneve', 'Cabinet-archamps'])) {
+
+                $bureauLibre = $bureauRepo->findAvailableBureau(
+                    $lieuChoisi,
+                    $rendezVous->getDateDebut(),
+                    $rendezVous->getDateFin()
+                );
+
+                if (!$bureauLibre) {
+                    // Cas rare : le dernier bureau a été pris pendant que l'user remplissait le form
+                    $this->addFlash('danger', 'Désolé, le dernier bureau disponible pour ce lieu vient d\'être réservé. Veuillez choisir un autre horaire.');
+                    return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId, 'lieu' => $lieuChoisi]);
+                }
+
+                // On assigne le bureau trouvé
+                $rendezVous->setBureau($bureauLibre);
+            }
+            // --------------------------------------
+
+            // Enregistrement
             $em->persist($rendezVous);
             $em->flush();
 
+            // Outlook (+ Invitation Salle Exchange automatique via le Service)
             try {
                 if ($rendezVous->getConseiller()) {
                     $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
@@ -152,7 +247,7 @@ class BookingController extends AbstractController
             return $this->redirectToRoute('app_booking_success', ['id' => $rendezVous->getId()]);
         }
 
-        return $this->render('booking/confirm.html.twig', [
+        return $this->render('booking/details.html.twig', [
             'form' => $form->createView(),
             'event' => $event,
             'dateChoisie' => $rendezVous->getDateDebut(),
@@ -160,13 +255,7 @@ class BookingController extends AbstractController
         ]);
     }
 
-    // --- LOGIQUE DES TAMPONS ---
-
-    /**
-     * Vérifie la disponibilité en prenant en compte les tampons des RDV existants.
-     * Exemple : Si un RDV est de 10h à 11h avec 30min tampon APRES,
-     * le créneau est considéré occupé de 10h à 11h30.
-     */
+    // --- LOGIQUE DES TAMPONS (inchangé) ---
     private function checkDispoWithBuffers(User $user, \DateTime $start, int $duree, $rdvRepo, $outlookService): bool
     {
         $slotStart = clone $start;
@@ -176,7 +265,6 @@ class BookingController extends AbstractController
         if ($rdvRepo->countRendezVousForUserOnDate($user, $start) >= 3) return false;
 
         // 2. BDD avec Tampons
-        // On cherche les conflits avec les RDV existants
         $dayStart = (clone $start)->setTime(0, 0, 0);
         $dayEnd = (clone $start)->setTime(23, 59, 59);
 
@@ -190,15 +278,11 @@ class BookingController extends AbstractController
             ->getResult();
 
         foreach ($existingRdvs as $rdv) {
-            // Récupération des tampons de l'événement déjà planifié
-            $tAvant = $rdv->getEvenement()->getTamponAvant(); // ex: 30
-            $tApres = $rdv->getEvenement()->getTamponApres(); // ex: 60
-
-            // Le RDV occupe réellement : [Début - Avant] jusqu'à [Fin + Après]
+            $tAvant = $rdv->getEvenement()->getTamponAvant();
+            $tApres = $rdv->getEvenement()->getTamponApres();
             $busyStart = (clone $rdv->getDateDebut())->modify("-{$tAvant} minutes");
             $busyEnd = (clone $rdv->getDateFin())->modify("+{$tApres} minutes");
 
-            // Si notre nouveau créneau touche cette zone élargie, c'est mort
             if ($slotStart < $busyEnd && $slotEnd > $busyStart) {
                 return false;
             }
@@ -234,12 +318,12 @@ class BookingController extends AbstractController
         return null;
     }
 
-    // --- CALENDRIER OPTIMISÉ ---
-    private function generateSlots($user, $event, $rdvRepo, $dispoRepo): array {
+    // --- CALENDRIER OPTIMISÉ (Avec Filtre Bureau) ---
+
+    private function generateSlots($user, $event, $rdvRepo, $dispoRepo, $bureauRepo, string $lieu): array
+    {
         $calendarData = [];
         $duration = $event->getDuree();
-
-        // Fréquence des créneaux (Tu peux changer 30 par 15 ou 60 ici)
         $increment = 30;
 
         $startPeriod = new \DateTime('first day of this month');
@@ -248,7 +332,6 @@ class BookingController extends AbstractController
 
         if ($dateLimite && $endPeriod < new \DateTime('today')) return [];
 
-        // CHARGEMENT OPTIMISÉ DES RDV
         $allRdvs = $rdvRepo->createQueryBuilder('r')
             ->where('r.conseiller = :user')
             ->andWhere('r.dateDebut BETWEEN :start AND :end')
@@ -280,8 +363,6 @@ class BookingController extends AbstractController
             if (!$dayData['isPast'] && isset($rulesByDay[$dayOfWeek])) {
                 $dayStartFilter = (clone $currentDate)->setTime(0,0,0);
                 $dayEndFilter = (clone $currentDate)->setTime(23,59,59);
-
-                // Filtre RDV du jour en mémoire PHP (rapide)
                 $rdvsDuJour = array_filter($allRdvs, function($r) use ($dayStartFilter, $dayEndFilter) {
                     return $r->getDateDebut() >= $dayStartFilter && $r->getDateDebut() <= $dayEndFilter;
                 });
@@ -292,30 +373,34 @@ class BookingController extends AbstractController
                     $end = (clone $currentDate)->setTime((int)$rule->getHeureFin()->format('H'), (int)$rule->getHeureFin()->format('i'));
 
                     while ($start < $end) {
-                        // Fin théorique du RDV
                         $slotEnd = (clone $start)->modify("+$duration minutes");
-
-                        // Si le RDV dépasse l'heure de fin de dispo du conseiller, on arrête
                         if ($slotEnd > $end) break;
 
                         $isFree = true;
 
-                        // QUOTA (Désactivé pour tes tests, décommente pour la prod)
-                        // if (count($rdvsDuJour) >= 3) { $isFree = false; }
-
+                        // 1. Check Conseiller (Tampons)
                         if ($isFree) {
                             foreach ($rdvsDuJour as $rdv) {
-                                // Gestion des Tampons
                                 $tAvant = $rdv->getEvenement()->getTamponAvant();
                                 $tApres = $rdv->getEvenement()->getTamponApres();
                                 $busyStart = (clone $rdv->getDateDebut())->modify("-{$tAvant} minutes");
                                 $busyEnd = (clone $rdv->getDateFin())->modify("+{$tApres} minutes");
 
-                                // Si chevauchement
                                 if ($start < $busyEnd && $slotEnd > $busyStart) {
                                     $isFree = false;
                                     break;
                                 }
+                            }
+                        }
+
+                        // 2. Check Bureau (SI LIEU PHYSIQUE)
+                        // Si le conseiller est libre, on vérifie s'il reste un bureau
+                        if ($isFree && in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps'])) {
+                            // On demande au repo : "Y a-t-il au moins UN bureau libre ?"
+                            // (Pas besoin de savoir lequel pour l'affichage, juste qu'il y en a un)
+                            $bureauDispo = $bureauRepo->findAvailableBureau($lieu, $start, $slotEnd);
+                            if (!$bureauDispo) {
+                                $isFree = false; // Conseiller dispo mais plus de salle
                             }
                         }
 
@@ -324,9 +409,6 @@ class BookingController extends AbstractController
                             $dayData['hasAvailability'] = true;
                         }
 
-                        // --- C'EST ICI QUE TOUT CHANGE ---
-                        // Au lieu de sauter de la durée du RDV ($start = $slotEnd),
-                        // on avance par petit pas fixe (30 min).
                         $start->modify("+$increment minutes");
                     }
                 }
