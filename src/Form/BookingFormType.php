@@ -21,35 +21,24 @@ class BookingFormType extends AbstractType
     {
         $groupe = $options['groupe'];
         $isRoundRobin = $options['is_round_robin'];
-        $cacherConseiller = $options['cacher_conseiller']; // Nouvelle option
+        $cacherConseiller = $options['cacher_conseiller'];
 
         $builder
-            ->add('prenom', TextType::class, [
-                'label' => 'Prénom',
-                'attr' => ['class' => 'form-control-lg', 'placeholder' => 'Jean']
-            ])
-            ->add('nom', TextType::class, [
-                'label' => 'Nom',
-                'attr' => ['class' => 'form-control-lg', 'placeholder' => 'Dupont']
-            ])
-            ->add('email', EmailType::class, [
-                'label' => 'Email',
-                'attr' => ['class' => 'form-control-lg', 'placeholder' => 'jean.dupont@email.com']
-            ])
-            ->add('telephone', TelType::class, [
-                'label' => 'Téléphone mobile',
-                'attr' => ['class' => 'form-control-lg', 'placeholder' => '06 12 34 56 78']
-            ]);
+            ->add('prenom', TextType::class, ['label' => 'Prénom', 'attr' => ['class' => 'form-control-lg', 'placeholder' => 'Jean']])
+            ->add('nom', TextType::class, ['label' => 'Nom', 'attr' => ['class' => 'form-control-lg', 'placeholder' => 'Dupont']])
+            ->add('email', EmailType::class, ['label' => 'Email', 'attr' => ['class' => 'form-control-lg', 'placeholder' => 'jean.dupont@email.com']])
+            ->add('telephone', TelType::class, ['label' => 'Téléphone mobile', 'attr' => ['class' => 'form-control-lg', 'placeholder' => '06 12 34 56 78']]);
 
-        // --- LOGIQUE D'AFFICHAGE DU CONSEILLER ---
-        // On affiche la liste SEULEMENT SI on n'est pas en mode "Lien Perso" (cacher_conseiller = false)
-        if (!$cacherConseiller) {
+        // --- NOUVELLE LOGIQUE STRICTE ---
+        // On affiche le sélecteur UNIQUEMENT si :
+        // 1. Ce n'est PAS un Round Robin (le client DOIT choisir)
+        // 2. ET on n'a pas déjà imposé un conseiller via l'URL (cacher_conseiller est false)
+        if (!$isRoundRobin && !$cacherConseiller) {
             $builder->add('conseiller', EntityType::class, [
                 'class' => User::class,
-                // Si Round Robin activé -> Optionnel. Sinon -> Obligatoire.
-                'required' => !$isRoundRobin,
-                'label' => $isRoundRobin ? 'Choisir un conseiller (Optionnel)' : 'Choisir un conseiller *',
-                'placeholder' => $isRoundRobin ? 'Peu importe (Premier disponible)' : 'Veuillez sélectionner...',
+                'required' => true, // Devient obligatoire car si on est là, c'est que le client doit choisir
+                'label' => 'Choisir un conseiller *',
+                'placeholder' => 'Veuillez sélectionner...',
                 'attr' => ['class' => 'form-select-lg'],
                 'choice_label' => fn (User $user) => $user->getFirstName() . ' ' . $user->getLastName(),
                 'query_builder' => function (EntityRepository $er) use ($groupe) {
@@ -60,7 +49,7 @@ class BookingFormType extends AbstractType
                 },
             ]);
         }
-        // ------------------------------------------
+        // --------------------------------
 
         $builder
             ->add('typeLieu', ChoiceType::class, [
@@ -78,13 +67,9 @@ class BookingFormType extends AbstractType
             ->add('adresse', TextType::class, [
                 'label' => 'Adresse du rendez-vous',
                 'required' => false,
-                'attr' => [
-                    'class' => 'form-control-lg',
-                    'placeholder' => 'Ex: 12 Avenue des Champs-Élysées, 75008 Paris'
-                ],
+                'attr' => ['class' => 'form-control-lg', 'placeholder' => 'Ex: 12 Avenue des Champs-Élysées, 75008 Paris'],
                 'help' => 'Indiquez le code d\'accès ou l\'étage si nécessaire.'
-            ])
-        ;
+            ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
@@ -93,9 +78,8 @@ class BookingFormType extends AbstractType
             'data_class' => RendezVous::class,
             'groupe' => null,
             'is_round_robin' => true,
-            'cacher_conseiller' => false, // Par défaut, on affiche le choix
+            'cacher_conseiller' => false,
         ]);
-
         $resolver->setAllowedTypes('groupe', ['null', Groupe::class]);
         $resolver->setAllowedTypes('is_round_robin', 'bool');
         $resolver->setAllowedTypes('cacher_conseiller', 'bool');
