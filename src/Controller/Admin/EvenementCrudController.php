@@ -7,10 +7,12 @@ use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ColorField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\DateField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextEditorField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\DateField;
 
 class EvenementCrudController extends AbstractCrudController
 {
@@ -22,21 +24,31 @@ class EvenementCrudController extends AbstractCrudController
     public function configureFields(string $pageName): iterable
     {
         return [
-            TextField::new('titre', 'Nom de l\'événement'),
-            AssociationField::new('groupe', 'Groupe assigné'),
+            IdField::new('id')->hideOnForm(),
 
-            // On a supprimé visioUrl ici
-            BooleanField::new('isRoundRobin', 'Round Robin (Distribution Auto)')
-                ->setHelp('Si activé, le rendez-vous sera attribué automatiquement à un membre de l\'équipe.'),
-
-            IntegerField::new('duree', 'Durée (min)'),
-            IntegerField::new('delaiPrevention', 'Délai minimum avant RDV (min)')
-                ->setHelp('Empêche les réservations de dernière minute. Ex: mettez "60" pour interdire les RDV dans moins d\'une heure.'),
+            FormField::addPanel('Informations Générales'),
+            TextField::new('titre', 'Titre de l\'événement'),
+            TextField::new('slug', 'Slug')->hideOnIndex(),
+            IntegerField::new('duree', 'Durée (minutes)'),
             ColorField::new('couleur', 'Couleur'),
 
-            TextEditorField::new('description')->hideOnIndex(),
+            FormField::addPanel('Gestion des Pauses (Tampons)'),
+            IntegerField::new('tamponAvant', 'Pause AVANT (min)')
+                ->setHelp('Temps bloqué avant le début pour la préparation.')
+                ->setColumns(6),
+            IntegerField::new('tamponApres', 'Pause APRES (min)')
+                ->setHelp('Temps bloqué après la fin pour le debriefing ou le trajet.')
+                ->setColumns(6),
 
-            DateField::new('dateLimite', 'Date limite de réservation')->setHelp('Après cette date, l\'événement ne sera plus proposé.'),
+            FormField::addPanel('Options'),
+            AssociationField::new('groupe', 'Groupe associé'),
+            BooleanField::new('isRoundRobin', 'Attribution Auto (Round Robin)')
+                ->setHelp('Si coché, le client ne choisit pas le conseiller.'),
+
+            DateField::new('dateLimite', 'Date Limite (Optionnel)')
+                ->setHelp('Aucun RDV ne pourra être pris après cette date.'),
+
+            TextEditorField::new('description', 'Description'),
         ];
     }
 }

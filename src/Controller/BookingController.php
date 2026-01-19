@@ -21,10 +21,6 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class BookingController extends AbstractController
 {
-    /**
-     * ROUTE 1 : Affichage du calendrier
-     * Permet de voir les disponibilités.
-     */
     #[Route('/book/event/{eventId}/{userId?}', name: 'app_booking_calendar', requirements: ['eventId' => '\d+', 'userId' => '\d+'])]
     public function calendar(
         int $eventId,
@@ -39,13 +35,9 @@ class BookingController extends AbstractController
         if (!$event) throw $this->createNotFoundException("Événement introuvable.");
 
         $targetUser = $userId ? $userRepo->find($userId) : null;
-
-        // Si aucun user ciblé, on prend le premier du groupe pour l'affichage par défaut
         $displayUser = $targetUser ?? $event->getGroupe()->getUsers()->first();
 
-        if (!$displayUser) {
-            throw $this->createNotFoundException("Aucun conseiller dans ce groupe.");
-        }
+        if (!$displayUser) throw $this->createNotFoundException("Aucun conseiller dans ce groupe.");
 
         $slotsByDay = $this->generateSlots($displayUser, $event, $rdvRepo, $dispoRepo);
 
@@ -56,10 +48,6 @@ class BookingController extends AbstractController
         ]);
     }
 
-    /**
-     * ROUTE 2 : Confirmation et Finalisation du RDV
-     * Gère le formulaire, le Round Robin et l'enregistrement.
-     */
     #[Route('/book/confirm/{eventId}', name: 'app_booking_confirm')]
     public function confirm(
         Request $request,
@@ -78,18 +66,15 @@ class BookingController extends AbstractController
         $rendezVous = new RendezVous();
         $rendezVous->setEvenement($event);
 
-        // 1. Récupération de la date depuis l'URL
+        // 1. Date
         $dateParam = $request->query->get('date');
         if ($dateParam) {
             try {
                 $startDate = new \DateTime($dateParam);
-
-                // Vérification Date Limite
                 if ($event->getDateLimite() && $startDate > $event->getDateLimite()) {
                     $this->addFlash('danger', 'La date limite pour cet événement est dépassée.');
                     return $this->redirectToRoute('app_booking_calendar', ['eventId' => $event->getId()]);
                 }
-
                 $rendezVous->setDateDebut($startDate);
                 $rendezVous->setDateFin((clone $startDate)->modify('+' . $event->getDuree() . ' minutes'));
             } catch (\Exception $e) {
@@ -97,18 +82,15 @@ class BookingController extends AbstractController
             }
         }
 
-        // 2. Gestion du Lien Personnel (Conseiller Imposé)
+        // 2. Conseiller Imposé
         $userIdParam = $request->query->get('user');
         $conseillerImpose = null;
-
         if ($userIdParam) {
             $conseillerImpose = $userRepo->find($userIdParam);
-            if ($conseillerImpose) {
-                $rendezVous->setConseiller($conseillerImpose);
-            }
+            if ($conseillerImpose) $rendezVous->setConseiller($conseillerImpose);
         }
 
-        // 3. Création du Formulaire
+        // 3. Formulaire
         $form = $this->createForm(BookingFormType::class, $rendezVous, [
             'groupe' => $event->getGroupe(),
             'is_round_robin' => $event->isRoundRobin(),
@@ -119,27 +101,24 @@ class BookingController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
 
-            // Si le formulaire contient un choix utilisateur explicite
             if ($form->has('conseiller')) {
                 $choixFormulaire = $form->get('conseiller')->getData();
-                if ($choixFormulaire) {
-                    $rendezVous->setConseiller($choixFormulaire);
-                }
+                if ($choixFormulaire) $rendezVous->setConseiller($choixFormulaire);
             }
 
             $conseillerFinal = $rendezVous->getConseiller();
 
             if ($conseillerFinal) {
-                // CAS A : Conseiller DÉFINI (Imposé ou Choisi)
-                if (!$this->isConseillerDispo($conseillerFinal, $rendezVous->getDateDebut(), $event->getDuree(), $rdvRepo, $outlookService)) {
-                    $this->addFlash('danger', 'Oups ! Ce conseiller n\'est plus disponible à cette heure. Veuillez choisir un autre créneau.');
+                // VERIFICATION DU CONSEILLER (Avec Tampons)
+                if (!$this->checkDispoWithBuffers($conseillerFinal, $rendezVous->getDateDebut(), $event->getDuree(), $rdvRepo, $outlookService)) {
+                    $this->addFlash('danger', 'Ce conseiller n\'est plus disponible (conflit avec les temps de pause/trajet).');
                     return $this->redirectToRoute('app_booking_calendar', [
                         'eventId' => $eventId,
                         'userId' => $conseillerImpose ? $conseillerImpose->getId() : null
                     ]);
                 }
             } else {
-                // CAS B : Conseiller NON DÉFINI (Round Robin)
+                // ROUND ROBIN (Avec Tampons)
                 $conseillerTrouve = $this->findAvailableConseiller(
                     $event->getGroupe(),
                     $rendezVous->getDateDebut(),
@@ -149,26 +128,22 @@ class BookingController extends AbstractController
                 );
 
                 if (!$conseillerTrouve) {
-                    $this->addFlash('danger', 'Oups ! Ce créneau n\'est plus disponible (tous nos conseillers sont pris). Veuillez en choisir un autre.');
+                    $this->addFlash('danger', 'Aucun conseiller n\'est disponible sur ce créneau (temps de pause/trajet inclus).');
                     return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
                 }
-
                 $rendezVous->setConseiller($conseillerTrouve);
             }
 
-            // Enregistrement
             $rendezVous->setTypeLieu('Visioconférence');
             $em->persist($rendezVous);
             $em->flush();
 
-            // Synchro Outlook
             try {
                 if ($rendezVous->getConseiller()) {
                     $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
                 }
             } catch (\Exception $e) {}
 
-            // Emails
             $this->sendConfirmationEmails($mailer, $rendezVous, $event);
 
             return $this->redirectToRoute('app_booking_success', ['id' => $rendezVous->getId()]);
@@ -182,25 +157,57 @@ class BookingController extends AbstractController
         ]);
     }
 
-    // --- ALGORITHMES & OUTILS ---
+    // --- LOGIQUE DES TAMPONS ---
 
-    private function isConseillerDispo(User $user, \DateTime $start, int $duree, $rdvRepo, $outlookService): bool
+    /**
+     * Vérifie la disponibilité en prenant en compte les tampons des RDV existants.
+     * Exemple : Si un RDV est de 10h à 11h avec 30min tampon APRES,
+     * le créneau est considéré occupé de 10h à 11h30.
+     */
+    private function checkDispoWithBuffers(User $user, \DateTime $start, int $duree, $rdvRepo, $outlookService): bool
     {
+        $slotStart = clone $start;
         $slotEnd = (clone $start)->modify("+$duree minutes");
 
         // 1. Quota
         if ($rdvRepo->countRendezVousForUserOnDate($user, $start) >= 3) return false;
-        // 2. BDD
-        if (!$rdvRepo->isSlotAvailable($user, $start, $slotEnd)) return false;
+
+        // 2. BDD avec Tampons
+        // On cherche les conflits avec les RDV existants
+        $dayStart = (clone $start)->setTime(0, 0, 0);
+        $dayEnd = (clone $start)->setTime(23, 59, 59);
+
+        $existingRdvs = $rdvRepo->createQueryBuilder('r')
+            ->where('r.conseiller = :user')
+            ->andWhere('r.dateDebut BETWEEN :start AND :end')
+            ->setParameter('user', $user)
+            ->setParameter('start', $dayStart)
+            ->setParameter('end', $dayEnd)
+            ->getQuery()
+            ->getResult();
+
+        foreach ($existingRdvs as $rdv) {
+            // Récupération des tampons de l'événement déjà planifié
+            $tAvant = $rdv->getEvenement()->getTamponAvant(); // ex: 30
+            $tApres = $rdv->getEvenement()->getTamponApres(); // ex: 60
+
+            // Le RDV occupe réellement : [Début - Avant] jusqu'à [Fin + Après]
+            $busyStart = (clone $rdv->getDateDebut())->modify("-{$tAvant} minutes");
+            $busyEnd = (clone $rdv->getDateFin())->modify("+{$tApres} minutes");
+
+            // Si notre nouveau créneau touche cette zone élargie, c'est mort
+            if ($slotStart < $busyEnd && $slotEnd > $busyStart) {
+                return false;
+            }
+        }
+
         // 3. Outlook
         try {
             $busyPeriods = $outlookService->getOutlookBusyPeriods($user, $start);
             foreach ($busyPeriods as $period) {
-                if ($start < $period['end'] && $slotEnd > $period['start']) return false;
+                if ($slotStart < $period['end'] && $slotEnd > $period['start']) return false;
             }
-        } catch (\Exception $e) {
-            // return true; // (Optionnel : ignorer erreur Outlook)
-        }
+        } catch (\Exception $e) {}
 
         return true;
     }
@@ -216,74 +223,47 @@ class BookingController extends AbstractController
             return $countA <=> $countB;
         });
 
-        $slotEnd = (clone $start)->modify("+$duree minutes");
-
         foreach ($conseillers as $conseiller) {
-            if ($rdvRepo->countRendezVousForUserOnDate($conseiller, $start) >= 3) continue;
-            if (!$rdvRepo->isSlotAvailable($conseiller, $start, $slotEnd)) continue;
-
-            try {
-                $busyPeriods = $outlookService->getOutlookBusyPeriods($conseiller, $start);
-                foreach ($busyPeriods as $period) {
-                    if ($start < $period['end'] && $slotEnd > $period['start']) {
-                        continue 2;
-                    }
-                }
-            } catch (\Exception $e) {}
-
-            return $conseiller;
+            if ($this->checkDispoWithBuffers($conseiller, $start, $duree, $rdvRepo, $outlookService)) {
+                return $conseiller;
+            }
         }
-
         return null;
     }
 
-    #[Route('/book/success/{id}', name: 'app_booking_success')]
-    public function success(RendezVous $rendezVous): Response
-    {
-        return $this->render('booking/success.html.twig', [
-            'rendezvous' => $rendezVous
-        ]);
-    }
-
-    // --- OUTILS CALENDRIER ---
-
+    // --- CALENDRIER OPTIMISÉ ---
     private function generateSlots($user, $event, $rdvRepo, $dispoRepo): array {
         $calendarData = [];
         $duration = $event->getDuree();
 
-        // --- CORRECTION : DÉFINITION DE $minBookingTime ---
-        // On calcule l'heure minimum autorisée (Maintenant + Délai de prévention)
-        $minBookingTime = new \DateTime();
-
-        // On vérifie si la méthode existe (au cas où tu n'as pas encore mis à jour l'entité)
-        // Cela t'évitera une autre erreur si tu n'as pas fait la migration BDD
-        if (method_exists($event, 'getDelaiPrevention') && $event->getDelaiPrevention() > 0) {
-            $minBookingTime->modify('+' . $event->getDelaiPrevention() . ' minutes');
-        }
-        // ---------------------------------------------------
+        // Fréquence des créneaux (Tu peux changer 30 par 15 ou 60 ici)
+        $increment = 30;
 
         $startPeriod = new \DateTime('first day of this month');
         $dateLimite = $event->getDateLimite();
+        $endPeriod = $dateLimite ? clone $dateLimite : (clone $startPeriod)->modify('+12 months')->modify('last day of this month');
 
-        if ($dateLimite) {
-            $endPeriod = clone $dateLimite;
-            if ($endPeriod < new \DateTime('today')) return [];
-        } else {
-            $endPeriod = (clone $startPeriod)->modify('+12 months')->modify('last day of this month');
-        }
+        if ($dateLimite && $endPeriod < new \DateTime('today')) return [];
+
+        // CHARGEMENT OPTIMISÉ DES RDV
+        $allRdvs = $rdvRepo->createQueryBuilder('r')
+            ->where('r.conseiller = :user')
+            ->andWhere('r.dateDebut BETWEEN :start AND :end')
+            ->setParameter('user', $user)
+            ->setParameter('start', $startPeriod)
+            ->setParameter('end', $endPeriod)
+            ->getQuery()
+            ->getResult();
 
         $disposHebdo = $dispoRepo->findBy(['user' => $user]);
         $rulesByDay = [];
-        foreach ($disposHebdo as $dispo) {
-            $rulesByDay[$dispo->getJourSemaine()][] = $dispo;
-        }
+        foreach ($disposHebdo as $dispo) $rulesByDay[$dispo->getJourSemaine()][] = $dispo;
 
         $currentDate = clone $startPeriod;
         while ($currentDate <= $endPeriod) {
             $sortKey = $currentDate->format('Y-m');
-            if (!isset($calendarData[$sortKey])) {
-                $calendarData[$sortKey] = ['label' => clone $currentDate, 'days' => []];
-            }
+            if (!isset($calendarData[$sortKey])) $calendarData[$sortKey] = ['label' => clone $currentDate, 'days' => []];
+
             $dayOfWeek = (int)$currentDate->format('N');
             $dayData = [
                 'dateObj' => clone $currentDate,
@@ -294,29 +274,57 @@ class BookingController extends AbstractController
                 'hasAvailability' => false
             ];
 
-            if (!$dayData['isPast']) {
-                if (isset($rulesByDay[$dayOfWeek])) {
-                    foreach ($rulesByDay[$dayOfWeek] as $rule) {
-                        if ($rule->isEstBloque()) continue;
-                        $start = (clone $currentDate)->setTime((int)$rule->getHeureDebut()->format('H'), (int)$rule->getHeureDebut()->format('i'));
-                        $end = (clone $currentDate)->setTime((int)$rule->getHeureFin()->format('H'), (int)$rule->getHeureFin()->format('i'));
-                        while ($start < $end) {
-                            $slotEnd = (clone $start)->modify("+$duration minutes");
-                            if ($slotEnd > $end) break;
+            if (!$dayData['isPast'] && isset($rulesByDay[$dayOfWeek])) {
+                $dayStartFilter = (clone $currentDate)->setTime(0,0,0);
+                $dayEndFilter = (clone $currentDate)->setTime(23,59,59);
 
-                            // --- UTILISATION DE LA VARIABLE DÉFINIE PLUS HAUT ---
-                            if ($start < $minBookingTime) {
-                                $start = $slotEnd;
-                                continue;
-                            }
-                            // ----------------------------------------------------
+                // Filtre RDV du jour en mémoire PHP (rapide)
+                $rdvsDuJour = array_filter($allRdvs, function($r) use ($dayStartFilter, $dayEndFilter) {
+                    return $r->getDateDebut() >= $dayStartFilter && $r->getDateDebut() <= $dayEndFilter;
+                });
 
-                            if ($rdvRepo->isSlotAvailable($user, $start, $slotEnd)) {
-                                $dayData['slots'][] = $start->format('H:i');
-                                $dayData['hasAvailability'] = true;
+                foreach ($rulesByDay[$dayOfWeek] as $rule) {
+                    if ($rule->isEstBloque()) continue;
+                    $start = (clone $currentDate)->setTime((int)$rule->getHeureDebut()->format('H'), (int)$rule->getHeureDebut()->format('i'));
+                    $end = (clone $currentDate)->setTime((int)$rule->getHeureFin()->format('H'), (int)$rule->getHeureFin()->format('i'));
+
+                    while ($start < $end) {
+                        // Fin théorique du RDV
+                        $slotEnd = (clone $start)->modify("+$duration minutes");
+
+                        // Si le RDV dépasse l'heure de fin de dispo du conseiller, on arrête
+                        if ($slotEnd > $end) break;
+
+                        $isFree = true;
+
+                        // QUOTA (Désactivé pour tes tests, décommente pour la prod)
+                        // if (count($rdvsDuJour) >= 3) { $isFree = false; }
+
+                        if ($isFree) {
+                            foreach ($rdvsDuJour as $rdv) {
+                                // Gestion des Tampons
+                                $tAvant = $rdv->getEvenement()->getTamponAvant();
+                                $tApres = $rdv->getEvenement()->getTamponApres();
+                                $busyStart = (clone $rdv->getDateDebut())->modify("-{$tAvant} minutes");
+                                $busyEnd = (clone $rdv->getDateFin())->modify("+{$tApres} minutes");
+
+                                // Si chevauchement
+                                if ($start < $busyEnd && $slotEnd > $busyStart) {
+                                    $isFree = false;
+                                    break;
+                                }
                             }
-                            $start = $slotEnd;
                         }
+
+                        if ($isFree) {
+                            $dayData['slots'][] = $start->format('H:i');
+                            $dayData['hasAvailability'] = true;
+                        }
+
+                        // --- C'EST ICI QUE TOUT CHANGE ---
+                        // Au lieu de sauter de la durée du RDV ($start = $slotEnd),
+                        // on avance par petit pas fixe (30 min).
+                        $start->modify("+$increment minutes");
                     }
                 }
             }
@@ -327,6 +335,12 @@ class BookingController extends AbstractController
         return array_values($calendarData);
     }
 
+    #[Route('/book/success/{id}', name: 'app_booking_success')]
+    public function success(RendezVous $rendezVous): Response
+    {
+        return $this->render('booking/success.html.twig', ['rendezvous' => $rendezVous]);
+    }
+
     private function sendConfirmationEmails($mailer, $rdv, $event): void
     {
         $emailClient = new TemplatedEmail()
@@ -335,9 +349,6 @@ class BookingController extends AbstractController
             ->subject('Confirmation RDV : ' . $event->getTitre())
             ->htmlTemplate('emails/booking_confirmation_client.html.twig')
             ->context(['rdv' => $rdv]);
-
-        try {
-            $mailer->send($emailClient);
-        } catch (\Exception $e) {}
+        try { $mailer->send($emailClient); } catch (\Exception $e) {}
     }
 }

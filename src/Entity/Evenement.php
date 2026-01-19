@@ -36,7 +36,11 @@ class Evenement
     private ?\DateTimeInterface $dateLimite = null;
 
     #[ORM\Column(options: ['default' => 0])]
-    private ?int $delaiPrevention = 0;
+    private ?int $tamponAvant = 0; // En minutes (ex: 30)
+
+    #[ORM\Column(options: ['default' => 0])]
+    private ?int $tamponApres = 0; // En minutes (ex: 60)
+
     #[ORM\ManyToOne(inversedBy: 'evenements')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Groupe $groupe = null;
@@ -138,16 +142,28 @@ class Evenement
         return $this;
     }
 
-    public function getDelaiPrevention(): ?int
+    public function getTamponAvant(): ?int
     {
-        return $this->delaiPrevention;
+        return $this->tamponAvant;
     }
 
-    public function setDelaiPrevention(int $delaiPrevention): static
+    public function setTamponAvant(int $tamponAvant): static
     {
-        $this->delaiPrevention = $delaiPrevention;
+        $this->tamponAvant = $tamponAvant;
         return $this;
     }
+
+    public function getTamponApres(): ?int
+    {
+        return $this->tamponApres;
+    }
+
+    public function setTamponApres(int $tamponApres): static
+    {
+        $this->tamponApres = $tamponApres;
+        return $this;
+    }
+
 
     public function __toString(): string
     {
