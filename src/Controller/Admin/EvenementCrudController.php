@@ -30,6 +30,8 @@ class EvenementCrudController extends AbstractCrudController
                 ->setHelp('Si activé, le rendez-vous sera attribué automatiquement à un membre de l\'équipe.'),
 
             IntegerField::new('duree', 'Durée (min)'),
+            IntegerField::new('delaiPrevention', 'Délai minimum avant RDV (min)')
+                ->setHelp('Empêche les réservations de dernière minute. Ex: mettez "60" pour interdire les RDV dans moins d\'une heure.'),
             ColorField::new('couleur', 'Couleur'),
 
             TextEditorField::new('description')->hideOnIndex(),

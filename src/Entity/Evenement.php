@@ -29,13 +29,14 @@ class Evenement
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
 
-    // J'ai ajouté isRoundRobin car c'est crucial pour ta logique d'équipe
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private ?bool $isRoundRobin = false;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
     private ?\DateTimeInterface $dateLimite = null;
 
+    #[ORM\Column(options: ['default' => 0])]
+    private ?int $delaiPrevention = 0;
     #[ORM\ManyToOne(inversedBy: 'evenements')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Groupe $groupe = null;
@@ -134,6 +135,17 @@ class Evenement
     public function setDateLimite(?\DateTimeInterface $dateLimite): static
     {
         $this->dateLimite = $dateLimite;
+        return $this;
+    }
+
+    public function getDelaiPrevention(): ?int
+    {
+        return $this->delaiPrevention;
+    }
+
+    public function setDelaiPrevention(int $delaiPrevention): static
+    {
+        $this->delaiPrevention = $delaiPrevention;
         return $this;
     }
 

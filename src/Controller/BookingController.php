@@ -41,7 +41,6 @@ class BookingController extends AbstractController
         $targetUser = $userId ? $userRepo->find($userId) : null;
 
         // Si aucun user ciblé, on prend le premier du groupe pour l'affichage par défaut
-        // (Note : Pour une V2, tu pourrais fusionner les dispos de tout le groupe)
         $displayUser = $targetUser ?? $event->getGroupe()->getUsers()->first();
 
         if (!$displayUser) {
@@ -84,6 +83,13 @@ class BookingController extends AbstractController
         if ($dateParam) {
             try {
                 $startDate = new \DateTime($dateParam);
+
+                // Vérification Date Limite
+                if ($event->getDateLimite() && $startDate > $event->getDateLimite()) {
+                    $this->addFlash('danger', 'La date limite pour cet événement est dépassée.');
+                    return $this->redirectToRoute('app_booking_calendar', ['eventId' => $event->getId()]);
+                }
+
                 $rendezVous->setDateDebut($startDate);
                 $rendezVous->setDateFin((clone $startDate)->modify('+' . $event->getDuree() . ' minutes'));
             } catch (\Exception $e) {
@@ -98,7 +104,6 @@ class BookingController extends AbstractController
         if ($userIdParam) {
             $conseillerImpose = $userRepo->find($userIdParam);
             if ($conseillerImpose) {
-                // On force le conseiller dans l'entité
                 $rendezVous->setConseiller($conseillerImpose);
             }
         }
@@ -107,7 +112,6 @@ class BookingController extends AbstractController
         $form = $this->createForm(BookingFormType::class, $rendezVous, [
             'groupe' => $event->getGroupe(),
             'is_round_robin' => $event->isRoundRobin(),
-            // Si un conseiller est imposé, on cache le sélecteur dans le formulaire
             'cacher_conseiller' => ($conseillerImpose !== null)
         ]);
 
@@ -115,7 +119,7 @@ class BookingController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
 
-            // Si le formulaire contient un choix utilisateur explicite, on le prend
+            // Si le formulaire contient un choix utilisateur explicite
             if ($form->has('conseiller')) {
                 $choixFormulaire = $form->get('conseiller')->getData();
                 if ($choixFormulaire) {
@@ -123,15 +127,10 @@ class BookingController extends AbstractController
                 }
             }
 
-            // À ce stade, le conseiller est soit :
-            // - Imposé (via URL)
-            // - Choisi (via Formulaire)
-            // - Null (via "Peu importe" / Round Robin)
             $conseillerFinal = $rendezVous->getConseiller();
 
             if ($conseillerFinal) {
                 // CAS A : Conseiller DÉFINI (Imposé ou Choisi)
-                // On vérifie s'il est toujours libre
                 if (!$this->isConseillerDispo($conseillerFinal, $rendezVous->getDateDebut(), $event->getDuree(), $rdvRepo, $outlookService)) {
                     $this->addFlash('danger', 'Oups ! Ce conseiller n\'est plus disponible à cette heure. Veuillez choisir un autre créneau.');
                     return $this->redirectToRoute('app_booking_calendar', [
@@ -141,7 +140,6 @@ class BookingController extends AbstractController
                 }
             } else {
                 // CAS B : Conseiller NON DÉFINI (Round Robin)
-                // Le client a choisi "Peu importe"
                 $conseillerTrouve = $this->findAvailableConseiller(
                     $event->getGroupe(),
                     $rendezVous->getDateDebut(),
@@ -150,31 +148,27 @@ class BookingController extends AbstractController
                     $outlookService
                 );
 
-                // --- GESTION ERREUR CLIENT ---
                 if (!$conseillerTrouve) {
                     $this->addFlash('danger', 'Oups ! Ce créneau n\'est plus disponible (tous nos conseillers sont pris). Veuillez en choisir un autre.');
                     return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
                 }
-                // -----------------------------
 
                 $rendezVous->setConseiller($conseillerTrouve);
             }
 
             // Enregistrement
-            $rendezVous->setTypeLieu('Visioconférence'); // Ou valeur du form
+            $rendezVous->setTypeLieu('Visioconférence');
             $em->persist($rendezVous);
             $em->flush();
 
-            // Synchro Outlook (sécurisée)
+            // Synchro Outlook
             try {
                 if ($rendezVous->getConseiller()) {
                     $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
                 }
-            } catch (\Exception $e) {
-                // On log l'erreur mais on ne bloque pas le client
-            }
+            } catch (\Exception $e) {}
 
-            // Envoi des emails
+            // Emails
             $this->sendConfirmationEmails($mailer, $rendezVous, $event);
 
             return $this->redirectToRoute('app_booking_success', ['id' => $rendezVous->getId()]);
@@ -184,25 +178,20 @@ class BookingController extends AbstractController
             'form' => $form->createView(),
             'event' => $event,
             'dateChoisie' => $rendezVous->getDateDebut(),
-            'conseiller' => $rendezVous->getConseiller(), // Pour afficher la photo/nom
+            'conseiller' => $rendezVous->getConseiller(),
         ]);
     }
 
     // --- ALGORITHMES & OUTILS ---
 
-    /**
-     * Vérifie la disponibilité d'un conseiller précis (BDD + Outlook + Quota)
-     */
     private function isConseillerDispo(User $user, \DateTime $start, int $duree, $rdvRepo, $outlookService): bool
     {
         $slotEnd = (clone $start)->modify("+$duree minutes");
 
-        // 1. Quota journalier (3 RDV max)
+        // 1. Quota
         if ($rdvRepo->countRendezVousForUserOnDate($user, $start) >= 3) return false;
-
-        // 2. BDD Interne
+        // 2. BDD
         if (!$rdvRepo->isSlotAvailable($user, $start, $slotEnd)) return false;
-
         // 3. Outlook
         try {
             $busyPeriods = $outlookService->getOutlookBusyPeriods($user, $start);
@@ -210,23 +199,17 @@ class BookingController extends AbstractController
                 if ($start < $period['end'] && $slotEnd > $period['start']) return false;
             }
         } catch (\Exception $e) {
-            // Si Outlook ne répond pas, on peut décider de bloquer ou laisser passer.
-            // Ici, par sécurité, on laisse passer (true) ou on bloque (false) selon ta politique.
-            // return true;
+            // return true; // (Optionnel : ignorer erreur Outlook)
         }
 
         return true;
     }
 
-    /**
-     * Trouve un conseiller disponible dans le groupe (Round Robin)
-     */
     private function findAvailableConseiller($groupe, \DateTime $start, int $duree, $rdvRepo, $outlookService): ?User
     {
         $conseillers = $groupe->getUsers()->toArray();
-        shuffle($conseillers); // Mélange pour équité
+        shuffle($conseillers);
 
-        // Tri : Celui qui a le MOINS de RDV passe en premier
         usort($conseillers, function ($userA, $userB) use ($rdvRepo, $start) {
             $countA = $rdvRepo->countRendezVousForUserOnDate($userA, $start);
             $countB = $rdvRepo->countRendezVousForUserOnDate($userB, $start);
@@ -236,27 +219,18 @@ class BookingController extends AbstractController
         $slotEnd = (clone $start)->modify("+$duree minutes");
 
         foreach ($conseillers as $conseiller) {
-
-            // 1. Limite 3 RDV
-            // (Tu peux commenter cette ligne si tu veux faire des tests intensifs)
             if ($rdvRepo->countRendezVousForUserOnDate($conseiller, $start) >= 3) continue;
-
-            // 2. Dispo BDD Interne (OBLIGATOIRE)
             if (!$rdvRepo->isSlotAvailable($conseiller, $start, $slotEnd)) continue;
 
-            // 3. Outlook (Avec gestion d'erreur)
             try {
                 $busyPeriods = $outlookService->getOutlookBusyPeriods($conseiller, $start);
                 foreach ($busyPeriods as $period) {
                     if ($start < $period['end'] && $slotEnd > $period['start']) {
-                        continue 2; // Occupé sur Outlook
+                        continue 2;
                     }
                 }
-            } catch (\Exception $e) {
-                // On ignore les erreurs Outlook pour ne pas bloquer l'app
-            }
+            } catch (\Exception $e) {}
 
-            // Si on arrive ici, le conseiller est validé !
             return $conseiller;
         }
 
@@ -276,6 +250,18 @@ class BookingController extends AbstractController
     private function generateSlots($user, $event, $rdvRepo, $dispoRepo): array {
         $calendarData = [];
         $duration = $event->getDuree();
+
+        // --- CORRECTION : DÉFINITION DE $minBookingTime ---
+        // On calcule l'heure minimum autorisée (Maintenant + Délai de prévention)
+        $minBookingTime = new \DateTime();
+
+        // On vérifie si la méthode existe (au cas où tu n'as pas encore mis à jour l'entité)
+        // Cela t'évitera une autre erreur si tu n'as pas fait la migration BDD
+        if (method_exists($event, 'getDelaiPrevention') && $event->getDelaiPrevention() > 0) {
+            $minBookingTime->modify('+' . $event->getDelaiPrevention() . ' minutes');
+        }
+        // ---------------------------------------------------
+
         $startPeriod = new \DateTime('first day of this month');
         $dateLimite = $event->getDateLimite();
 
@@ -317,6 +303,14 @@ class BookingController extends AbstractController
                         while ($start < $end) {
                             $slotEnd = (clone $start)->modify("+$duration minutes");
                             if ($slotEnd > $end) break;
+
+                            // --- UTILISATION DE LA VARIABLE DÉFINIE PLUS HAUT ---
+                            if ($start < $minBookingTime) {
+                                $start = $slotEnd;
+                                continue;
+                            }
+                            // ----------------------------------------------------
+
                             if ($rdvRepo->isSlotAvailable($user, $start, $slotEnd)) {
                                 $dayData['slots'][] = $start->format('H:i');
                                 $dayData['hasAvailability'] = true;
