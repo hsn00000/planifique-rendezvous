@@ -50,6 +50,9 @@ class RendezVous
     #[ORM\ManyToOne(inversedBy: 'rendezVouses')]
     private ?User $conseiller = null;
 
+    #[ORM\ManyToOne]
+    private ?Bureau $bureau = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -184,6 +187,17 @@ class RendezVous
     public function setOutlookId(?string $outlookId): static
     {
         $this->outlookId = $outlookId;
+        return $this;
+    }
+
+    public function getBureau(): ?Bureau
+    {
+        return $this->bureau;
+    }
+
+    public function setBureau(?Bureau $bureau): static
+    {
+        $this->bureau = $bureau;
         return $this;
     }
 }
