@@ -42,17 +42,21 @@ class BookingController extends AbstractController
 
         // 1. Gestion conseiller imposé par URL (?user=123)
         $userIdParam = $request->query->get('user');
-        $viewUser = null; // Par défaut, pas de conseiller spécifique affiché
+        $viewUser = null;
 
         if ($userIdParam && $u = $userRepo->find($userIdParam)) {
             $rendezVous->setConseiller($u);
-            $viewUser = $u; // On affiche ce conseiller car il est imposé
+            $viewUser = $u;
         }
 
         $form = $this->createForm(BookingFormType::class, $rendezVous, [
             'groupe' => $event->getGroupe(),
             'is_round_robin' => $event->isRoundRobin(),
-            'cacher_conseiller' => true
+            'cacher_conseiller' => true,
+            // --- CORRECTION IMPORTANTE ICI ---
+            // On force l'action du formulaire à être l'URL actuelle COMPLÈTE (avec ?user=...)
+            // pour ne pas perdre le conseiller lors du clic sur "Suivant".
+            'action' => $request->getUri()
         ]);
 
         $form->handleRequest($request);
@@ -61,15 +65,17 @@ class BookingController extends AbstractController
             $session = $request->getSession();
             $lieuChoisi = $form->get('typeLieu')->getData();
 
-            // On s'assure de récupérer l'ID si il était dans l'URL
+            // Récupération de l'ID (soit via l'objet s'il a persisté, soit via l'URL qui est maintenant préservée)
             $conseillerId = $rendezVous->getConseiller()?->getId();
+
+            // Sécurité supplémentaire : si l'objet a perdu le conseiller, on le reprend de l'URL
             if (!$conseillerId && $userIdParam) {
                 $conseillerId = $userIdParam;
             }
 
             $bookingData = [
                 'lieu' => $lieuChoisi,
-                'conseiller_id' => $conseillerId,
+                'conseiller_id' => $conseillerId, // Sera bien rempli maintenant
                 'prenom' => $rendezVous->getPrenom(),
                 'nom' => $rendezVous->getNom(),
                 'email' => $rendezVous->getEmail(),
@@ -81,14 +87,14 @@ class BookingController extends AbstractController
 
             return $this->redirectToRoute('app_booking_calendar', [
                 'eventId' => $eventId,
-                'user' => $userIdParam
+                'user' => $userIdParam // On passe le paramètre à la page suivante
             ]);
         }
 
         return $this->render('booking/details.html.twig', [
             'form' => $form->createView(),
             'event' => $event,
-            'conseiller' => $viewUser, // Passe null si Round Robin (affiche le groupe)
+            'conseiller' => $viewUser,
         ]);
     }
 
