@@ -57,15 +57,16 @@
                 <div class="col-lg-7 bg-white p-5">
 
                     <div class="text-center mb-5">
-                        {# --- AJOUT DU BADGE ÉTAPE 1 SUR 2 ICI --- #}
+                        {# --- MODIFICATION ICI : Étape 1 sur 3 --- #}
                         <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill fw-bold mb-3 text-uppercase" style="font-size: 0.7rem; letter-spacing: 1px;">
-                            Étape 1 sur 2
+                            Étape 1 sur 3
                         </span>
 
                         <h2 class="h3 fw-bold text-dark mt-2">Vos coordonnées</h2>
                         <p class="text-muted small">Remplissez ce formulaire pour accéder au calendrier.</p>
                     </div>
 
+                    {# Le reste du formulaire est inchangé #}
                     {{ form_start(form, {'attr': {'data-turbo': 'false', 'id': 'booking-form'}}) }}
 
                     <div class="row g-4 mb-4">
@@ -93,11 +94,8 @@
                         {{ form_errors(form.telephone) }}
                     </div>
 
-                    {# Le champ conseiller est masqué via le contrôleur #}
-
                     <hr class="my-5 opacity-10">
 
-                    {# CHOIX DU LIEU #}
                     <div class="mb-4">
                         <label class="form-label fw-bold small text-secondary">Lieu du rendez-vous</label>
                         {{ form_widget(form.typeLieu, {'attr': {'class': 'form-select form-select-lg', 'id': 'select-lieu'}}) }}

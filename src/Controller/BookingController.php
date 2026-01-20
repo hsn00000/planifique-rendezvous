@@ -26,6 +26,9 @@ class BookingController extends AbstractController
     /**
      * ÉTAPE 1 : LE FORMULAIRE
      */
+    /**
+     * ÉTAPE 1 : LE FORMULAIRE
+     */
     #[Route('/book/event/{eventId}', name: 'app_booking_form', requirements: ['eventId' => '\d+'])]
     public function form(
         int $eventId,
@@ -40,7 +43,7 @@ class BookingController extends AbstractController
         $rendezVous = new RendezVous();
         $rendezVous->setEvenement($event);
 
-        // 1. Gestion conseiller imposé par URL (?user=123)
+        // 1. Gestion conseiller (URL ou Auto-détection)
         $userIdParam = $request->query->get('user');
         $viewUser = null;
 
@@ -48,9 +51,12 @@ class BookingController extends AbstractController
             $rendezVous->setConseiller($u);
             $viewUser = $u;
         }
-        // --- CORRECTION CLÉ ICI ---
-        // Si pas de user dans l'URL, MAIS que l'événement n'est PAS en Round Robin,
-        // on assigne d'office le premier conseiller du groupe pour l'affichage.
+        elseif ($this->getUser() && !$event->isRoundRobin() && $event->getGroupe()->getUsers()->contains($this->getUser())) {
+            $currentUser = $this->getUser();
+            $rendezVous->setConseiller($currentUser);
+            $viewUser = $currentUser;
+            $userIdParam = $currentUser->getId();
+        }
         elseif (!$event->isRoundRobin()) {
             $defaultUser = $event->getGroupe()->getUsers()->first();
             if ($defaultUser) {
@@ -59,11 +65,26 @@ class BookingController extends AbstractController
             }
         }
 
+        // --- NOUVEAU : PRÉ-REMPLISSAGE EN CAS DE RETOUR ---
+        // Si le client revient du calendrier, on remet ses infos dans le formulaire
+        $session = $request->getSession();
+        if ($session->has('temp_booking_data')) {
+            $data = $session->get('temp_booking_data');
+            $rendezVous->setPrenom($data['prenom'] ?? '');
+            $rendezVous->setNom($data['nom'] ?? '');
+            $rendezVous->setEmail($data['email'] ?? '');
+            $rendezVous->setTelephone($data['telephone'] ?? '');
+            $rendezVous->setAdresse($data['adresse'] ?? '');
+            if (isset($data['lieu'])) {
+                $rendezVous->setTypeLieu($data['lieu']);
+            }
+        }
+        // --------------------------------------------------
+
         $form = $this->createForm(BookingFormType::class, $rendezVous, [
             'groupe' => $event->getGroupe(),
             'is_round_robin' => $event->isRoundRobin(),
             'cacher_conseiller' => true,
-            // On génère l'URL d'action en préservant le paramètre user s'il existe
             'action' => $this->generateUrl('app_booking_form', [
                 'eventId' => $eventId,
                 'user' => $userIdParam
@@ -73,16 +94,10 @@ class BookingController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $session = $request->getSession();
             $lieuChoisi = $form->get('typeLieu')->getData();
-
-            // Récupération de l'ID (depuis l'objet s'il a été set par défaut ou par URL)
             $conseillerId = $rendezVous->getConseiller()?->getId();
 
-            // Sécurité
-            if (!$conseillerId && $userIdParam) {
-                $conseillerId = $userIdParam;
-            }
+            if (!$conseillerId && $userIdParam) $conseillerId = $userIdParam;
 
             $bookingData = [
                 'lieu' => $lieuChoisi,
@@ -154,13 +169,11 @@ class BookingController extends AbstractController
             $firstUser = $event->getGroupe()->getUsers()->first();
             $calculationUser = $firstUser;
 
-            // --- CORRECTION CLÉ ICI AUSSI ---
-            // Si ce n'est PAS un Round Robin, on veut afficher le nom du conseiller par défaut (ex: Jean Dupont)
-            // et pas "Notre Équipe".
+            // Si ce n'est PAS un Round Robin, on affiche le user par défaut
             if (!$event->isRoundRobin()) {
                 $viewUser = $firstUser;
             } else {
-                // Si c'est un vrai Round Robin, on laisse viewUser à null pour afficher "Notre Équipe"
+                // Si Round Robin, on force l'affichage "Équipe"
                 $viewUser = null;
             }
         }
@@ -174,6 +187,57 @@ class BookingController extends AbstractController
             'event' => $event,
             'slotsByDay' => $slotsByDay,
             'lieuChoisi' => $lieuChoisi
+        ]);
+    }
+
+    /**
+     * ÉTAPE 2.5 : RÉCAPITULATIF (Page de validation)
+     */
+    #[Route('/book/summary/{eventId}', name: 'app_booking_summary')]
+    public function summary(
+        Request $request,
+        int $eventId,
+        EvenementRepository $eventRepo,
+        UserRepository $userRepo
+    ): Response
+    {
+        $session = $request->getSession();
+        $data = $session->get('temp_booking_data');
+
+        // Sécurité : si pas de données, retour au formulaire
+        if (!$data) return $this->redirectToRoute('app_booking_form', ['eventId' => $eventId]);
+
+        $event = $eventRepo->find($eventId);
+        $dateParam = $request->query->get('date');
+
+        // Sécurité : si pas de date choisie, retour au calendrier
+        if (!$dateParam) return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
+
+        $startDate = new \DateTime($dateParam);
+        $endDate = (clone $startDate)->modify('+' . $event->getDuree() . ' minutes');
+
+        // Logique d'affichage du conseiller (identique au calendrier)
+        $targetUserId = $request->query->get('user');
+        $viewUser = null;
+
+        if (!empty($data['conseiller_id'])) {
+            $viewUser = $userRepo->find($data['conseiller_id']);
+        } elseif ($targetUserId) {
+            $viewUser = $userRepo->find($targetUserId);
+        } elseif (!$event->isRoundRobin()) {
+            $viewUser = $event->getGroupe()->getUsers()->first();
+        }
+        // Sinon Round Robin = null (affiche "Notre Équipe")
+
+        return $this->render('booking/summary.html.twig', [
+            'event' => $event,
+            'dateDebut' => $startDate,
+            'dateFin' => $endDate,
+            'conseiller' => $viewUser,
+            'client' => $data,
+            'lieu' => $data['lieu'],
+            'dateParam' => $dateParam, // Pour passer à l'étape suivante
+            'userIdParam' => $targetUserId // Pour conserver le paramètre d'URL
         ]);
     }
 
@@ -218,7 +282,6 @@ class BookingController extends AbstractController
 
         // --- CHOIX FINAL DU CONSEILLER ---
         if (!empty($data['conseiller_id'])) {
-            // Cas 1 : Conseiller fixé (via URL ou forcé par "Non-RoundRobin")
             $conseiller = $userRepo->find($data['conseiller_id']);
             if (!$this->checkDispoWithBuffers($conseiller, $startDate, $event->getDuree(), $rdvRepo, $outlookService)) {
                 $this->addFlash('danger', 'Ce créneau n\'est plus disponible.');
@@ -226,17 +289,15 @@ class BookingController extends AbstractController
             }
             $rendezVous->setConseiller($conseiller);
         } else {
-            // Cas 2 : On n'a pas d'ID.
-            // Si c'est PAS Round Robin, on force le premier du groupe (comme dans le calendrier)
+            // Logique de secours pour Non-RR sans ID (prend le premier)
             if (!$event->isRoundRobin()) {
                 $conseiller = $event->getGroupe()->getUsers()->first();
-                // On vérifie sa dispo spécifique
                 if (!$this->checkDispoWithBuffers($conseiller, $startDate, $event->getDuree(), $rdvRepo, $outlookService)) {
                     $this->addFlash('danger', 'Ce créneau n\'est plus disponible.');
                     return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
                 }
             } else {
-                // Cas 3 : Vrai Round Robin (Aléatoire intelligent)
+                // Vrai Round Robin
                 $conseiller = $this->findAvailableConseiller($event->getGroupe(), $startDate, $event->getDuree(), $rdvRepo, $outlookService);
             }
 
