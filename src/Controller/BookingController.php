@@ -53,10 +53,12 @@ class BookingController extends AbstractController
             'groupe' => $event->getGroupe(),
             'is_round_robin' => $event->isRoundRobin(),
             'cacher_conseiller' => true,
-            // --- CORRECTION IMPORTANTE ICI ---
-            // On force l'action du formulaire à être l'URL actuelle COMPLÈTE (avec ?user=...)
-            // pour ne pas perdre le conseiller lors du clic sur "Suivant".
-            'action' => $request->getUri()
+            // --- CORRECTION ---
+            // On génère proprement l'URL avec le paramètre user inclus
+            'action' => $this->generateUrl('app_booking_form', [
+                'eventId' => $eventId,
+                'user' => $userIdParam
+            ])
         ]);
 
         $form->handleRequest($request);
@@ -65,17 +67,16 @@ class BookingController extends AbstractController
             $session = $request->getSession();
             $lieuChoisi = $form->get('typeLieu')->getData();
 
-            // Récupération de l'ID (soit via l'objet s'il a persisté, soit via l'URL qui est maintenant préservée)
             $conseillerId = $rendezVous->getConseiller()?->getId();
 
-            // Sécurité supplémentaire : si l'objet a perdu le conseiller, on le reprend de l'URL
+            // Sécurité : si l'objet a perdu le conseiller, on le reprend de l'URL
             if (!$conseillerId && $userIdParam) {
                 $conseillerId = $userIdParam;
             }
 
             $bookingData = [
                 'lieu' => $lieuChoisi,
-                'conseiller_id' => $conseillerId, // Sera bien rempli maintenant
+                'conseiller_id' => $conseillerId,
                 'prenom' => $rendezVous->getPrenom(),
                 'nom' => $rendezVous->getNom(),
                 'email' => $rendezVous->getEmail(),
@@ -87,7 +88,7 @@ class BookingController extends AbstractController
 
             return $this->redirectToRoute('app_booking_calendar', [
                 'eventId' => $eventId,
-                'user' => $userIdParam // On passe le paramètre à la page suivante
+                'user' => $userIdParam
             ]);
         }
 
