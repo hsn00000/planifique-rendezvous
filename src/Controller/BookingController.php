@@ -48,13 +48,22 @@ class BookingController extends AbstractController
             $rendezVous->setConseiller($u);
             $viewUser = $u;
         }
+        // --- CORRECTION CLÉ ICI ---
+        // Si pas de user dans l'URL, MAIS que l'événement n'est PAS en Round Robin,
+        // on assigne d'office le premier conseiller du groupe pour l'affichage.
+        elseif (!$event->isRoundRobin()) {
+            $defaultUser = $event->getGroupe()->getUsers()->first();
+            if ($defaultUser) {
+                $rendezVous->setConseiller($defaultUser);
+                $viewUser = $defaultUser;
+            }
+        }
 
         $form = $this->createForm(BookingFormType::class, $rendezVous, [
             'groupe' => $event->getGroupe(),
             'is_round_robin' => $event->isRoundRobin(),
             'cacher_conseiller' => true,
-            // --- CORRECTION ---
-            // On génère proprement l'URL avec le paramètre user inclus
+            // On génère l'URL d'action en préservant le paramètre user s'il existe
             'action' => $this->generateUrl('app_booking_form', [
                 'eventId' => $eventId,
                 'user' => $userIdParam
@@ -67,9 +76,10 @@ class BookingController extends AbstractController
             $session = $request->getSession();
             $lieuChoisi = $form->get('typeLieu')->getData();
 
+            // Récupération de l'ID (depuis l'objet s'il a été set par défaut ou par URL)
             $conseillerId = $rendezVous->getConseiller()?->getId();
 
-            // Sécurité : si l'objet a perdu le conseiller, on le reprend de l'URL
+            // Sécurité
             if (!$conseillerId && $userIdParam) {
                 $conseillerId = $userIdParam;
             }
@@ -126,25 +136,33 @@ class BookingController extends AbstractController
 
         $targetUserId = $request->query->get('user');
 
-        // --- CORRECTION DU ROUND ROBIN ---
-        $viewUser = null;       // Utilisateur affiché à l'écran (Template)
-        $calculationUser = null; // Utilisateur utilisé pour calculer les slots
+        $viewUser = null;       // Utilisateur affiché (Template)
+        $calculationUser = null; // Utilisateur pour calculs
 
-        // Cas 1 : Conseiller déjà fixé en session (Formulaire précédent)
+        // 1. Session (Priorité)
         if (!empty($data['conseiller_id'])) {
             $viewUser = $userRepo->find($data['conseiller_id']);
             $calculationUser = $viewUser;
         }
-        // Cas 2 : Conseiller dans l'URL
+        // 2. URL
         elseif ($targetUserId) {
             $viewUser = $userRepo->find($targetUserId);
             $calculationUser = $viewUser;
         }
-        // Cas 3 : Round Robin (Aucun user spécifié)
+        // 3. Défaut (Round Robin OU Non-Round Robin sans user)
         else {
-            $viewUser = null; // On force NULL pour que le template affiche "Notre Équipe"
-            // Pour le calcul, on utilise le premier user comme proxy (ou logique plus complexe si besoin)
-            $calculationUser = $event->getGroupe()->getUsers()->first();
+            $firstUser = $event->getGroupe()->getUsers()->first();
+            $calculationUser = $firstUser;
+
+            // --- CORRECTION CLÉ ICI AUSSI ---
+            // Si ce n'est PAS un Round Robin, on veut afficher le nom du conseiller par défaut (ex: Jean Dupont)
+            // et pas "Notre Équipe".
+            if (!$event->isRoundRobin()) {
+                $viewUser = $firstUser;
+            } else {
+                // Si c'est un vrai Round Robin, on laisse viewUser à null pour afficher "Notre Équipe"
+                $viewUser = null;
+            }
         }
 
         $outlookService->synchronizeCalendar($calculationUser);
@@ -152,7 +170,7 @@ class BookingController extends AbstractController
         $slotsByDay = $this->generateSlots($calculationUser, $event, $rdvRepo, $dispoRepo, $bureauRepo, $lieuChoisi);
 
         return $this->render('booking/index.html.twig', [
-            'conseiller' => $viewUser, // Sera null en Round Robin -> Affiche le groupe
+            'conseiller' => $viewUser,
             'event' => $event,
             'slotsByDay' => $slotsByDay,
             'lieuChoisi' => $lieuChoisi
@@ -200,6 +218,7 @@ class BookingController extends AbstractController
 
         // --- CHOIX FINAL DU CONSEILLER ---
         if (!empty($data['conseiller_id'])) {
+            // Cas 1 : Conseiller fixé (via URL ou forcé par "Non-RoundRobin")
             $conseiller = $userRepo->find($data['conseiller_id']);
             if (!$this->checkDispoWithBuffers($conseiller, $startDate, $event->getDuree(), $rdvRepo, $outlookService)) {
                 $this->addFlash('danger', 'Ce créneau n\'est plus disponible.');
@@ -207,8 +226,20 @@ class BookingController extends AbstractController
             }
             $rendezVous->setConseiller($conseiller);
         } else {
-            // Round Robin
-            $conseiller = $this->findAvailableConseiller($event->getGroupe(), $startDate, $event->getDuree(), $rdvRepo, $outlookService);
+            // Cas 2 : On n'a pas d'ID.
+            // Si c'est PAS Round Robin, on force le premier du groupe (comme dans le calendrier)
+            if (!$event->isRoundRobin()) {
+                $conseiller = $event->getGroupe()->getUsers()->first();
+                // On vérifie sa dispo spécifique
+                if (!$this->checkDispoWithBuffers($conseiller, $startDate, $event->getDuree(), $rdvRepo, $outlookService)) {
+                    $this->addFlash('danger', 'Ce créneau n\'est plus disponible.');
+                    return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
+                }
+            } else {
+                // Cas 3 : Vrai Round Robin (Aléatoire intelligent)
+                $conseiller = $this->findAvailableConseiller($event->getGroupe(), $startDate, $event->getDuree(), $rdvRepo, $outlookService);
+            }
+
             if (!$conseiller) {
                 $this->addFlash('danger', 'Aucun conseiller disponible sur ce créneau.');
                 return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
@@ -290,12 +321,9 @@ class BookingController extends AbstractController
                 foreach ($rulesByDay[$dayOfWeek] as $rule) {
                     if ($rule->isEstBloque()) continue;
 
-                    // --- AJOUT SÉCURITÉ QUOTA ---
-                    // Si ce conseiller a déjà atteint sa limite ce jour-là, on n'affiche aucun créneau
                     if ($rdvRepo->countRendezVousForUserOnDate($user, $currentDate) >= 3) {
                         continue;
                     }
-                    // ----------------------------
 
                     $start = (clone $currentDate)->setTime((int)$rule->getHeureDebut()->format('H'), (int)$rule->getHeureDebut()->format('i'));
                     $end = (clone $currentDate)->setTime((int)$rule->getHeureFin()->format('H'), (int)$rule->getHeureFin()->format('i'));
@@ -336,9 +364,7 @@ class BookingController extends AbstractController
 
     private function checkDispoWithBuffers(User $user, \DateTime $start, int $duree, $rdvRepo, $outlookService): bool
     {
-        // --- AJOUT SÉCURITÉ QUOTA ---
         if ($rdvRepo->countRendezVousForUserOnDate($user, $start) >= 3) return false;
-        // ----------------------------
 
         $slotStart = clone $start;
         $slotEnd = (clone $start)->modify("+$duree minutes");
