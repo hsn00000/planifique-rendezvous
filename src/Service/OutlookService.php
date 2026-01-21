@@ -4,239 +4,222 @@ namespace App\Service;
 
 use App\Entity\RendezVous;
 use App\Entity\User;
-use Doctrine\ORM\EntityManagerInterface;
-use KnpU\OAuth2ClientBundle\Client\ClientRegistry;
+use App\Repository\MicrosoftAccountRepository;
+use App\Repository\RendezVousRepository; // Ajout du repo
+use League\OAuth2\Client\Provider\GenericProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Doctrine\ORM\EntityManagerInterface; // Nécessaire pour flush et remove
 
 class OutlookService
 {
+    private $oauthProvider;
+    private $accountRepo;
+    private $rdvRepo; // Pour la synchro
+    private $em;      // Pour la synchro
+    private $router;
+
     public function __construct(
-        private ClientRegistry $clientRegistry,
-        private EntityManagerInterface $em,
-        private HttpClientInterface $httpClient
-    ) {}
+        MicrosoftAccountRepository $accountRepo,
+        RendezVousRepository $rdvRepo,
+        EntityManagerInterface $em,
+        UrlGeneratorInterface $router,
+        string $clientId,
+        string $clientSecret,
+        string $tenantId
+    ) {
+        $this->accountRepo = $accountRepo;
+        $this->rdvRepo = $rdvRepo;
+        $this->em = $em;
+        $this->router = $router;
 
-    /**
-     * Ajoute l'événement au calendrier Outlook et sauvegarde l'ID pour la synchro future.
-     */
-    public function addEventToCalendar(User $conseiller, RendezVous $rdv): void
+        $this->oauthProvider = new GenericProvider([
+            'clientId'                => $clientId,
+            'clientSecret'            => $clientSecret,
+            'redirectUri'             => $this->router->generate('connect_microsoft_check', [], UrlGeneratorInterface::ABSOLUTE_URL),
+            'urlAuthorize'            => 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+            'urlAccessToken'          => 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+            'urlResourceOwnerDetails' => '',
+            'scopes'                  => 'openid profile offline_access User.Read Calendars.ReadWrite'
+        ]);
+    }
+
+    public function addEventToCalendar(User $user, RendezVous $rendezVous): void
     {
-        // 1. Récupération du compte Microsoft
-        $microsoftAccount = $conseiller->getMicrosoftAccount();
-        if (!$microsoftAccount) return;
+        $account = $this->accountRepo->findOneBy(['user' => $user]);
+        if (!$account || !$account->getAccessToken()) return;
 
-        // 2. Token valide
-        $accessToken = $this->getValidAccessToken($microsoftAccount);
-        if (!$accessToken) return;
+        $this->refreshAccessTokenIfExpired($account);
 
-        // 3. Préparation des données
+        // --- Construction des participants (Client + Salle) ---
+        $attendees = [];
+
+        // 1. Le Client
+        $attendees[] = [
+            'emailAddress' => ['address' => $rendezVous->getEmail(), 'name' => $rendezVous->getPrenom() . ' ' . $rendezVous->getNom()],
+            'type' => 'required'
+        ];
+
+        // 2. La Salle (si elle a un email)
+        if ($rendezVous->getBureau() && $rendezVous->getBureau()->getEmail()) {
+            $attendees[] = [
+                'emailAddress' => [
+                    'address' => $rendezVous->getBureau()->getEmail(),
+                    'name' => $rendezVous->getBureau()->getNom()
+                ],
+                'type' => 'resource'
+            ];
+        }
+
         $eventData = [
-            'subject' => 'RDV Client : ' . $rdv->getPrenom() . ' ' . $rdv->getNom(),
+            'subject' => 'RDV: ' . $rendezVous->getEvenement()->getTitre() . ' - ' . $rendezVous->getPrenom() . ' ' . $rendezVous->getNom(),
             'body' => [
                 'contentType' => 'HTML',
-                'content' => sprintf(
-                    "<b>Client :</b> %s %s<br><b>Tel :</b> %s<br><b>Email :</b> %s<br><b>Lieu :</b> %s<br><b>Adresse :</b> %s",
-                    $rdv->getPrenom(),
-                    $rdv->getNom(),
-                    $rdv->getTelephone(),
-                    $rdv->getEmail(),
-                    $rdv->getTypeLieu(),
-                    $rdv->getAdresse() ?? 'Non précisée'
-                )
+                'content' => "Rendez-vous planifié via Planifique.<br>Client: {$rendezVous->getTelephone()}"
             ],
             'start' => [
-                'dateTime' => $rdv->getDateDebut()->format('Y-m-d\TH:i:s'),
+                'dateTime' => $rendezVous->getDateDebut()->format('Y-m-d\TH:i:s'),
                 'timeZone' => 'Europe/Paris'
             ],
             'end' => [
-                'dateTime' => $rdv->getDateFin()->format('Y-m-d\TH:i:s'),
+                'dateTime' => $rendezVous->getDateFin()->format('Y-m-d\TH:i:s'),
                 'timeZone' => 'Europe/Paris'
             ],
             'location' => [
-                'displayName' => $rdv->getTypeLieu()
+                'displayName' => $rendezVous->getTypeLieu() . ($rendezVous->getBureau() ? ' - ' . $rendezVous->getBureau()->getNom() : '')
             ],
-            'attendees' => [
-                [
-                    'emailAddress' => [
-                        'address' => $rdv->getEmail(),
-                        'name' => $rdv->getPrenom() . ' ' . $rdv->getNom()
-                    ],
-                    'type' => 'required'
-                ]
-            ],
-            'allowNewTimeProposals' => false,
-            'showAs' => 'busy'
+            'attendees' => $attendees
         ];
 
-        // 4. Envoi à l'API
         try {
-            $response = $this->httpClient->request('POST', 'https://graph.microsoft.com/v1.0/me/events', [
+            $client = new \GuzzleHttp\Client();
+            $response = $client->post('https://graph.microsoft.com/v1.0/me/events', [
                 'headers' => [
-                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Authorization' => 'Bearer ' . $account->getAccessToken(),
                     'Content-Type' => 'application/json'
                 ],
                 'json' => $eventData
             ]);
 
-            // --- MODIFICATION ICI : ON SAUVEGARDE L'ID OUTLOOK ---
-            if ($response->getStatusCode() === 201) {
-                $data = $response->toArray();
-
-                // On récupère l'ID unique généré par Microsoft
-                if (isset($data['id'])) {
-                    $rdv->setOutlookId($data['id']);
-                    $this->em->flush(); // Mise à jour en base de données
-                }
-            }
-            // -----------------------------------------------------
-
-        } catch (\Exception $e) {
-            // Log erreur
-        }
-    }
-
-    /**
-     * NOUVELLE MÉTHODE : Vérifie si les RDV locaux existent toujours dans Outlook.
-     * Si un RDV a été supprimé dans Outlook, il sera supprimé de l'application.
-     */
-    public function synchronizeCalendar(User $conseiller): void
-    {
-        $microsoftAccount = $conseiller->getMicrosoftAccount();
-        if (!$microsoftAccount) return;
-
-        $accessToken = $this->getValidAccessToken($microsoftAccount);
-        if (!$accessToken) return;
-
-        // 1. On récupère les RDV locaux FUTURS qui sont liés à Outlook (ont un outlookId)
-        $now = new \DateTime();
-        $localRdvs = $this->em->getRepository(RendezVous::class)->createQueryBuilder('r')
-            ->where('r.conseiller = :user')
-            ->andWhere('r.dateDebut >= :now')
-            ->andWhere('r.outlookId IS NOT NULL')
-            ->setParameter('user', $conseiller)
-            ->setParameter('now', $now)
-            ->getQuery()
-            ->getResult();
-
-        if (empty($localRdvs)) return;
-
-        // 2. On récupère la liste des événements Outlook pour les 3 prochains mois
-        $startStr = $now->format('Y-m-d\T00:00:00');
-        $endStr = (clone $now)->modify('+3 months')->format('Y-m-d\T23:59:59');
-
-        try {
-            // On demande uniquement les IDs ($select=id) pour aller vite + pagination max ($top=500)
-            $url = "https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=$startStr&endDateTime=$endStr&\$select=id&\$top=500";
-
-            $response = $this->httpClient->request('GET', $url, [
-                'headers' => ['Authorization' => 'Bearer ' . $accessToken]
-            ]);
-
-            $data = $response->toArray();
-
-            // On extrait tous les IDs existants chez Microsoft
-            $outlookIds = array_map(fn($e) => $e['id'], $data['value']);
-
-            // 3. Comparaison et Nettoyage
-            $deletedCount = 0;
-            foreach ($localRdvs as $rdv) {
-                // Si l'ID du RDV local n'est PAS dans la liste reçue de Microsoft...
-                if (!in_array($rdv->getOutlookId(), $outlookIds)) {
-                    // ... c'est qu'il a été supprimé manuellement dans Outlook.
-                    // On le supprime donc de notre base.
-                    $this->em->remove($rdv);
-                    $deletedCount++;
-                }
-            }
-
-            if ($deletedCount > 0) {
+            // --- NOUVEAU : Sauvegarde de l'ID Outlook ---
+            $responseData = json_decode($response->getBody(), true);
+            if (isset($responseData['id'])) {
+                $rendezVous->setOutlookId($responseData['id']);
+                // On sauvegarde immédiatement pour ne pas perdre le lien
+                $this->em->persist($rendezVous);
                 $this->em->flush();
             }
 
         } catch (\Exception $e) {
-            // Si l'API échoue, on ne fait rien pour ne pas supprimer de RDV par erreur
+            // Loguer l'erreur
         }
     }
 
     /**
-     * Gestion du Refresh Token
+     * Synchronise le calendrier : Supprime les RDV locaux si absents d'Outlook
      */
-    private function getValidAccessToken($microsoftAccount): ?string
+    public function synchronizeCalendar(User $user): void
     {
-        $token = $microsoftAccount->getAccessToken();
-        $expiresAt = $microsoftAccount->getExpiresAt();
+        $account = $this->accountRepo->findOneBy(['user' => $user]);
+        if (!$account) return;
 
-        // Conversion timestamp si nécessaire
-        $expirationTimestamp = ($expiresAt instanceof \DateTimeInterface) ? $expiresAt->getTimestamp() : $expiresAt;
+        $this->refreshAccessTokenIfExpired($account);
 
-        // Marge de 5 minutes (300s)
-        if ($expirationTimestamp && $expirationTimestamp > (time() + 300)) {
-            return $token;
-        }
+        // 1. Récupérer les RDV futurs de ce user qui ont un ID Outlook
+        $futureRdvs = $this->rdvRepo->createQueryBuilder('r')
+            ->where('r.conseiller = :user')
+            ->andWhere('r.dateDebut > :now')
+            ->andWhere('r.outlookId IS NOT NULL')
+            ->setParameter('user', $user)
+            ->setParameter('now', new \DateTime())
+            ->getQuery()->getResult();
 
-        // Refresh
-        $refreshToken = $microsoftAccount->getRefreshToken();
-        if (!$refreshToken) {
-            return null;
-        }
+        if (empty($futureRdvs)) return;
+
+        // 2. Récupérer la liste des IDs Outlook actuels (pour les 3 prochains mois)
+        $startStr = (new \DateTime())->format('Y-m-d\TH:i:s');
+        $endStr = (new \DateTime('+3 months'))->format('Y-m-d\TH:i:s');
 
         try {
-            $oauthClient = $this->clientRegistry->getClient('azure');
-
-            $newToken = $oauthClient->getOAuth2Provider()->getAccessToken('refresh_token', [
-                'refresh_token' => $refreshToken
-            ]);
-
-            $microsoftAccount->setAccessToken($newToken->getToken());
-            $microsoftAccount->setRefreshToken($newToken->getRefreshToken());
-            $microsoftAccount->setExpiresAt($newToken->getExpires());
-
-            $this->em->flush();
-
-            return $newToken->getToken();
-
-        } catch (IdentityProviderException $e) {
-            return null;
-        }
-    }
-
-    /**
-     * Récupère les périodes occupées pour le calcul des dispos
-     */
-    public function getOutlookBusyPeriods(User $conseiller, \DateTimeInterface $date): array
-    {
-        $microsoftAccount = $conseiller->getMicrosoftAccount();
-        if (!$microsoftAccount) return [];
-
-        $accessToken = $this->getValidAccessToken($microsoftAccount);
-        if (!$accessToken) return [];
-
-        $startStr = $date->format('Y-m-d') . 'T00:00:00';
-        $endStr = $date->format('Y-m-d') . 'T23:59:59';
-
-        try {
-            $response = $this->httpClient->request('GET', "https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=$startStr&endDateTime=$endStr", [
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $accessToken,
-                    'Prefer' => 'outlook.timezone="Europe/Paris"'
+            $client = new \GuzzleHttp\Client();
+            $response = $client->get('https://graph.microsoft.com/v1.0/me/calendarView', [
+                'headers' => ['Authorization' => 'Bearer ' . $account->getAccessToken()],
+                'query' => [
+                    'startDateTime' => $startStr,
+                    'endDateTime' => $endStr,
+                    '$select' => 'id', // On veut juste les IDs pour comparer
+                    '$top' => 999 // Pagination large
                 ]
             ]);
 
-            $data = $response->toArray();
+            $data = json_decode($response->getBody(), true);
+            $outlookIds = array_column($data['value'] ?? [], 'id');
+
+            // 3. Comparaison : Si un RDV local n'est pas dans la liste Outlook -> Suppression
+            foreach ($futureRdvs as $rdv) {
+                if (!in_array($rdv->getOutlookId(), $outlookIds)) {
+                    // Le RDV a été supprimé dans Outlook, on le supprime de Planifique
+                    $this->em->remove($rdv);
+                }
+            }
+            $this->em->flush();
+
+        } catch (\Exception $e) {}
+    }
+
+    public function getOutlookBusyPeriods(User $user, \DateTime $date): array
+    {
+        $account = $this->accountRepo->findOneBy(['user' => $user]);
+        if (!$account) return [];
+
+        $this->refreshAccessTokenIfExpired($account);
+
+        $startDateTime = (clone $date)->setTime(0, 0, 0)->format('Y-m-d\TH:i:s');
+        $endDateTime = (clone $date)->setTime(23, 59, 59)->format('Y-m-d\TH:i:s');
+
+        try {
+            $client = new \GuzzleHttp\Client();
+            $response = $client->get('https://graph.microsoft.com/v1.0/me/calendarView', [
+                'headers' => ['Authorization' => 'Bearer ' . $account->getAccessToken()],
+                'query' => [
+                    'startDateTime' => $startDateTime,
+                    'endDateTime' => $endDateTime,
+                    '$select' => 'start,end'
+                ]
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
             $busySlots = [];
 
-            foreach ($data['value'] as $event) {
+            foreach ($data['value'] ?? [] as $event) {
                 $busySlots[] = [
                     'start' => new \DateTime($event['start']['dateTime']),
                     'end' => new \DateTime($event['end']['dateTime'])
                 ];
             }
-
             return $busySlots;
 
         } catch (\Exception $e) {
             return [];
+        }
+    }
+
+    private function refreshAccessTokenIfExpired($account): void
+    {
+        if ($account->getExpiresAt() < new \DateTime()) {
+            try {
+                $newAccessToken = $this->oauthProvider->getAccessToken('refresh_token', [
+                    'refresh_token' => $account->getRefreshToken()
+                ]);
+
+                $account->setAccessToken($newAccessToken->getToken());
+                $account->setRefreshToken($newAccessToken->getRefreshToken());
+                $account->setExpiresAt((new \DateTime())->setTimestamp($newAccessToken->getExpires()));
+
+                $this->accountRepo->save($account, true);
+            } catch (IdentityProviderException $e) {
+                // Token invalide
+            }
         }
     }
 }

@@ -251,7 +251,7 @@ class BookingController extends AbstractController
         EvenementRepository $eventRepo,
         RendezVousRepository $rdvRepo,
         UserRepository $userRepo,
-        BureauRepository $bureauRepo,
+        BureauRepository $bureauRepo, // <--- Injection du repository Bureau
         EntityManagerInterface $em,
         MailerInterface $mailer,
         OutlookService $outlookService
@@ -280,7 +280,7 @@ class BookingController extends AbstractController
         $rendezVous->setDateDebut($startDate);
         $rendezVous->setDateFin((clone $startDate)->modify('+' . $event->getDuree() . ' minutes'));
 
-        // --- CHOIX FINAL DU CONSEILLER ---
+        // --- 1. ATTRIBUTION CONSEILLER ---
         if (!empty($data['conseiller_id'])) {
             $conseiller = $userRepo->find($data['conseiller_id']);
             if (!$this->checkDispoWithBuffers($conseiller, $startDate, $event->getDuree(), $rdvRepo, $outlookService)) {
@@ -289,7 +289,6 @@ class BookingController extends AbstractController
             }
             $rendezVous->setConseiller($conseiller);
         } else {
-            // Logique de secours pour Non-RR sans ID (prend le premier)
             if (!$event->isRoundRobin()) {
                 $conseiller = $event->getGroupe()->getUsers()->first();
                 if (!$this->checkDispoWithBuffers($conseiller, $startDate, $event->getDuree(), $rdvRepo, $outlookService)) {
@@ -297,7 +296,6 @@ class BookingController extends AbstractController
                     return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
                 }
             } else {
-                // Vrai Round Robin
                 $conseiller = $this->findAvailableConseiller($event->getGroupe(), $startDate, $event->getDuree(), $rdvRepo, $outlookService);
             }
 
@@ -308,25 +306,30 @@ class BookingController extends AbstractController
             $rendezVous->setConseiller($conseiller);
         }
 
-        // --- BUREAU ---
+        // --- 2. ATTRIBUTION BUREAU (Nouvelle logique) ---
+        // On vérifie si le lieu correspond à un de nos cabinets physiques
         if (in_array($data['lieu'], ['Cabinet-geneve', 'Cabinet-archamps'])) {
             $bureauLibre = $bureauRepo->findAvailableBureau($data['lieu'], $rendezVous->getDateDebut(), $rendezVous->getDateFin());
+
             if (!$bureauLibre) {
-                $this->addFlash('danger', 'Plus de bureau disponible.');
+                $this->addFlash('danger', 'Désolé, aucune salle n\'est disponible à cette heure.');
                 return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
             }
+
             $rendezVous->setBureau($bureauLibre);
         }
 
         $em->persist($rendezVous);
         $em->flush();
 
+        // --- 3. SYNCHRO OUTLOOK ---
         try {
             if ($rendezVous->getConseiller()) {
                 $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
             }
         } catch (\Exception $e) {}
 
+        // --- 4. ENVOI EMAILS ---
         try {
             $this->sendConfirmationEmails($mailer, $rendezVous, $event);
         } catch (\Exception $e) {}
@@ -382,6 +385,7 @@ class BookingController extends AbstractController
                 foreach ($rulesByDay[$dayOfWeek] as $rule) {
                     if ($rule->isEstBloque()) continue;
 
+                    // Vérification Quota Journalier (ex: max 3 RDV/jour)
                     if ($rdvRepo->countRendezVousForUserOnDate($user, $currentDate) >= 3) {
                         continue;
                     }
@@ -395,6 +399,7 @@ class BookingController extends AbstractController
 
                         $isFree = true;
 
+                        // 1. Vérification disponibilité Conseiller (avec tampons)
                         foreach ($rdvsDuJour as $rdv) {
                             $tAvant = $rdv->getEvenement()->getTamponAvant();
                             $tApres = $rdv->getEvenement()->getTamponApres();
@@ -403,9 +408,12 @@ class BookingController extends AbstractController
                             if ($start < $busyEnd && $slotEnd > $busyStart) { $isFree = false; break; }
                         }
 
+                        // 2. Vérification disponibilité Salle (SI lieu physique)
                         if ($isFree && in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps'])) {
                             $bureauDispo = $bureauRepo->findAvailableBureau($lieu, $start, $slotEnd);
-                            if (!$bureauDispo) { $isFree = false; }
+                            if (!$bureauDispo) {
+                                $isFree = false; // Pas de salle libre, on ferme le créneau
+                            }
                         }
 
                         if ($isFree) {

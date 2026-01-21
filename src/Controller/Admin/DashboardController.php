@@ -2,6 +2,7 @@
 
 namespace App\Controller\Admin;
 
+use App\Entity\Bureau; // N'oublie pas cet import
 use App\Entity\DisponibiliteHebdomadaire;
 use App\Entity\Evenement;
 use App\Entity\Groupe;
@@ -17,7 +18,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class DashboardController extends AbstractDashboardController
 {
-    // On injecte les repositories pour avoir accès aux données
+    // On garde ton constructeur tel quel
     public function __construct(
         private UserRepository $userRepository,
         private EvenementRepository $evenementRepository,
@@ -27,7 +28,7 @@ class DashboardController extends AbstractDashboardController
     #[Route('/admin', name: 'admin')]
     public function index(): Response
     {
-        // On récupère les compteurs
+        // On garde tes statistiques
         $stats = [
             'users' => $this->userRepository->count([]),
             'events' => $this->evenementRepository->count([]),
@@ -41,8 +42,8 @@ class DashboardController extends AbstractDashboardController
 
     public function configureDashboard(): Dashboard
     {
+        // On garde ton joli titre avec le logo
         return Dashboard::new()
-            // Titre propre avec le logo et un espacement corrigé
             ->setTitle('<img src="/img/logo.png" style="height: 35px; margin-right: 10px; vertical-align: text-bottom;"> Planifique <span style="font-size: 0.8em; color: #777;">Admin</span>')
             ->setFaviconPath('img/logo.png')
             ->renderContentMaximized();
@@ -52,12 +53,22 @@ class DashboardController extends AbstractDashboardController
     {
         yield MenuItem::linkToDashboard('Vue d\'ensemble', 'fa fa-home');
 
-        yield MenuItem::section('Gestion');
-        yield MenuItem::linkToCrud('Groupes', 'fas fa-users', Groupe::class);
+        // --- SECTION PLANNING ---
+        yield MenuItem::section('Gestion Planning');
         yield MenuItem::linkToCrud('Événements', 'fas fa-calendar-check', Evenement::class);
+        yield MenuItem::linkToCrud('Groupes', 'fas fa-users', Groupe::class);
         yield MenuItem::linkToCrud('Collaborateurs', 'fas fa-user-tie', User::class);
 
+        // --- SECTION LIEUX (DOSSIER) ---
+        // C'est ici qu'on crée l'effet "Dossier" visuel
+        yield MenuItem::section('Infrastructures');
 
+        yield MenuItem::subMenu('Bureaux / Salles', 'fas fa-building')->setSubItems([
+            // Le lien pointe vers le CRUD Bureau (qui est maintenant trié par Genève/Archamps)
+            MenuItem::linkToCrud('Gérer les Salles', 'fas fa-list', Bureau::class),
+        ]);
+
+        // --- LIENS ---
         yield MenuItem::section('Liens');
         yield MenuItem::linkToRoute('Retour au site', 'fas fa-arrow-left', 'app_home');
     }
