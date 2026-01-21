@@ -3,6 +3,8 @@
 namespace App\Controller\Admin;
 
 use App\Entity\Bureau;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
@@ -18,40 +20,56 @@ class BureauCrudController extends AbstractCrudController
         return Bureau::class;
     }
 
-    // 1. CONFIGURATION DU TRI (Pour ne plus que ce soit mélangé)
+    // --- C'EST ICI QU'ON AJOUTE LE BOUTON HISTORIQUE ---
+    public function configureActions(Actions $actions): Actions
+    {
+        // 1. Création de l'action personnalisée "Historique"
+        $viewHistory = Action::new('viewHistory', 'Historique')
+            ->setIcon('fas fa-history') // Icône horloge
+            ->setLabel('Historique') // Le texte du bouton
+
+            // 2. On lie le clic à la route de votre calendrier d'historique
+            // (Il faut que la route 'admin_bureau_history_view' existe bien, voir étape précédente)
+            ->linkToRoute('admin_bureau_history_view', function (Bureau $bureau) {
+                return ['id' => $bureau->getId()];
+            });
+
+        return $actions
+            // 3. On ajoute l'action à la page INDEX (la liste)
+            ->add(Crud::PAGE_INDEX, $viewHistory)
+
+            // 4. On réorganise l'ordre pour que ce soit joli : Historique | Modifier | Supprimer
+            ->reorder(Crud::PAGE_INDEX, ['viewHistory', Action::EDIT, Action::DELETE]);
+    }
+
     public function configureCrud(Crud $crud): Crud
     {
         return $crud
             ->setPageTitle('index', 'Gestion des Salles')
             ->setEntityLabelInSingular('Salle')
             ->setEntityLabelInPlural('Salles')
-            // C'est ici que la magie opère : on trie d'abord par Lieu, puis par Nom
             ->setDefaultSort(['lieu' => 'DESC', 'nom' => 'ASC']);
     }
 
-    // 2. CONFIGURATION DES FILTRES (Menu de droite)
     public function configureFilters(Filters $filters): Filters
     {
         return $filters
-            ->add('lieu'); // Permet de filtrer "Uniquement Genève" ou "Uniquement Archamps"
+            ->add('lieu');
     }
 
-    // 3. CONFIGURATION DES CHAMPS (Visuel)
     public function configureFields(string $pageName): iterable
     {
         return [
             IdField::new('id')->hideOnForm(),
 
-            // On met le LIEU en premier pour bien voir le groupe
             ChoiceField::new('lieu', 'Localisation')
                 ->setChoices([
                     'Cabinet Genève' => 'Cabinet-geneve',
                     'Cabinet Archamps' => 'Cabinet-archamps',
                 ])
-                // Les badges mettent de la couleur pour distinguer les groupes
                 ->renderAsBadges([
-                    'Cabinet-geneve' => 'success',  // Vert
-                    'Cabinet-archamps' => 'warning', // Jaune/Orange
+                    'Cabinet-geneve' => 'success',
+                    'Cabinet-archamps' => 'warning',
                 ]),
 
             TextField::new('nom', 'Nom de la salle')

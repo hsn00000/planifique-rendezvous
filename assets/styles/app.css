@@ -116,3 +116,88 @@ body {
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
+
+/* --- 🌙 GESTION DU DARK MODE (Mode Sombre) --- */
+@media (prefers-color-scheme: dark) {
+    /* 1. Fond global sombre et texte clair */
+    body {
+        background-color: #121212 !important; /* Gris très foncé (mieux que noir pur) */
+        color: #e0e0e0 !important;
+    }
+
+    /* 2. Correction des Cartes (Cards) qui étaient blanches */
+    .card, .bg-white {
+        background-color: #1e1e1e !important; /* Gris foncé pour détacher du fond */
+        color: #ffffff !important;
+        border: 1px solid #333 !important; /* Bordure subtile pour la structure */
+    }
+
+    /* 3. Navbar en mode sombre */
+    .navbar, .navbar-glass {
+        background: rgba(30, 30, 30, 0.95) !important;
+        border-bottom: 1px solid #333 !important;
+    }
+    .navbar-brand span {
+        color: #fff !important; /* Le logo "Planifique" en blanc */
+    }
+    .nav-link {
+        color: #b0b0b0 !important;
+    }
+    .nav-link:hover, .nav-link.active {
+        color: var(--brand-primary) !important;
+    }
+
+    /* 4. Formulaires (Inputs) */
+    .form-control, .form-select {
+        background-color: #2d2d2d !important;
+        border-color: #444 !important;
+        color: #fff !important;
+    }
+    .form-control:focus, .form-select:focus {
+        background-color: #333 !important;
+        color: #fff !important;
+        border-color: var(--brand-primary) !important;
+    }
+
+    /* 5. Correction des textes forcés en "text-dark" */
+    .text-dark {
+        color: #e0e0e0 !important;
+    }
+    .text-muted {
+        color: #9ca3af !important; /* Gris plus clair pour être lisible */
+    }
+
+    /* 6. Boutons et Badges */
+    .btn-light {
+        background-color: #333 !important;
+        color: #fff !important;
+        border-color: #444 !important;
+    }
+    .btn-outline-secondary {
+        color: #ccc !important;
+        border-color: #666 !important;
+    }
+    .btn-outline-secondary:hover {
+        background-color: #ccc !important;
+        color: #000 !important;
+    }
+
+    /* 7. FullCalendar (Calendrier historique) en mode sombre */
+    .fc-theme-standard .fc-scrollgrid {
+        border-color: #444 !important;
+    }
+    .fc-col-header-cell-cushion, .fc-timegrid-slot-label-cushion {
+        color: #ccc !important;
+    }
+    .fc-daygrid-day-number {
+        color: #fff !important;
+    }
+    .fc-list-day-cushion {
+        background-color: #2d2d2d !important;
+    }
+
+    /* Petits détails */
+    .border-end, .border-bottom, .border {
+        border-color: #333 !important;
+    }
+}

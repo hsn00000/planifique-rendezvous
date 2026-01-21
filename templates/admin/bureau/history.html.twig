@@ -1,0 +1,87 @@
+{# templates/admin/bureau/history.html.twig #}
+{% extends '@EasyAdmin/page/content.html.twig' %}
+
+{% block content_title %}
+    Historique : <span class="text-primary">{{ bureau.nom }}</span> <small class="text-muted">({{ bureau.lieu }})</small>
+{% endblock %}
+
+{% block main %}
+    <div class="row">
+        {# Bouton de retour #}
+        <div class="col-12 mb-4">
+            <a href="{{ path('admin', {'crudAction': 'index', 'crudControllerFqcn': 'App\\Controller\\Admin\\BureauCrudController'}) }}" class="btn btn-secondary">
+                <i class="fa fa-arrow-left me-2"></i> Retour à la liste des bureaux
+            </a>
+        </div>
+
+        {# Zone du calendrier #}
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div id="calendar" style="min-height: 800px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# --- Intégration de FullCalendar (CDN) --- #}
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'timeGridWeek', // Vue par défaut : Semaine
+                locale: 'fr',               // Langue Française
+                firstDay: 1,                // La semaine commence le Lundi
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                buttonText: {
+                    today: "Aujourd'hui",
+                    month: "Mois",
+                    week: "Semaine",
+                    day: "Jour"
+                },
+                slotMinTime: '07:00:00', // Début journée visible
+                slotMaxTime: '21:00:00', // Fin journée visible
+                allDaySlot: false,       // Cache la ligne "Toute la journée"
+                nowIndicator: true,      // Ligne rouge pour l'heure actuelle
+                height: 'auto',          // Hauteur automatique
+
+                // SOURCE DES DONNÉES
+                // On appelle l'API que nous avons créée dans BureauHistoryController
+                events: "{{ path('admin_bureau_history_api', {'id': bureau.id}) }}",
+
+                // INTERACTION
+                eventClick: function(info) {
+                    // Au clic, on affiche une petite alerte avec les infos
+                    alert(
+                        'Rendez-vous : ' + info.event.title + '\n' +
+                        'Début : ' + info.event.start.toLocaleString() + '\n' +
+                        'Fin : ' + info.event.end.toLocaleString()
+                    );
+                },
+
+                // Apparence des événements
+                eventDidMount: function(info) {
+                    // Ajoute un petit effet pointer au survol
+                    info.el.style.cursor = 'pointer';
+                }
+            });
+
+            calendar.render();
+        });
+    </script>
+
+    <style>
+        /* Quelques ajustements pour que ce soit joli dans EasyAdmin */
+        .fc-toolbar-title { font-size: 1.5rem !important; font-weight: bold; color: #333; }
+        .fc-col-header-cell-cushion { text-transform: uppercase; font-size: 0.9rem; font-weight: bold; color: #666; padding: 10px 0 !important; }
+        .fc-timegrid-slot-label-cushion { font-size: 0.9rem; color: #999; }
+        .fc-event { border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: none; }
+    </style>
+{% endblock %}
