@@ -3,85 +3,157 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Confirmation de rendez-vous</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+<body style="margin: 0; padding: 0; background-color: #f4f5f7; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
 
-<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; margin-top: 40px; margin-bottom: 40px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-
-    {# --- EN-TÊTE : BLEU PLANIFIQUE --- #}
+{# CONTENEUR PRINCIPAL CENTRÉ #}
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f5f7;">
     <tr>
-        <td align="center" style="padding: 40px; background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: #ffffff;">
-            {# LOGO (Utilise absolute_url pour que l'image s'affiche dans Gmail) #}
-            <img src="{{ absolute_url(asset('img/logo.png')) }}" alt="Planifique" style="height: 35px; filter: brightness(0) invert(1); margin-bottom: 20px; display: block;">
+        <td align="center" style="padding: 40px 10px;">
 
-            <h1 style="margin: 0; font-size: 24px; font-weight: bold;">Rendez-vous confirmé</h1>
-            <p style="margin: 10px 0 0 0; opacity: 0.8; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Récapitulatif</p>
-        </td>
-    </tr>
+            {# CARTE BLANCHE #}
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow: hidden;">
 
-    {# --- CORPS DU MESSAGE --- #}
-    <tr>
-        <td style="padding: 40px;">
-            <p style="color: #333; font-size: 16px; line-height: 1.5; margin-bottom: 30px; text-align: center;">
-                Bonjour <strong>{{ rdv.prenom }}</strong>,<br>
-                Votre demande a été validée avec succès. Voici les détails de votre entretien.
-            </p>
-
-            {# CADRE GRIS CLAIR #}
-            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8f9fa; border-radius: 12px; border: 1px solid #e9ecef;">
+                {# 1. EN-TÊTE BLEU #}
                 <tr>
-                    <td style="padding: 25px;">
+                    <td style="background-color: #2563eb; padding: 30px; text-align: center;">
+                        {# Logo en blanc (assurez-vous que le logo existe bien dans public/img/logo.png) #}
+                        <img src="{{ absolute_url(asset('img/logo.png')) }}" alt="Planifique" width="150" style="max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto; filter: brightness(0) invert(1);">
+                        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Confirmation de rendez-vous</h1>
+                    </td>
+                </tr>
 
-                        {# TYPE D'ÉVÉNEMENT #}
-                        <div style="margin-bottom: 20px; text-align: center;">
-                            <div style="font-size: 12px; color: #6c757d; text-transform: uppercase; margin-bottom: 5px;">Type de rendez-vous</div>
-                            <div style="font-size: 18px; font-weight: bold; color: #2563eb;">{{ rdv.evenement.titre }}</div>
-                        </div>
+                {# 2. MESSAGE DE BIENVENUE #}
+                <tr>
+                    <td style="padding: 40px 40px 20px 40px;">
+                        <p style="margin: 0; color: #374151; font-size: 16px; line-height: 24px;">
+                            Bonjour <strong>{{ rdv.prenom }}</strong>,
+                        </p>
+                        <p style="margin: 15px 0 0 0; color: #374151; font-size: 16px; line-height: 24px;">
+                            Votre rendez-vous est confirmé. Nous avons hâte de vous rencontrer pour votre entretien <strong>{{ rdv.evenement.titre }}</strong>.
+                        </p>
+                    </td>
+                </tr>
 
-                        <hr style="border: 0; border-top: 1px solid #e9ecef; margin: 20px 0;">
+                {# 3. DÉTAILS DU RENDEZ-VOUS (BLOC GRIS) #}
+                <tr>
+                    <td style="padding: 0 40px;">
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+                            <tr>
+                                <td style="padding: 20px;">
 
-                        {# DÉTAILS TEXTE (Sans Icônes) #}
-                        <table width="100%">
-                            <tr>
-                                <td style="padding-bottom: 15px; color: #6c757d; font-size: 14px;">Date</td>
-                                <td style="padding-bottom: 15px; text-align: right; font-weight: bold; color: #333; text-transform: capitalize;">
-                                    {{ rdv.dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr') }}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="padding-bottom: 15px; color: #6c757d; font-size: 14px;">Horaire</td>
-                                <td style="padding-bottom: 15px; text-align: right; font-weight: bold; color: #333;">
-                                    {{ rdv.dateDebut|date('H:i') }} - {{ rdv.dateFin|date('H:i') }}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="padding-bottom: 15px; color: #6c757d; font-size: 14px;">Conseiller</td>
-                                <td style="padding-bottom: 15px; text-align: right; font-weight: bold; color: #333;">
-                                    {{ rdv.conseiller.firstName }} {{ rdv.conseiller.lastName }}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="color: #6c757d; font-size: 14px;">Lieu</td>
-                                <td style="text-align: right; font-weight: bold; color: #333;">
-                                    {{ rdv.typeLieu }}
-                                    {% if rdv.adresse %}
-                                        <br><span style="font-size: 12px; font-weight: normal; color: #666;">{{ rdv.adresse }}</span>
-                                    {% endif %}
+                                    {# DATE ET HEURE #}
+                                    <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                        <tr>
+                                            <td width="30" style="vertical-align: top; padding-right: 15px;">
+                                                <img src="https://img.icons8.com/ios-filled/50/2563eb/calendar--v1.png" width="24" height="24" alt="Date">
+                                            </td>
+                                            <td style="padding-bottom: 20px;">
+                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Quand ?</div>
+                                                <div style="font-size: 16px; color: #111827; font-weight: 600;">
+                                                    {{ rdv.dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr')|title }}
+                                                </div>
+                                                <div style="font-size: 16px; color: #2563eb; font-weight: 600;">
+                                                    de {{ rdv.dateDebut|date('H:i') }} à {{ rdv.dateFin|date('H:i') }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                    {# CONSEILLER #}
+                                    <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                        <tr>
+                                            <td width="30" style="vertical-align: top; padding-right: 15px;">
+                                                <img src="https://img.icons8.com/ios-filled/50/2563eb/user-male-circle.png" width="24" height="24" alt="Conseiller">
+                                            </td>
+                                            <td style="padding-bottom: 20px;">
+                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Avec qui ?</div>
+                                                <div style="font-size: 16px; color: #111827;">
+                                                    {{ rdv.conseiller.firstName }} {{ rdv.conseiller.lastName }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                    {# LIEU #}
+                                    <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                        <tr>
+                                            <td width="30" style="vertical-align: top; padding-right: 15px;">
+                                                <img src="https://img.icons8.com/ios-filled/50/2563eb/marker.png" width="24" height="24" alt="Lieu">
+                                            </td>
+                                            <td>
+                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Où ?</div>
+                                                <div style="font-size: 16px; color: #111827; font-weight: 600;">
+                                                    {% if rdv.typeLieu == 'visio' %}
+                                                        🌐 En visioconférence (Teams/Zoom)
+                                                    {% else %}
+                                                        📍 {{ rdv.typeLieu }}
+                                                    {% endif %}
+                                                </div>
+
+                                                {# Affichage intelligent de l'adresse #}
+                                                {% if rdv.adresse %}
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">
+                                                        {{ rdv.adresse }}
+                                                    </div>
+                                                    {# Lien Google Maps si c'est un lieu physique #}
+                                                    {% if rdv.typeLieu != 'visio' %}
+                                                        <div style="margin-top: 8px;">
+                                                            <a href="https://www.google.com/maps/search/?api=1&query={{ rdv.adresse|url_encode }}" style="color: #2563eb; text-decoration: none; font-size: 13px; font-weight: 500;">
+                                                                Voir sur la carte &rarr;
+                                                            </a>
+                                                        </div>
+                                                    {% endif %}
+                                                {% elseif rdv.typeLieu == 'Cabinet-geneve' %}
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Rue de Genève 12, 1201 Genève</div>
+                                                {% elseif rdv.typeLieu == 'Cabinet-archamps' %}
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Technopole d'Archamps, France</div>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    </table>
+
                                 </td>
                             </tr>
                         </table>
-
                     </td>
                 </tr>
-            </table>
 
-            <div style="margin-top: 40px; text-align: center; font-size: 12px; color: #999;">
-                <p style="margin: 0;">Ceci est un message automatique, merci de ne pas y répondre.</p>
-                <p style="margin: 5px 0 0 0;">&copy; {{ 'now'|date('Y') }} Planifique SA</p>
-            </div>
+                {# 4. RÉCAPITULATIF INFOS CLIENT #}
+                <tr>
+                    <td style="padding: 30px 40px;">
+                        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #111827;">Vos coordonnées enregistrées :</h3>
+                        <table width="100%" style="font-size: 14px; color: #4b5563;">
+                            <tr>
+                                <td style="padding-bottom: 5px; width: 30px;">📞</td>
+                                <td style="padding-bottom: 5px;">{{ rdv.telephone }}</td>
+                            </tr>
+                            <tr>
+                                <td style="width: 30px;">📧</td>
+                                <td>{{ rdv.email }}</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                {# 5. PIED DE PAGE #}
+                <tr>
+                    <td style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                            Besoin de modifier ce rendez-vous ? Contactez-nous par téléphone ou répondez à cet email.
+                        </p>
+                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #d1d5db;">
+                            &copy; {{ 'now'|date('Y') }} Planifique - Tous droits réservés.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
         </td>
     </tr>
 </table>
+
 </body>
 </html>

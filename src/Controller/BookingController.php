@@ -339,6 +339,7 @@ class BookingController extends AbstractController
         return $this->redirectToRoute('app_booking_success', ['id' => $rendezVous->getId()]);
     }
 
+
     // --- FONCTIONS PRIVÉES ---
 
     private function generateSlots($user, $event, $rdvRepo, $dispoRepo, $bureauRepo, string $lieu): array
@@ -478,14 +479,116 @@ class BookingController extends AbstractController
         return $this->render('booking/success.html.twig', ['rendezvous' => $rendezVous]);
     }
 
-    private function sendConfirmationEmails($mailer, $rdv, $event): void
+    #[Route('/booking/confirm', name: 'booking_confirm', methods: ['POST'])]
+    public function confirm(Request $request, EntityManagerInterface $em, MailerInterface $mailer): Response
     {
-        $emailClient = new TemplatedEmail()
-            ->from('no-reply@planifique.com')
-            ->to($rdv->getEmail())
-            ->subject('Confirmation RDV : ' . $event->getTitre())
+        // 1. Récupération ou Création du Rendez-vous
+        // (Ici, j'imagine que vous récupérez les infos du formulaire ou de la session)
+        // Ceci est un exemple, adaptez selon votre logique actuelle de formulaire
+        $rendezVous = new RendezVous();
+        // $form->handleRequest($request)...
+        // Supposons que $rendezVous est prêt et validé ici.
+
+        // --- EXEMPLE DE DONNÉES EN DUR POUR LE TEST (A REMPLACER PAR VOTRE LOGIQUE) ---
+        // Si vous avez déjà votre logique de formulaire, gardez-la et insérez juste la partie EMAIL ci-dessous.
+        // ---------------------------------------------------------------------------
+
+        // 2. Enregistrement en base de données
+        $em->persist($rendezVous);
+        $em->flush();
+
+        // 3. Synchronisation Outlook (votre service)
+        try {
+            $this->outlookService->addEventToOutlook($rendezVous);
+        } catch (\Exception $e) {
+            // On ne bloque pas la réservation si Outlook échoue, mais on peut logger l'erreur
+            // $logger->error('Erreur Outlook : ' . $e->getMessage());
+        }
+
+        // =========================================================================
+        // 4. GÉNÉRATION DU FICHIER CALENDRIER (.ics)
+        // =========================================================================
+        $icsContent = $this->generateIcsContent($rendezVous);
+
+        // =========================================================================
+        // 5. ENVOI DE L'EMAIL (La partie corrigée pour Gmail)
+        // =========================================================================
+        $email = (new TemplatedEmail())
+            ->from('automate@planifique.com') // Votre adresse configurée
+            ->to($rendezVous->getEmail())
+            ->subject('Confirmation de rendez-vous : ' . $rendezVous->getEvenement()->getTitre())
+
+            // Le chemin vers votre nouveau template "joli"
             ->htmlTemplate('emails/booking_confirmation_client.html.twig')
-            ->context(['rdv' => $rdv]);
-        try { $mailer->send($emailClient); } catch (\Exception $e) {}
+
+            // On passe les variables au template
+            ->context([
+                'rdv' => $rendezVous,
+            ])
+
+            // --- LA CORRECTION EST ICI ---
+            // On utilise 'application/octet-stream' pour forcer le téléchargement
+            // et empêcher Gmail de casser le design.
+            ->attach($icsContent, 'rendez-vous.ics', 'application/octet-stream');
+
+        $mailer->send($email);
+
+        // 6. Redirection ou réponse
+        return $this->render('booking/success.html.twig', [
+            'rdv' => $rendezVous
+        ]);
+    }
+
+    /**
+     * Génère le contenu texte du fichier .ics
+     */
+    private function generateIcsContent(RendezVous $rdv): string
+    {
+        $start = $rdv->getDateDebut()->format('Ymd\THis');
+        $end = $rdv->getDateFin()->format('Ymd\THis');
+        $now = new \DateTime();
+        $dtStamp = $now->format('Ymd\THis');
+
+        // Nettoyage des textes pour éviter de casser le fichier ICS
+        $description = "Rendez-vous avec " . $rdv->getConseiller()->getFirstName();
+        $location = $rdv->getTypeLieu() === 'visio' ? 'En visioconférence' : $rdv->getAdresse();
+
+        return "BEGIN:VCALENDAR\r\n" .
+            "VERSION:2.0\r\n" .
+            "PRODID:-//Planifique//Boking System//FR\r\n" .
+            "CALSCALE:GREGORIAN\r\n" .
+            "BEGIN:VEVENT\r\n" .
+            "DTSTAMP:$dtStamp\r\n" .
+            "DTSTART:$start\r\n" .
+            "DTEND:$end\r\n" .
+            "SUMMARY:" . $rdv->getEvenement()->getTitre() . "\r\n" .
+            "DESCRIPTION:$description\r\n" .
+            "LOCATION:$location\r\n" .
+            "STATUS:CONFIRMED\r\n" .
+            "END:VEVENT\r\n" .
+            "END:VCALENDAR";
+    }
+
+    /**
+     * Envoie le mail de confirmation avec le fichier calendrier joint
+     */
+    private function sendConfirmationEmails(MailerInterface $mailer, RendezVous $rdv): void
+    {
+        // 1. On génère le contenu du fichier calendrier (ICS)
+        // (Appelle la fonction generateIcsContent qu'on a ajoutée plus bas)
+        $icsContent = $this->generateIcsContent($rdv);
+
+        $email = (new TemplatedEmail())
+            ->from('automate@planifique.com')
+            // Attention : on utilise bien $rdv ici, pas $rendezVous
+            ->to($rdv->getEmail())
+            ->subject('Confirmation de rendez-vous : ' . $rdv->getEvenement()->getTitre())
+            ->htmlTemplate('emails/booking_confirmation_client.html.twig')
+            ->context(['rdv' => $rdv]) // On passe $rdv au template
+
+            // C'est cette ligne qui fait la magie pour le design Gmail :
+            ->attach($icsContent, 'rendez-vous.ics', 'application/octet-stream');
+
+        $mailer->send($email);
     }
 }

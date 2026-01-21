@@ -209,39 +209,35 @@ class OutlookService
         // On récupère la date d'expiration
         $expiresAt = $account->getExpiresAt();
 
-        // Si c'est null, on force le refresh par sécurité
-        if (!$expiresAt) {
-            // Logique de refresh...
-        }
-
-        // On s'assure d'avoir un timestamp pour comparer
-        $expiryTimestamp = ($expiresAt instanceof \DateTimeInterface) ? $expiresAt->getTimestamp() : (int) $expiresAt;
+        // On convertit tout en timestamp entier pour la comparaison
+        // Si c'est déjà un int, on le garde. Si c'est null, on met 0 pour forcer le refresh.
+        $expiryTimestamp = (int) $expiresAt;
         $nowTimestamp = time();
 
-        // On ajoute une marge de sécurité de 5 minutes (300s) pour ne pas être pris de court
+        // Si le token expire dans moins de 5 minutes (300s) ou s'il n'y a pas de date
         if ($expiryTimestamp < ($nowTimestamp + 300)) {
             try {
                 $newAccessToken = $this->oauthProvider->getAccessToken('refresh_token', [
                     'refresh_token' => $account->getRefreshToken()
                 ]);
 
-                // ... reste du code (mise à jour du token) ...
-
-                // Pensez à mettre à jour l'entité avec le nouveau token !
+                // Mise à jour de l'entité avec les nouvelles valeurs
                 $account->setAccessToken($newAccessToken->getToken());
                 $account->setRefreshToken($newAccessToken->getRefreshToken());
 
-                // Si la librairie retourne un timestamp, on le convertit en DateTime pour Doctrine
+                // --- CORRECTION ICI ---
+                // getExpires() retourne un timestamp (int).
+                // Votre entité attend un int via setExpiresAt().
+                // Donc on lui passe directement la valeur sans new DateTime().
                 if ($newAccessToken->getExpires()) {
-                    $dt = new \DateTime();
-                    $dt->setTimestamp($newAccessToken->getExpires());
-                    $account->setExpiresAt($dt);
+                    $account->setExpiresAt($newAccessToken->getExpires());
                 }
 
-                $this->entityManager->flush();
+                // On sauvegarde en base
+                $this->em->flush();
 
             } catch (\Exception $e) {
-                // Gérer l'erreur ou la logger
+                // Log de l'erreur si besoin, ou on laisse couler pour ne pas bloquer l'user
             }
         }
     }
