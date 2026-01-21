@@ -206,19 +206,42 @@ class OutlookService
 
     private function refreshAccessTokenIfExpired($account): void
     {
-        if ($account->getExpiresAt() < new \DateTime()) {
+        // On récupère la date d'expiration
+        $expiresAt = $account->getExpiresAt();
+
+        // Si c'est null, on force le refresh par sécurité
+        if (!$expiresAt) {
+            // Logique de refresh...
+        }
+
+        // On s'assure d'avoir un timestamp pour comparer
+        $expiryTimestamp = ($expiresAt instanceof \DateTimeInterface) ? $expiresAt->getTimestamp() : (int) $expiresAt;
+        $nowTimestamp = time();
+
+        // On ajoute une marge de sécurité de 5 minutes (300s) pour ne pas être pris de court
+        if ($expiryTimestamp < ($nowTimestamp + 300)) {
             try {
                 $newAccessToken = $this->oauthProvider->getAccessToken('refresh_token', [
                     'refresh_token' => $account->getRefreshToken()
                 ]);
 
+                // ... reste du code (mise à jour du token) ...
+
+                // Pensez à mettre à jour l'entité avec le nouveau token !
                 $account->setAccessToken($newAccessToken->getToken());
                 $account->setRefreshToken($newAccessToken->getRefreshToken());
-                $account->setExpiresAt((new \DateTime())->setTimestamp($newAccessToken->getExpires()));
 
-                $this->accountRepo->save($account, true);
-            } catch (IdentityProviderException $e) {
-                // Token invalide
+                // Si la librairie retourne un timestamp, on le convertit en DateTime pour Doctrine
+                if ($newAccessToken->getExpires()) {
+                    $dt = new \DateTime();
+                    $dt->setTimestamp($newAccessToken->getExpires());
+                    $account->setExpiresAt($dt);
+                }
+
+                $this->entityManager->flush();
+
+            } catch (\Exception $e) {
+                // Gérer l'erreur ou la logger
             }
         }
     }
