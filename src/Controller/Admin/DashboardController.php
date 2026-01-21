@@ -46,7 +46,8 @@ class DashboardController extends AbstractDashboardController
         return Dashboard::new()
             ->setTitle('<img src="/img/logo.png" style="height: 35px; margin-right: 10px; vertical-align: text-bottom;"> Planifique <span style="font-size: 0.8em; color: #777;">Admin</span>')
             ->setFaviconPath('img/logo.png')
-            ->renderContentMaximized();
+            ->renderContentMaximized()
+            ->disableDarkMode();
     }
 
     public function configureMenuItems(): iterable
