@@ -28,28 +28,28 @@ class BureauRepository extends ServiceEntityRepository
             return null; // Aucun bureau n'existe à cet endroit
         }
 
-        // 2. On récupère tous les rendez-vous qui chevauchent ce créneau
+        // 2. On récupère tous les rendez-vous qui chevauchent ce créneau ET qui ont un bureau
         $entityManager = $this->getEntityManager();
+
+        // Approche plus robuste : on récupère tous les RDV avec bureau, puis on filtre par lieu
         $query = $entityManager->createQuery(
             'SELECT r
              FROM App\Entity\RendezVous r
-             JOIN r.bureau b
-             WHERE b.lieu = :lieu
+             WHERE r.bureau IS NOT NULL
              AND r.dateDebut < :end
              AND r.dateFin > :start'
         )->setParameters([
-            'lieu' => $lieu,
             'start' => $start,
             'end' => $end
         ]);
 
         $rdvsOccupes = $query->getResult();
 
-        // 3. On extrait les IDs des bureaux occupés
+        // 3. On extrait les IDs des bureaux occupés pour ce lieu spécifique
         $occupiedIds = [];
         foreach ($rdvsOccupes as $rdv) {
             $bureau = $rdv->getBureau();
-            if ($bureau) {
+            if ($bureau && $bureau->getLieu() === $lieu) {
                 $occupiedIds[] = $bureau->getId();
             }
         }
@@ -78,12 +78,14 @@ class BureauRepository extends ServiceEntityRepository
             return [];
         }
 
-        // 2. On récupère tous les rendez-vous qui chevauchent ce créneau
+        // 2. On récupère tous les rendez-vous qui chevauchent ce créneau ET qui ont un bureau
         $entityManager = $this->getEntityManager();
+
+        // Récupération directe avec INNER JOIN pour être sûr
         $query = $entityManager->createQuery(
-            'SELECT r
+            'SELECT r, b
              FROM App\Entity\RendezVous r
-             JOIN r.bureau b
+             INNER JOIN r.bureau b
              WHERE b.lieu = :lieu
              AND r.dateDebut < :end
              AND r.dateFin > :start'
