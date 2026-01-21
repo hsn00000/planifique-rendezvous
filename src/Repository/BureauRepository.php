@@ -31,7 +31,7 @@ class BureauRepository extends ServiceEntityRepository
         // 2. On cherche les ID des bureaux occupés sur ce créneau
         $entityManager = $this->getEntityManager();
         $query = $entityManager->createQuery(
-            'SELECT IDENTITY(r.bureau)
+            'SELECT IDENTITY(r.bureau) as bureauId
              FROM App\Entity\RendezVous r
              WHERE r.bureau IS NOT NULL
              AND r.dateDebut < :end
@@ -41,11 +41,15 @@ class BureauRepository extends ServiceEntityRepository
             'end' => $end
         ]);
 
-        $occupiedIds = array_column($query->getScalarResult(), 1);
+        $result = $query->getScalarResult();
+        // Extraction correcte des IDs
+        $occupiedIds = array_map(function($row) {
+            return (int) $row['bureauId'];
+        }, $result);
 
         // 3. On retourne le premier bureau qui n'est PAS dans la liste des occupés
         foreach ($allBureaux as $bureau) {
-            if (!in_array($bureau->getId(), $occupiedIds)) {
+            if (!in_array($bureau->getId(), $occupiedIds, true)) {
                 return $bureau;
             }
         }
@@ -69,17 +73,21 @@ class BureauRepository extends ServiceEntityRepository
         // 2. On cherche les ID des bureaux occupés sur ce créneau (en BDD locale)
         $entityManager = $this->getEntityManager();
         $query = $entityManager->createQuery(
-            'SELECT IDENTITY(r.bureau)
-         FROM App\Entity\RendezVous r
-         WHERE r.bureau IS NOT NULL
-         AND r.dateDebut < :end
-         AND r.dateFin > :start'
+            'SELECT IDENTITY(r.bureau) as bureauId
+             FROM App\Entity\RendezVous r
+             WHERE r.bureau IS NOT NULL
+             AND r.dateDebut < :end
+             AND r.dateFin > :start'
         )->setParameters([
             'start' => $start,
             'end' => $end
         ]);
 
-        $occupiedIds = array_column($query->getScalarResult(), 1);
+        $result = $query->getScalarResult();
+        // Extraction correcte des IDs (getScalarResult retourne [['bureauId' => X]])
+        $occupiedIds = array_map(function($row) {
+            return (int) $row['bureauId'];
+        }, $result);
 
         // 3. On retourne tous les bureaux qui ne sont PAS dans la liste des occupés
         $free = [];
