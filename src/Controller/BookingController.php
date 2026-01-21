@@ -287,22 +287,48 @@ class BookingController extends AbstractController
             $rendezVous->setConseiller($conseiller);
         }
 
-        // --- 2. ATTRIBUTION BUREAU (avec fallback autre site) ---
-        if (in_array($data['lieu'], ['Cabinet-geneve', 'Cabinet-archamps'])) {
-            $bureauLibre = $bureauRepo->findAvailableBureau($data['lieu'], $rendezVous->getDateDebut(), $rendezVous->getDateFin());
+        // --- 2. ATTRIBUTION BUREAU (BDD + vérification Outlook) ---
+        if (in_array($data['lieu'], ['Cabinet-geneve', 'Cabinet-archamps'], true)) {
 
+            // Fonction helper pour tester un lieu
+            $tryLieu = function (string $lieu) use ($bureauRepo, $outlookService, $rendezVous, $conseiller) {
+                // 1) On récupère toutes les salles libres en BDD pour ce lieu
+                $freeBureaux = $bureauRepo->findAvailableBureaux(
+                    $lieu,
+                    $rendezVous->getDateDebut(),
+                    $rendezVous->getDateFin()
+                );
+
+                if (empty($freeBureaux)) {
+                    return null;
+                }
+
+                // 2) On vérifie côté Outlook laquelle est vraiment libre
+                return $outlookService->pickAvailableBureauOnOutlook(
+                    $conseiller,
+                    $freeBureaux,
+                    $rendezVous->getDateDebut(),
+                    $rendezVous->getDateFin()
+                );
+            };
+
+            $lieuInitial = $rendezVous->getTypeLieu();
+            $bureauLibre = $tryLieu($lieuInitial);
+
+            // Si aucune salle libre dans le lieu initial, on tente l'autre lieu
             if (!$bureauLibre) {
-                $autreLieu = $data['lieu'] === 'Cabinet-geneve' ? 'Cabinet-archamps' : 'Cabinet-geneve';
-                $bureauLibre = $bureauRepo->findAvailableBureau($autreLieu, $rendezVous->getDateDebut(), $rendezVous->getDateFin());
+                $autreLieu = $lieuInitial === 'Cabinet-geneve' ? 'Cabinet-archamps' : 'Cabinet-geneve';
+                $bureauLibre = $tryLieu($autreLieu);
 
                 if ($bureauLibre) {
                     $rendezVous->setTypeLieu($autreLieu);
-                    $this->addFlash('info', 'Le lieu initial était complet, nous avons réservé une autre salle.');
+                    $this->addFlash('info', 'Le lieu initial était complet, nous avons réservé une salle dans l\'autre cabinet.');
                 }
             }
 
+            // Si toujours rien, on refuse la réservation
             if (!$bureauLibre) {
-                $this->addFlash('danger', 'Aucune salle n’est disponible à cet horaire. Merci de choisir un autre créneau.');
+                $this->addFlash('danger', 'Aucune salle n\'est disponible à cet horaire (conflits Outlook détectés). Merci de choisir un autre créneau.');
                 return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
             }
 

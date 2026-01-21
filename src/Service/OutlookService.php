@@ -234,6 +234,95 @@ class OutlookService
         }
     }
 
+    /**
+     * Vérifie si une salle (room) est libre côté Outlook/Exchange pour un créneau donné
+     */
+    private function isRoomFreeOnOutlook(string $accessToken, string $roomEmail, \DateTimeInterface $start, \DateTimeInterface $end): bool
+    {
+        try {
+            $client = new \GuzzleHttp\Client();
+
+            $payload = [
+                'schedules' => [$roomEmail],
+                'startTime' => [
+                    'dateTime' => $start->format('Y-m-d\TH:i:s'),
+                    'timeZone' => 'Europe/Paris',
+                ],
+                'endTime' => [
+                    'dateTime' => $end->format('Y-m-d\TH:i:s'),
+                    'timeZone' => 'Europe/Paris',
+                ],
+                'availabilityViewInterval' => 30, // résolution 30 minutes
+            ];
+
+            $response = $client->post('https://graph.microsoft.com/v1.0/me/calendar/getSchedule', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type'  => 'application/json',
+                ],
+                'json' => $payload,
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
+            $schedule = $data['value'][0] ?? null;
+
+            if (!$schedule) {
+                // Si Outlook ne renvoie rien, on considère comme non-fiable => on bloque (évite faux positifs)
+                return false;
+            }
+
+            // availabilityView : string de 0/1/2/3/4
+            // 0 = Free, 1 = Tentative, 2 = Busy, 3 = OOF, 4 = WorkingElsewhere
+            // Si un seul créneau n'est pas free (0) => pas libre
+            $view = $schedule['availabilityView'] ?? '';
+            if (!is_string($view) || $view === '') {
+                return false;
+            }
+
+            // Si un seul caractère n'est pas '0', la salle est occupée
+            return !preg_match('/[1-9]/', $view);
+
+        } catch (\Exception $e) {
+            // Si erreur Graph, on considère comme non-libre (sécurité)
+            return false;
+        }
+    }
+
+    /**
+     * Choisit la première salle vraiment libre côté Outlook parmi une liste de bureaux libres en BDD
+     */
+    public function pickAvailableBureauOnOutlook(User $user, array $bureaux, \DateTimeInterface $start, \DateTimeInterface $end): ?\App\Entity\Bureau
+    {
+        $account = $this->accountRepo->findOneBy(['user' => $user]);
+        if (!$account || !$account->getAccessToken()) {
+            return null;
+        }
+
+        $this->refreshAccessTokenIfExpired($account);
+        $token = $account->getAccessToken();
+
+        // On teste chaque bureau pour trouver le premier vraiment libre côté Outlook
+        foreach ($bureaux as $bureau) {
+            if (!$bureau->getEmail()) {
+                // Une salle sans email ne peut pas être vérifiée ni réservée côté Outlook
+                continue;
+            }
+
+            try {
+                if ($this->isRoomFreeOnOutlook($token, $bureau->getEmail(), $start, $end)) {
+                    // Cette salle est libre côté Outlook → on la prend
+                    return $bureau;
+                }
+            } catch (\Exception $e) {
+                // Si erreur Graph, on skip cette salle et on continue avec la suivante
+                continue;
+            }
+        }
+
+        // Aucune salle libre trouvée
+        return null;
+    }
+
     private function refreshAccessTokenIfExpired($account): void
     {
         $expiresAt = $account->getExpiresAt();
