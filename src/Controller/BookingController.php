@@ -432,11 +432,12 @@ class BookingController extends AbstractController
                             if ($start < $busyEnd && $slotEnd > $busyStart) { $isFree = false; break; }
                         }
 
-                        // dispo salle si cabinet
+                        // dispo salle si cabinet (vérifie qu'au moins UNE salle est libre)
                         if ($isFree && in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps'])) {
-                            $bureauDispo = $bureauRepo->findAvailableBureau($lieu, $start, $slotEnd);
-                            if (!$bureauDispo) {
-                                $isFree = false;
+                            // On vérifie qu'il existe AU MOINS une salle libre (pas juste la première)
+                            $freeBureaux = $bureauRepo->findAvailableBureaux($lieu, $start, $slotEnd);
+                            if (empty($freeBureaux)) {
+                                $isFree = false; // Aucune salle libre → on masque ce créneau
                             }
                         }
 
