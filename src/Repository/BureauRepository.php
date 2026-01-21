@@ -31,21 +31,20 @@ class BureauRepository extends ServiceEntityRepository
         // 2. On cherche les ID des bureaux occupés sur ce créneau
         $entityManager = $this->getEntityManager();
         $query = $entityManager->createQuery(
-            'SELECT IDENTITY(r.bureau) as bureauId
+            'SELECT DISTINCT b.id
              FROM App\Entity\RendezVous r
-             WHERE r.bureau IS NOT NULL
+             JOIN r.bureau b
+             WHERE b.lieu = :lieu
              AND r.dateDebut < :end
-             AND r.dateFin > :start' // Chevauchement temporel
+             AND r.dateFin > :start'
         )->setParameters([
+            'lieu' => $lieu,
             'start' => $start,
             'end' => $end
         ]);
 
         $result = $query->getScalarResult();
-        // Extraction correcte des IDs
-        $occupiedIds = array_map(function($row) {
-            return (int) $row['bureauId'];
-        }, $result);
+        $occupiedIds = array_column($result, 'id');
 
         // 3. On retourne le premier bureau qui n'est PAS dans la liste des occupés
         foreach ($allBureaux as $bureau) {
@@ -71,23 +70,23 @@ class BureauRepository extends ServiceEntityRepository
         }
 
         // 2. On cherche les ID des bureaux occupés sur ce créneau (en BDD locale)
+        // On filtre aussi par lieu pour être sûr
         $entityManager = $this->getEntityManager();
         $query = $entityManager->createQuery(
-            'SELECT IDENTITY(r.bureau) as bureauId
+            'SELECT DISTINCT b.id
              FROM App\Entity\RendezVous r
-             WHERE r.bureau IS NOT NULL
+             JOIN r.bureau b
+             WHERE b.lieu = :lieu
              AND r.dateDebut < :end
              AND r.dateFin > :start'
         )->setParameters([
+            'lieu' => $lieu,
             'start' => $start,
             'end' => $end
         ]);
 
         $result = $query->getScalarResult();
-        // Extraction correcte des IDs (getScalarResult retourne [['bureauId' => X]])
-        $occupiedIds = array_map(function($row) {
-            return (int) $row['bureauId'];
-        }, $result);
+        $occupiedIds = array_column($result, 'id');
 
         // 3. On retourne tous les bureaux qui ne sont PAS dans la liste des occupés
         $free = [];
