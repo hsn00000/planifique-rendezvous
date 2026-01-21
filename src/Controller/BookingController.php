@@ -5,7 +5,6 @@ namespace App\Controller;
 use App\Entity\Evenement;
 use App\Entity\RendezVous;
 use App\Entity\User;
-use App\Entity\Bureau;
 use App\Form\BookingFormType;
 use App\Repository\BureauRepository;
 use App\Repository\DisponibiliteHebdomadaireRepository;
@@ -26,38 +25,32 @@ class BookingController extends AbstractController
     /**
      * ÉTAPE 1 : LE FORMULAIRE
      */
-    /**
-     * ÉTAPE 1 : LE FORMULAIRE
-     */
     #[Route('/book/event/{eventId}', name: 'app_booking_form', requirements: ['eventId' => '\d+'])]
     public function form(
         int $eventId,
         Request $request,
         EvenementRepository $eventRepo,
         UserRepository $userRepo
-    ): Response
-    {
+    ): Response {
         $event = $eventRepo->find($eventId);
         if (!$event) throw $this->createNotFoundException("Événement introuvable.");
 
         $rendezVous = new RendezVous();
         $rendezVous->setEvenement($event);
 
-        // 1. Gestion conseiller (URL ou Auto-détection)
+        // Gestion conseiller (URL ou Auto)
         $userIdParam = $request->query->get('user');
         $viewUser = null;
 
         if ($userIdParam && $u = $userRepo->find($userIdParam)) {
             $rendezVous->setConseiller($u);
             $viewUser = $u;
-        }
-        elseif ($this->getUser() && !$event->isRoundRobin() && $event->getGroupe()->getUsers()->contains($this->getUser())) {
+        } elseif ($this->getUser() && !$event->isRoundRobin() && $event->getGroupe()->getUsers()->contains($this->getUser())) {
             $currentUser = $this->getUser();
             $rendezVous->setConseiller($currentUser);
             $viewUser = $currentUser;
             $userIdParam = $currentUser->getId();
-        }
-        elseif (!$event->isRoundRobin()) {
+        } elseif (!$event->isRoundRobin()) {
             $defaultUser = $event->getGroupe()->getUsers()->first();
             if ($defaultUser) {
                 $rendezVous->setConseiller($defaultUser);
@@ -65,8 +58,7 @@ class BookingController extends AbstractController
             }
         }
 
-        // --- NOUVEAU : PRÉ-REMPLISSAGE EN CAS DE RETOUR ---
-        // Si le client revient du calendrier, on remet ses infos dans le formulaire
+        // Pré-remplissage si retour
         $session = $request->getSession();
         if ($session->has('temp_booking_data')) {
             $data = $session->get('temp_booking_data');
@@ -79,7 +71,6 @@ class BookingController extends AbstractController
                 $rendezVous->setTypeLieu($data['lieu']);
             }
         }
-        // --------------------------------------------------
 
         $form = $this->createForm(BookingFormType::class, $rendezVous, [
             'groupe' => $event->getGroupe(),
@@ -137,8 +128,7 @@ class BookingController extends AbstractController
         DisponibiliteHebdomadaireRepository $dispoRepo,
         BureauRepository $bureauRepo,
         OutlookService $outlookService
-    ): Response
-    {
+    ): Response {
         $session = $request->getSession();
         if (!$session->has('temp_booking_data')) {
             return $this->redirectToRoute('app_booking_form', ['eventId' => $eventId]);
@@ -148,13 +138,12 @@ class BookingController extends AbstractController
         $lieuChoisi = $data['lieu'];
 
         $event = $eventRepo->find($eventId);
-
         $targetUserId = $request->query->get('user');
 
-        $viewUser = null;       // Utilisateur affiché (Template)
-        $calculationUser = null; // Utilisateur pour calculs
+        $viewUser = null;
+        $calculationUser = null;
 
-        // 1. Session (Priorité)
+        // 1. Session
         if (!empty($data['conseiller_id'])) {
             $viewUser = $userRepo->find($data['conseiller_id']);
             $calculationUser = $viewUser;
@@ -164,16 +153,14 @@ class BookingController extends AbstractController
             $viewUser = $userRepo->find($targetUserId);
             $calculationUser = $viewUser;
         }
-        // 3. Défaut (Round Robin OU Non-Round Robin sans user)
+        // 3. Défaut
         else {
             $firstUser = $event->getGroupe()->getUsers()->first();
             $calculationUser = $firstUser;
 
-            // Si ce n'est PAS un Round Robin, on affiche le user par défaut
             if (!$event->isRoundRobin()) {
                 $viewUser = $firstUser;
             } else {
-                // Si Round Robin, on force l'affichage "Équipe"
                 $viewUser = null;
             }
         }
@@ -191,7 +178,7 @@ class BookingController extends AbstractController
     }
 
     /**
-     * ÉTAPE 2.5 : RÉCAPITULATIF (Page de validation)
+     * ÉTAPE 2.5 : RÉCAPITULATIF
      */
     #[Route('/book/summary/{eventId}', name: 'app_booking_summary')]
     public function summary(
@@ -199,24 +186,20 @@ class BookingController extends AbstractController
         int $eventId,
         EvenementRepository $eventRepo,
         UserRepository $userRepo
-    ): Response
-    {
+    ): Response {
         $session = $request->getSession();
         $data = $session->get('temp_booking_data');
 
-        // Sécurité : si pas de données, retour au formulaire
         if (!$data) return $this->redirectToRoute('app_booking_form', ['eventId' => $eventId]);
 
         $event = $eventRepo->find($eventId);
         $dateParam = $request->query->get('date');
 
-        // Sécurité : si pas de date choisie, retour au calendrier
         if (!$dateParam) return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
 
         $startDate = new \DateTime($dateParam);
         $endDate = (clone $startDate)->modify('+' . $event->getDuree() . ' minutes');
 
-        // Logique d'affichage du conseiller (identique au calendrier)
         $targetUserId = $request->query->get('user');
         $viewUser = null;
 
@@ -227,7 +210,6 @@ class BookingController extends AbstractController
         } elseif (!$event->isRoundRobin()) {
             $viewUser = $event->getGroupe()->getUsers()->first();
         }
-        // Sinon Round Robin = null (affiche "Notre Équipe")
 
         return $this->render('booking/summary.html.twig', [
             'event' => $event,
@@ -236,8 +218,8 @@ class BookingController extends AbstractController
             'conseiller' => $viewUser,
             'client' => $data,
             'lieu' => $data['lieu'],
-            'dateParam' => $dateParam, // Pour passer à l'étape suivante
-            'userIdParam' => $targetUserId // Pour conserver le paramètre d'URL
+            'dateParam' => $dateParam,
+            'userIdParam' => $targetUserId
         ]);
     }
 
@@ -251,12 +233,11 @@ class BookingController extends AbstractController
         EvenementRepository $eventRepo,
         RendezVousRepository $rdvRepo,
         UserRepository $userRepo,
-        BureauRepository $bureauRepo, // <--- Injection du repository Bureau
+        BureauRepository $bureauRepo,
         EntityManagerInterface $em,
         MailerInterface $mailer,
         OutlookService $outlookService
-    ): Response
-    {
+    ): Response {
         $session = $request->getSession();
         $data = $session->get('temp_booking_data');
 
@@ -306,13 +287,22 @@ class BookingController extends AbstractController
             $rendezVous->setConseiller($conseiller);
         }
 
-        // --- 2. ATTRIBUTION BUREAU (Nouvelle logique) ---
-        // On vérifie si le lieu correspond à un de nos cabinets physiques
+        // --- 2. ATTRIBUTION BUREAU (avec fallback autre site) ---
         if (in_array($data['lieu'], ['Cabinet-geneve', 'Cabinet-archamps'])) {
             $bureauLibre = $bureauRepo->findAvailableBureau($data['lieu'], $rendezVous->getDateDebut(), $rendezVous->getDateFin());
 
             if (!$bureauLibre) {
-                $this->addFlash('danger', 'Désolé, aucune salle n\'est disponible à cette heure.');
+                $autreLieu = $data['lieu'] === 'Cabinet-geneve' ? 'Cabinet-archamps' : 'Cabinet-geneve';
+                $bureauLibre = $bureauRepo->findAvailableBureau($autreLieu, $rendezVous->getDateDebut(), $rendezVous->getDateFin());
+
+                if ($bureauLibre) {
+                    $rendezVous->setTypeLieu($autreLieu);
+                    $this->addFlash('info', 'Le lieu initial était complet, nous avons réservé une autre salle.');
+                }
+            }
+
+            if (!$bureauLibre) {
+                $this->addFlash('danger', 'Aucune salle n’est disponible à cet horaire. Merci de choisir un autre créneau.');
                 return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
             }
 
@@ -322,16 +312,16 @@ class BookingController extends AbstractController
         $em->persist($rendezVous);
         $em->flush();
 
-        // --- 3. SYNCHRO OUTLOOK ---
+        // --- 3. SYNCHRO OUTLOOK (client non invité) ---
         try {
             if ($rendezVous->getConseiller()) {
                 $outlookService->addEventToCalendar($rendezVous->getConseiller(), $rendezVous);
             }
         } catch (\Exception $e) {}
 
-        // --- 4. ENVOI EMAILS ---
+        // --- 4. ENVOI EMAILS (HTML + ICS public sans bureau) ---
         try {
-            $this->sendConfirmationEmails($mailer, $rendezVous, $event);
+            $this->sendConfirmationEmails($mailer, $rendezVous);
         } catch (\Exception $e) {}
 
         $session->remove('temp_booking_data');
@@ -339,8 +329,15 @@ class BookingController extends AbstractController
         return $this->redirectToRoute('app_booking_success', ['id' => $rendezVous->getId()]);
     }
 
+    #[Route('/book/success/{id}', name: 'app_booking_success')]
+    public function success(RendezVous $rendezVous): Response
+    {
+        return $this->render('booking/success.html.twig', ['rendezvous' => $rendezVous]);
+    }
 
+    // =========================================================================
     // --- FONCTIONS PRIVÉES ---
+    // =========================================================================
 
     private function generateSlots($user, $event, $rdvRepo, $dispoRepo, $bureauRepo, string $lieu): array
     {
@@ -386,7 +383,7 @@ class BookingController extends AbstractController
                 foreach ($rulesByDay[$dayOfWeek] as $rule) {
                     if ($rule->isEstBloque()) continue;
 
-                    // Vérification Quota Journalier (ex: max 3 RDV/jour)
+                    // quota 3/jour
                     if ($rdvRepo->countRendezVousForUserOnDate($user, $currentDate) >= 3) {
                         continue;
                     }
@@ -400,7 +397,7 @@ class BookingController extends AbstractController
 
                         $isFree = true;
 
-                        // 1. Vérification disponibilité Conseiller (avec tampons)
+                        // dispo conseiller + tampons (RDV existants)
                         foreach ($rdvsDuJour as $rdv) {
                             $tAvant = $rdv->getEvenement()->getTamponAvant();
                             $tApres = $rdv->getEvenement()->getTamponApres();
@@ -409,11 +406,11 @@ class BookingController extends AbstractController
                             if ($start < $busyEnd && $slotEnd > $busyStart) { $isFree = false; break; }
                         }
 
-                        // 2. Vérification disponibilité Salle (SI lieu physique)
+                        // dispo salle si cabinet
                         if ($isFree && in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps'])) {
                             $bureauDispo = $bureauRepo->findAvailableBureau($lieu, $start, $slotEnd);
                             if (!$bureauDispo) {
-                                $isFree = false; // Pas de salle libre, on ferme le créneau
+                                $isFree = false;
                             }
                         }
 
@@ -441,7 +438,14 @@ class BookingController extends AbstractController
 
         $dayStart = (clone $start)->setTime(0, 0, 0);
         $dayEnd = (clone $start)->setTime(23, 59, 59);
-        $existingRdvs = $rdvRepo->createQueryBuilder('r')->where('r.conseiller = :user')->andWhere('r.dateDebut BETWEEN :start AND :end')->setParameter('user', $user)->setParameter('start', $dayStart)->setParameter('end', $dayEnd)->getQuery()->getResult();
+        $existingRdvs = $rdvRepo->createQueryBuilder('r')
+            ->where('r.conseiller = :user')
+            ->andWhere('r.dateDebut BETWEEN :start AND :end')
+            ->setParameter('user', $user)
+            ->setParameter('start', $dayStart)
+            ->setParameter('end', $dayEnd)
+            ->getQuery()->getResult();
+
         foreach ($existingRdvs as $rdv) {
             $tAvant = $rdv->getEvenement()->getTamponAvant();
             $tApres = $rdv->getEvenement()->getTamponApres();
@@ -473,120 +477,65 @@ class BookingController extends AbstractController
         return null;
     }
 
-    #[Route('/book/success/{id}', name: 'app_booking_success')]
-    public function success(RendezVous $rendezVous): Response
-    {
-        return $this->render('booking/success.html.twig', ['rendezvous' => $rendezVous]);
-    }
-
-    #[Route('/booking/confirm', name: 'booking_confirm', methods: ['POST'])]
-    public function confirm(Request $request, EntityManagerInterface $em, MailerInterface $mailer): Response
-    {
-        // 1. Récupération ou Création du Rendez-vous
-        // (Ici, j'imagine que vous récupérez les infos du formulaire ou de la session)
-        // Ceci est un exemple, adaptez selon votre logique actuelle de formulaire
-        $rendezVous = new RendezVous();
-        // $form->handleRequest($request)...
-        // Supposons que $rendezVous est prêt et validé ici.
-
-        // --- EXEMPLE DE DONNÉES EN DUR POUR LE TEST (A REMPLACER PAR VOTRE LOGIQUE) ---
-        // Si vous avez déjà votre logique de formulaire, gardez-la et insérez juste la partie EMAIL ci-dessous.
-        // ---------------------------------------------------------------------------
-
-        // 2. Enregistrement en base de données
-        $em->persist($rendezVous);
-        $em->flush();
-
-        // 3. Synchronisation Outlook (votre service)
-        try {
-            $this->outlookService->addEventToOutlook($rendezVous);
-        } catch (\Exception $e) {
-            // On ne bloque pas la réservation si Outlook échoue, mais on peut logger l'erreur
-            // $logger->error('Erreur Outlook : ' . $e->getMessage());
-        }
-
-        // =========================================================================
-        // 4. GÉNÉRATION DU FICHIER CALENDRIER (.ics)
-        // =========================================================================
-        $icsContent = $this->generateIcsContent($rendezVous);
-
-        // =========================================================================
-        // 5. ENVOI DE L'EMAIL (La partie corrigée pour Gmail)
-        // =========================================================================
-        $email = (new TemplatedEmail())
-            ->from('automate@planifique.com') // Votre adresse configurée
-            ->to($rendezVous->getEmail())
-            ->subject('Confirmation de rendez-vous : ' . $rendezVous->getEvenement()->getTitre())
-
-            // Le chemin vers votre nouveau template "joli"
-            ->htmlTemplate('emails/booking_confirmation_client.html.twig')
-
-            // On passe les variables au template
-            ->context([
-                'rdv' => $rendezVous,
-            ])
-
-            // --- LA CORRECTION EST ICI ---
-            // On utilise 'application/octet-stream' pour forcer le téléchargement
-            // et empêcher Gmail de casser le design.
-            ->attach($icsContent, 'rendez-vous.ics', 'application/octet-stream');
-
-        $mailer->send($email);
-
-        // 6. Redirection ou réponse
-        return $this->render('booking/success.html.twig', [
-            'rdv' => $rendezVous
-        ]);
-    }
-
     /**
-     * Génère le contenu texte du fichier .ics
+     * ICS public (sans bureau interne)
      */
     private function generateIcsContent(RendezVous $rdv): string
     {
         $start = $rdv->getDateDebut()->format('Ymd\THis');
         $end = $rdv->getDateFin()->format('Ymd\THis');
-        $now = new \DateTime();
-        $dtStamp = $now->format('Ymd\THis');
+        $dtStamp = (new \DateTime())->format('Ymd\THis');
 
-        // Nettoyage des textes pour éviter de casser le fichier ICS
-        $description = "Rendez-vous avec " . $rdv->getConseiller()->getFirstName();
-        $location = $rdv->getTypeLieu() === 'visio' ? 'En visioconférence' : $rdv->getAdresse();
+        // Lieu public (pas de bureau interne)
+        $lieu = $rdv->getTypeLieu();
+        $adresse = $rdv->getAdresse() ?: '';
+        if (strcasecmp($lieu, 'Cabinet-geneve') === 0) {
+            $adresse = 'Chemin du Pavillon 2, 1218 Le Grand-Saconnex';
+        } elseif (strcasecmp($lieu, 'Cabinet-archamps') === 0) {
+            $adresse = '160 Rue Georges de Mestral, 74160 Archamps, France';
+        }
+        $location = $lieu . ($adresse ? ' - ' . $adresse : '');
 
-        return "BEGIN:VCALENDAR\r\n" .
+        $summary = 'Rendez-vous : ' . $rdv->getEvenement()->getTitre();
+        $description = sprintf(
+            "Bonjour %s %s,\nVotre rendez-vous est confirmé.",
+            $rdv->getPrenom(),
+            $rdv->getNom()
+        );
+
+        return
+            "BEGIN:VCALENDAR\r\n" .
             "VERSION:2.0\r\n" .
-            "PRODID:-//Planifique//Boking System//FR\r\n" .
+            "PRODID:-//Planifique//Booking System//FR\r\n" .
             "CALSCALE:GREGORIAN\r\n" .
+            "METHOD:PUBLISH\r\n" .
             "BEGIN:VEVENT\r\n" .
+            "UID:rdv-" . $rdv->getId() . "@planifique\r\n" .
             "DTSTAMP:$dtStamp\r\n" .
             "DTSTART:$start\r\n" .
             "DTEND:$end\r\n" .
-            "SUMMARY:" . $rdv->getEvenement()->getTitre() . "\r\n" .
-            "DESCRIPTION:$description\r\n" .
-            "LOCATION:$location\r\n" .
+            "SUMMARY:" . addcslashes($summary, ",;\\") . "\r\n" .
+            "LOCATION:" . addcslashes($location, ",;\\") . "\r\n" .
+            "DESCRIPTION:" . addcslashes($description, ",;\\") . "\r\n" .
             "STATUS:CONFIRMED\r\n" .
             "END:VEVENT\r\n" .
-            "END:VCALENDAR";
+            "END:VCALENDAR\r\n";
     }
 
     /**
-     * Envoie le mail de confirmation avec le fichier calendrier joint
+     * Mail client : HTML + ICS public
      */
     private function sendConfirmationEmails(MailerInterface $mailer, RendezVous $rdv): void
     {
-        // 1. On génère le contenu du fichier calendrier (ICS)
-        // (Appelle la fonction generateIcsContent qu'on a ajoutée plus bas)
         $icsContent = $this->generateIcsContent($rdv);
 
         $email = (new TemplatedEmail())
             ->from('automate@planifique.com')
-            // Attention : on utilise bien $rdv ici, pas $rendezVous
             ->to($rdv->getEmail())
             ->subject('Confirmation de rendez-vous : ' . $rdv->getEvenement()->getTitre())
             ->htmlTemplate('emails/booking_confirmation_client.html.twig')
-            ->context(['rdv' => $rdv]) // On passe $rdv au template
-
-            // C'est cette ligne qui fait la magie pour le design Gmail :
+            ->context(['rdv' => $rdv])
+            // ICS public sans bureau interne
             ->attach($icsContent, 'rendez-vous.ics', 'application/octet-stream');
 
         $mailer->send($email);

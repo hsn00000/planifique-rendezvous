@@ -5,18 +5,18 @@ namespace App\Service;
 use App\Entity\RendezVous;
 use App\Entity\User;
 use App\Repository\MicrosoftAccountRepository;
-use App\Repository\RendezVousRepository; // Ajout du repo
+use App\Repository\RendezVousRepository;
 use League\OAuth2\Client\Provider\GenericProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
-use Doctrine\ORM\EntityManagerInterface; // Nécessaire pour flush et remove
+use Doctrine\ORM\EntityManagerInterface;
 
 class OutlookService
 {
     private $oauthProvider;
     private $accountRepo;
-    private $rdvRepo; // Pour la synchro
-    private $em;      // Pour la synchro
+    private $rdvRepo;
+    private $em;
     private $router;
 
     public function __construct(
@@ -44,51 +44,88 @@ class OutlookService
         ]);
     }
 
+    /**
+     * Crée l'événement Outlook pour le conseiller + ressource, sans inviter le client
+     */
     public function addEventToCalendar(User $user, RendezVous $rendezVous): void
     {
         $account = $this->accountRepo->findOneBy(['user' => $user]);
-        if (!$account || !$account->getAccessToken()) return;
+        if (!$account || !$account->getAccessToken()) {
+            return;
+        }
 
         $this->refreshAccessTokenIfExpired($account);
 
-        // --- Construction des participants (Client + Salle) ---
+        // Participants : uniquement la ressource (salle) si email
         $attendees = [];
-
-        // 1. Le Client
-        $attendees[] = [
-            'emailAddress' => ['address' => $rendezVous->getEmail(), 'name' => $rendezVous->getPrenom() . ' ' . $rendezVous->getNom()],
-            'type' => 'required'
-        ];
-
-        // 2. La Salle (si elle a un email)
         if ($rendezVous->getBureau() && $rendezVous->getBureau()->getEmail()) {
             $attendees[] = [
                 'emailAddress' => [
                     'address' => $rendezVous->getBureau()->getEmail(),
-                    'name' => $rendezVous->getBureau()->getNom()
+                    'name'    => $rendezVous->getBureau()->getNom(), // visible côté conseiller
                 ],
-                'type' => 'resource'
+                'type' => 'resource',
             ];
         }
 
+        // Lieu + adresse (sans nom de bureau interne dans displayName)
+        $lieuTexte = $rendezVous->getTypeLieu();
+        $adresseTexte = $rendezVous->getAdresse() ?: '';
+        if (strcasecmp($lieuTexte, 'Cabinet-geneve') === 0) {
+            $adresseTexte = 'Chemin du Pavillon 2, 1218 Le Grand-Saconnex';
+        } elseif (strcasecmp($lieuTexte, 'Cabinet-archamps') === 0) {
+            $adresseTexte = '160 Rue Georges de Mestral, 74160 Archamps, France';
+        }
+        $lieuComplet = $lieuTexte . ($adresseTexte ? ' - ' . $adresseTexte : '');
+        $bureauNom   = $rendezVous->getBureau() ? $rendezVous->getBureau()->getNom() : 'N/A';
+
         $eventData = [
-            'subject' => 'RDV: ' . $rendezVous->getEvenement()->getTitre() . ' - ' . $rendezVous->getPrenom() . ' ' . $rendezVous->getNom(),
+            'subject' => 'RDV: ' . $rendezVous->getEvenement()->getTitre() . ' - ' .
+                $rendezVous->getPrenom() . ' ' . $rendezVous->getNom(),
+
+            'hideAttendees' => true,
+
             'body' => [
                 'contentType' => 'HTML',
-                'content' => "Rendez-vous planifié via Planifique.<br>Client: {$rendezVous->getTelephone()}"
+                'content' => sprintf(
+                    '<div style="font-family:Segoe UI,Arial,sans-serif;">
+                        <h2 style="margin:0 0 12px 0;color:#0b4db7;">Rendez-vous confirmé</h2>
+                        <p style="margin:0 0 12px 0;">Bonjour %s %s,</p>
+                        <p style="margin:0 0 12px 0;">Récapitulatif (interne) :</p>
+                        <table style="border-collapse:collapse;width:100%%;max-width:520px;">
+                            <tr><td style="padding:6px 0;color:#666;">Type</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s</td></tr>
+                            <tr><td style="padding:6px 0;color:#666;">Date</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s</td></tr>
+                            <tr><td style="padding:6px 0;color:#666;">Horaire</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s - %s</td></tr>
+                            <tr><td style="padding:6px 0;color:#666;">Conseiller</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s %s</td></tr>
+                            <tr><td style="padding:6px 0;color:#666;">Lieu</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s</td></tr>
+                            <tr><td style="padding:6px 0;color:#666;">Bureau</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s</td></tr>
+                        </table>
+                    </div>',
+                    $rendezVous->getPrenom(),
+                    $rendezVous->getNom(),
+                    $rendezVous->getEvenement()->getTitre(),
+                    $rendezVous->getDateDebut()->format('d/m/Y'),
+                    $rendezVous->getDateDebut()->format('H:i'),
+                    $rendezVous->getDateFin()->format('H:i'),
+                    $rendezVous->getConseiller()->getFirstName(),
+                    $rendezVous->getConseiller()->getLastName(),
+                    $lieuComplet,
+                    $bureauNom
+                ),
             ],
+
             'start' => [
                 'dateTime' => $rendezVous->getDateDebut()->format('Y-m-d\TH:i:s'),
-                'timeZone' => 'Europe/Paris'
+                'timeZone' => 'Europe/Paris',
             ],
             'end' => [
                 'dateTime' => $rendezVous->getDateFin()->format('Y-m-d\TH:i:s'),
-                'timeZone' => 'Europe/Paris'
+                'timeZone' => 'Europe/Paris',
             ],
             'location' => [
-                'displayName' => $rendezVous->getTypeLieu() . ($rendezVous->getBureau() ? ' - ' . $rendezVous->getBureau()->getNom() : '')
+                'displayName' => $lieuComplet,
             ],
-            'attendees' => $attendees
+            'attendees' => $attendees,
         ];
 
         try {
@@ -96,22 +133,19 @@ class OutlookService
             $response = $client->post('https://graph.microsoft.com/v1.0/me/events', [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $account->getAccessToken(),
-                    'Content-Type' => 'application/json'
+                    'Content-Type'  => 'application/json',
                 ],
-                'json' => $eventData
+                'json' => $eventData,
             ]);
 
-            // --- NOUVEAU : Sauvegarde de l'ID Outlook ---
             $responseData = json_decode($response->getBody(), true);
             if (isset($responseData['id'])) {
                 $rendezVous->setOutlookId($responseData['id']);
-                // On sauvegarde immédiatement pour ne pas perdre le lien
                 $this->em->persist($rendezVous);
                 $this->em->flush();
             }
-
         } catch (\Exception $e) {
-            // Loguer l'erreur
+            // TODO: logger l'erreur si besoin
         }
     }
 
@@ -125,7 +159,6 @@ class OutlookService
 
         $this->refreshAccessTokenIfExpired($account);
 
-        // 1. Récupérer les RDV futurs de ce user qui ont un ID Outlook
         $futureRdvs = $this->rdvRepo->createQueryBuilder('r')
             ->where('r.conseiller = :user')
             ->andWhere('r.dateDebut > :now')
@@ -136,7 +169,6 @@ class OutlookService
 
         if (empty($futureRdvs)) return;
 
-        // 2. Récupérer la liste des IDs Outlook actuels (pour les 3 prochains mois)
         $startStr = (new \DateTime())->format('Y-m-d\TH:i:s');
         $endStr = (new \DateTime('+3 months'))->format('Y-m-d\TH:i:s');
 
@@ -147,18 +179,16 @@ class OutlookService
                 'query' => [
                     'startDateTime' => $startStr,
                     'endDateTime' => $endStr,
-                    '$select' => 'id', // On veut juste les IDs pour comparer
-                    '$top' => 999 // Pagination large
+                    '$select' => 'id',
+                    '$top' => 999
                 ]
             ]);
 
             $data = json_decode($response->getBody(), true);
             $outlookIds = array_column($data['value'] ?? [], 'id');
 
-            // 3. Comparaison : Si un RDV local n'est pas dans la liste Outlook -> Suppression
             foreach ($futureRdvs as $rdv) {
                 if (!in_array($rdv->getOutlookId(), $outlookIds)) {
-                    // Le RDV a été supprimé dans Outlook, on le supprime de Planifique
                     $this->em->remove($rdv);
                 }
             }
@@ -206,38 +236,27 @@ class OutlookService
 
     private function refreshAccessTokenIfExpired($account): void
     {
-        // On récupère la date d'expiration
         $expiresAt = $account->getExpiresAt();
-
-        // On convertit tout en timestamp entier pour la comparaison
-        // Si c'est déjà un int, on le garde. Si c'est null, on met 0 pour forcer le refresh.
         $expiryTimestamp = (int) $expiresAt;
         $nowTimestamp = time();
 
-        // Si le token expire dans moins de 5 minutes (300s) ou s'il n'y a pas de date
         if ($expiryTimestamp < ($nowTimestamp + 300)) {
             try {
                 $newAccessToken = $this->oauthProvider->getAccessToken('refresh_token', [
                     'refresh_token' => $account->getRefreshToken()
                 ]);
 
-                // Mise à jour de l'entité avec les nouvelles valeurs
                 $account->setAccessToken($newAccessToken->getToken());
                 $account->setRefreshToken($newAccessToken->getRefreshToken());
 
-                // --- CORRECTION ICI ---
-                // getExpires() retourne un timestamp (int).
-                // Votre entité attend un int via setExpiresAt().
-                // Donc on lui passe directement la valeur sans new DateTime().
                 if ($newAccessToken->getExpires()) {
                     $account->setExpiresAt($newAccessToken->getExpires());
                 }
 
-                // On sauvegarde en base
                 $this->em->flush();
 
             } catch (\Exception $e) {
-                // Log de l'erreur si besoin, ou on laisse couler pour ne pas bloquer l'user
+                // Optionnel: log
             }
         }
     }
