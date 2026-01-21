@@ -28,10 +28,10 @@ class BureauRepository extends ServiceEntityRepository
             return null; // Aucun bureau n'existe à cet endroit
         }
 
-        // 2. On cherche les ID des bureaux occupés sur ce créneau
+        // 2. On récupère tous les rendez-vous qui chevauchent ce créneau
         $entityManager = $this->getEntityManager();
         $query = $entityManager->createQuery(
-            'SELECT DISTINCT b.id
+            'SELECT r
              FROM App\Entity\RendezVous r
              JOIN r.bureau b
              WHERE b.lieu = :lieu
@@ -43,10 +43,19 @@ class BureauRepository extends ServiceEntityRepository
             'end' => $end
         ]);
 
-        $result = $query->getScalarResult();
-        $occupiedIds = array_column($result, 'id');
+        $rdvsOccupes = $query->getResult();
 
-        // 3. On retourne le premier bureau qui n'est PAS dans la liste des occupés
+        // 3. On extrait les IDs des bureaux occupés
+        $occupiedIds = [];
+        foreach ($rdvsOccupes as $rdv) {
+            $bureau = $rdv->getBureau();
+            if ($bureau) {
+                $occupiedIds[] = $bureau->getId();
+            }
+        }
+        $occupiedIds = array_unique($occupiedIds);
+
+        // 4. On retourne le premier bureau qui n'est PAS dans la liste des occupés
         foreach ($allBureaux as $bureau) {
             if (!in_array($bureau->getId(), $occupiedIds, true)) {
                 return $bureau;
@@ -69,11 +78,10 @@ class BureauRepository extends ServiceEntityRepository
             return [];
         }
 
-        // 2. On cherche les ID des bureaux occupés sur ce créneau (en BDD locale)
-        // On filtre aussi par lieu pour être sûr
+        // 2. On récupère tous les rendez-vous qui chevauchent ce créneau
         $entityManager = $this->getEntityManager();
         $query = $entityManager->createQuery(
-            'SELECT DISTINCT b.id
+            'SELECT r
              FROM App\Entity\RendezVous r
              JOIN r.bureau b
              WHERE b.lieu = :lieu
@@ -85,10 +93,19 @@ class BureauRepository extends ServiceEntityRepository
             'end' => $end
         ]);
 
-        $result = $query->getScalarResult();
-        $occupiedIds = array_column($result, 'id');
+        $rdvsOccupes = $query->getResult();
 
-        // 3. On retourne tous les bureaux qui ne sont PAS dans la liste des occupés
+        // 3. On extrait les IDs des bureaux occupés
+        $occupiedIds = [];
+        foreach ($rdvsOccupes as $rdv) {
+            $bureau = $rdv->getBureau();
+            if ($bureau) {
+                $occupiedIds[] = $bureau->getId();
+            }
+        }
+        $occupiedIds = array_unique($occupiedIds);
+
+        // 4. On retourne tous les bureaux qui ne sont PAS dans la liste des occupés
         $free = [];
         foreach ($allBureaux as $bureau) {
             if (!in_array($bureau->getId(), $occupiedIds, true)) {

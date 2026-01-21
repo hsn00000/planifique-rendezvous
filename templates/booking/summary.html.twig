@@ -47,8 +47,6 @@
                         <div class="me-3 text-center" style="width: 24px;"><i class="far fa-clock text-primary fs-5"></i></div>
                         <div>
                             <div class="fw-bold text-dark">{{ dateDebut|date('H:i') }} - {{ dateFin|date('H:i') }}</div>
-
-                            {# --- MODIFICATION DURÉE ICI --- #}
                             <div class="small text-muted">
                                 Durée :
                                 {% set hours = (event.duree / 60)|round(0, 'floor') %}
@@ -77,20 +75,52 @@
 
                 {# Boutons d'action #}
                 <div class="d-grid gap-3">
-                    {# BOUTON VALIDER #}
-                    <a href="{{ path('app_booking_finalize', {'eventId': event.id, 'date': dateParam, 'user': userIdParam}) }}"
-                       class="btn btn-primary btn-lg rounded-pill fw-bold py-3 shadow-sm">
-                        Valider
-                    </a>
+                    {# BOUTON VALIDER avec loader #}
+                    <form id="validateForm" action="{{ path('app_booking_finalize', {'eventId': event.id, 'date': dateParam, 'user': userIdParam}) }}" method="GET">
+                        <button type="submit" id="validateBtn" class="btn btn-primary btn-lg rounded-pill fw-bold py-3 shadow-sm w-100 position-relative" style="min-height: 56px;">
+                            <span id="validateText">Valider</span>
+                            <span id="validateLoader" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);"></span>
+                        </button>
+                    </form>
 
-                    {# --- MODIFICATION BOUTON REFUSER (ROUGE) --- #}
+                    {# BOUTON REFUSER #}
                     <a href="{{ path('app_booking_calendar', {'eventId': event.id, 'user': userIdParam}) }}"
                        class="btn btn-outline-danger btn-lg rounded-pill fw-bold py-3">
                         Refuser
                     </a>
                 </div>
 
+                {# Overlay de chargement #}
+                <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="background: rgba(0,0,0,0.5); z-index: 9999; backdrop-filter: blur(2px);">
+                    <div class="d-flex align-items-center justify-content-center h-100">
+                        <div class="text-center text-white">
+                            <div class="spinner-border spinner-border-lg mb-3" role="status" style="width: 3rem; height: 3rem;">
+                                <span class="visually-hidden">Chargement...</span>
+                            </div>
+                            <div class="fs-5 fw-bold">Validation en cours...</div>
+                            <div class="small mt-2 opacity-75">Vérification des disponibilités et réservation de la salle</div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
+
+    <script>
+        document.getElementById('validateForm').addEventListener('submit', function(e) {
+            const btn = document.getElementById('validateBtn');
+            const text = document.getElementById('validateText');
+            const loader = document.getElementById('validateLoader');
+            const overlay = document.getElementById('loadingOverlay');
+
+            // Désactiver le bouton et afficher le loader
+            btn.disabled = true;
+            text.classList.add('d-none');
+            loader.classList.remove('d-none');
+            overlay.classList.remove('d-none');
+
+            // Le formulaire va soumettre normalement, le loader restera jusqu'à la redirection
+        });
+    </script>
 {% endblock %}
