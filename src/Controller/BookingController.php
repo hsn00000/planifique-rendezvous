@@ -721,9 +721,16 @@ class BookingController extends AbstractController
                                         $periodStart = (clone $currentDate)->setTime($period === 'morning' ? 8 : 13, 0, 0);
                                         $periodEnd = (clone $currentDate)->setTime($period === 'morning' ? 13 : 18, 0, 0);
                                         try {
-                                            $outlookDayCache[$cacheKey] = $outlookService->hasAtLeastOneFreeRoomOnOutlook($user, $freeBureauxInBdd, $periodStart, $periodEnd);
+                                            // Limiter le nombre de bureaux vérifiés pour éviter les timeouts
+                                            // Si trop de bureaux, on limite à 10 pour éviter les appels API trop longs
+                                            $bureauxToCheck = count($freeBureauxInBdd) > 10 
+                                                ? array_slice($freeBureauxInBdd, 0, 10) 
+                                                : $freeBureauxInBdd;
+                                            
+                                            $outlookDayCache[$cacheKey] = $outlookService->hasAtLeastOneFreeRoomOnOutlook($user, $bureauxToCheck, $periodStart, $periodEnd);
                                         } catch (\Exception $e) {
                                             // En cas d'erreur/timeout Outlook, on bloque la période par sécurité
+                                            error_log('Erreur Outlook pour ' . $lieu . ' le ' . $currentDate->format('Y-m-d') . ': ' . $e->getMessage());
                                             $outlookDayCache[$cacheKey] = false;
                                         }
                                     }

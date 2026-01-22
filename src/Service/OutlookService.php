@@ -415,6 +415,11 @@ class OutlookService
 
             // Aucune salle libre trouvée
             return false;
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            // Timeout ou erreur réseau : on considère comme non-disponible par sécurité
+            // Log l'erreur pour le débogage (optionnel)
+            error_log('Outlook API error (hasAtLeastOneFreeRoomOnOutlook): ' . $e->getMessage());
+            return false;
 
         } catch (\Exception $e) {
             // En cas d'erreur, on retourne false pour sécurité
