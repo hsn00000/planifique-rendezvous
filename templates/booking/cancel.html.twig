@@ -1,0 +1,114 @@
+{% extends 'base_public.html.twig' %}
+
+{% block title %}Annuler le rendez-vous - Planifique{% endblock %}
+
+{% block body %}
+    <div class="container d-flex align-items-center justify-content-center min-vh-100 py-5">
+        <div class="card border-0 shadow-lg p-5" style="max-width: 600px; border-radius: 20px; width: 100%;">
+
+            {# Logo #}
+            <div class="text-center mb-4">
+                <img src="{{ asset('img/logo.png') }}" alt="Planifique" style="height: 50px; width: auto;">
+            </div>
+
+            {% if not canCancel %}
+                {# RDV déjà passé #}
+                <div class="text-center mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-warning bg-opacity-10 text-warning mb-3" style="width: 70px; height: 70px;">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                    <h1 class="h3 fw-bold text-dark mb-2">Rendez-vous déjà passé</h1>
+                    <p class="text-muted mb-4">
+                        Ce rendez-vous a déjà eu lieu et ne peut plus être annulé.
+                    </p>
+                </div>
+
+                {# Récapitulatif #}
+                <div class="bg-light p-4 rounded-3 text-start mb-4 border">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="far fa-calendar-check text-primary me-3 fs-4" style="width: 30px; text-align: center;"></i>
+                        <div>
+                            <div class="text-uppercase text-muted fw-bold small" style="font-size: 0.7rem;">Date & Heure</div>
+                            <div class="fw-bold text-dark">
+                                {{ rendezvous.dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr')|capitalize }}
+                                <br>
+                                {{ rendezvous.dateDebut|date('H:i') }} - {{ rendezvous.dateFin|date('H:i') }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-user-circle text-primary me-3 fs-4" style="width: 30px; text-align: center;"></i>
+                        <div>
+                            <div class="text-uppercase text-muted fw-bold small" style="font-size: 0.7rem;">Conseiller</div>
+                            <div class="fw-bold text-dark">{{ rendezvous.conseiller.firstName }} {{ rendezvous.conseiller.lastName }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <a href="{{ path('app_home') }}" class="btn btn-primary fw-bold py-3 rounded-pill shadow-sm">
+                        Retour à l'accueil
+                    </a>
+                </div>
+            {% else %}
+                {# Confirmation d'annulation #}
+                <div class="text-center mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 text-danger mb-3" style="width: 70px; height: 70px;">
+                        <i class="fas fa-times-circle fa-2x"></i>
+                    </div>
+                    <h1 class="h3 fw-bold text-dark mb-2">Annuler le rendez-vous</h1>
+                    <p class="text-muted mb-4">
+                        Êtes-vous sûr de vouloir annuler ce rendez-vous ? Cette action est irréversible.
+                    </p>
+                </div>
+
+                {# Récapitulatif du RDV #}
+                <div class="bg-light p-4 rounded-3 text-start mb-4 border">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="far fa-calendar-check text-primary me-3 fs-4" style="width: 30px; text-align: center;"></i>
+                        <div>
+                            <div class="text-uppercase text-muted fw-bold small" style="font-size: 0.7rem;">Date & Heure</div>
+                            <div class="fw-bold text-dark">
+                                {{ rendezvous.dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr')|capitalize }}
+                                <br>
+                                {{ rendezvous.dateDebut|date('H:i') }} - {{ rendezvous.dateFin|date('H:i') }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="fas fa-user-circle text-primary me-3 fs-4" style="width: 30px; text-align: center;"></i>
+                        <div>
+                            <div class="text-uppercase text-muted fw-bold small" style="font-size: 0.7rem;">Conseiller</div>
+                            <div class="fw-bold text-dark">{{ rendezvous.conseiller.firstName }} {{ rendezvous.conseiller.lastName }}</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-stopwatch text-warning me-3 fs-4" style="width: 30px; text-align: center;"></i>
+                        <div>
+                            <div class="text-uppercase text-muted fw-bold small" style="font-size: 0.7rem;">Type</div>
+                            <div class="fw-bold text-dark">{{ rendezvous.evenement.titre }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {# Formulaire d'annulation #}
+                <form action="{{ path('app_booking_cancel_confirm', {'token': rendezvous.cancelToken}) }}" method="POST" class="mb-3">
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger btn-lg fw-bold py-3 rounded-pill shadow-sm">
+                            <i class="fas fa-times me-2"></i>Oui, annuler ce rendez-vous
+                        </button>
+                        <a href="{{ path('app_home') }}" class="btn btn-outline-secondary btn-lg fw-bold py-3 rounded-pill">
+                            Non, conserver ce rendez-vous
+                        </a>
+                    </div>
+                </form>
+
+                <p class="text-center text-muted small mb-0">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Vous pouvez également <a href="{{ path('app_booking_modify', {'token': rendezvous.cancelToken}) }}">modifier ce rendez-vous</a> au lieu de l'annuler.
+                </p>
+            {% endif %}
+
+        </div>
+    </div>
+{% endblock %}

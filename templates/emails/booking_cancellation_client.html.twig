@@ -1,0 +1,109 @@
+{# templates/emails/booking_cancellation_client.html.twig #}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annulation de rendez-vous</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f5f7; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+
+{# CONTENEUR PRINCIPAL CENTRÉ #}
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f5f7;">
+    <tr>
+        <td align="center" style="padding: 40px 10px;">
+
+            {# CARTE BLANCHE #}
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow: hidden;">
+
+                {# 1. EN-TÊTE ROUGE #}
+                <tr>
+                    <td style="background-color: #dc2626; padding: 30px; text-align: center;">
+                        <img src="{{ absolute_url(asset('img/logo.png')) }}" alt="Planifique" width="150" style="max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto; filter: brightness(0) invert(1);">
+                        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Rendez-vous annulé</h1>
+                    </td>
+                </tr>
+
+                {# 2. MESSAGE #}
+                <tr>
+                    <td style="padding: 40px 40px 20px 40px;">
+                        <p style="margin: 0; color: #374151; font-size: 16px; line-height: 24px;">
+                            Bonjour <strong>{{ rdv.prenom }}</strong>,
+                        </p>
+                        <p style="margin: 15px 0 0 0; color: #374151; font-size: 16px; line-height: 24px;">
+                            Votre rendez-vous <strong>{{ rdv.evenement.titre }}</strong> prévu le 
+                            <strong>{{ rdv.dateDebut|format_datetime(pattern="d MMMM yyyy à H:i", locale='fr') }}</strong> 
+                            a été annulé avec succès.
+                        </p>
+                    </td>
+                </tr>
+
+                {# 3. DÉTAILS DU RENDEZ-VOUS ANNULÉ #}
+                <tr>
+                    <td style="padding: 0 40px;">
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+                            <tr>
+                                <td style="padding: 20px;">
+                                    <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 15px;">Rendez-vous annulé</div>
+                                    
+                                    <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                        <tr>
+                                            <td width="30" style="vertical-align: top; padding-right: 15px;">
+                                                <img src="https://img.icons8.com/ios-filled/50/dc2626/calendar--v1.png" width="24" height="24" alt="Date">
+                                            </td>
+                                            <td style="padding-bottom: 15px;">
+                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Date & Heure</div>
+                                                <div style="font-size: 16px; color: #111827; font-weight: 600;">
+                                                    {{ rdv.dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr')|title }}
+                                                </div>
+                                                <div style="font-size: 16px; color: #dc2626; font-weight: 600;">
+                                                    {{ rdv.dateDebut|date('H:i') }} - {{ rdv.dateFin|date('H:i') }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td width="30" style="vertical-align: top; padding-right: 15px;">
+                                                <img src="https://img.icons8.com/ios-filled/50/dc2626/user-male-circle.png" width="24" height="24" alt="Conseiller">
+                                            </td>
+                                            <td>
+                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Conseiller</div>
+                                                <div style="font-size: 16px; color: #111827;">
+                                                    {{ rdv.conseiller.firstName }} {{ rdv.conseiller.lastName }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                {# 4. MESSAGE FINAL #}
+                <tr>
+                    <td style="padding: 30px 40px;">
+                        <p style="margin: 0; color: #374151; font-size: 15px; line-height: 24px; text-align: center;">
+                            Si vous souhaitez prendre un nouveau rendez-vous, n'hésitez pas à revenir sur notre site.
+                        </p>
+                    </td>
+                </tr>
+
+                {# 5. PIED DE PAGE #}
+                <tr>
+                    <td style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                            Cette annulation est définitive.
+                        </p>
+                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #d1d5db;">
+                            &copy; {{ 'now'|date('Y') }} Planifique - Tous droits réservés.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

@@ -1,22 +1,23 @@
 {% extends 'base_public.html.twig' %}
 
-{% block title %}Valider le rendez-vous{% endblock %}
+{% block title %}Récapitulatif - Planifique{% endblock %}
 
 {% block body %}
-    <div class="d-flex align-items-center justify-content-center min-vh-100 py-5" style="background-color: #f8f9fa;">
-        <div class="card border-0 shadow-lg overflow-hidden" style="max-width: 600px; width: 100%; border-radius: 16px;">
+    <div class="container d-flex align-items-center justify-content-center min-vh-100 py-5">
+        <div class="card border-0 shadow-lg" style="max-width: 650px; width: 100%; border-radius: 16px; overflow: hidden;">
 
-            {# En-tête #}
-            <div class="p-5 text-center text-white" style="background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);">
-                <h1 class="h3 fw-bold mb-2">Récapitulatif</h1>
-                <p class="opacity-75 mb-0">Vérifiez les détails avant de confirmer.</p>
+            {# En-tête simple avec logo #}
+            <div class="p-4 text-center border-bottom bg-white">
+                <img src="{{ asset('img/logo.png') }}" alt="Planifique" style="height: 40px; width: auto;" class="mb-3">
+                <h1 class="h4 fw-bold text-dark mb-1">Récapitulatif</h1>
+                <p class="text-muted small mb-0">Vérifiez les informations avant de confirmer</p>
             </div>
 
-            <div class="p-5 bg-white">
+            <div class="p-4 p-md-5 bg-white">
 
-                {# Bloc Conseiller #}
+                {# Conseiller #}
                 <div class="d-flex align-items-center mb-4 pb-4 border-bottom">
-                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-light text-primary fw-bold me-3" style="width: 60px; height: 60px; font-size: 1.5rem;">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 text-primary fw-bold me-3" style="width: 55px; height: 55px; font-size: 1.3rem;">
                         {% if conseiller %}
                             {{ conseiller.firstName|first }}{{ conseiller.lastName|first }}
                         {% else %}
@@ -24,84 +25,114 @@
                         {% endif %}
                     </div>
                     <div>
-                        <div class="small text-muted text-uppercase fw-bold">Rendez-vous avec</div>
-                        <div class="fs-5 fw-bold text-dark">
+                        <div class="small text-muted text-uppercase fw-bold mb-1">Rendez-vous avec</div>
+                        <div class="h5 fw-bold text-dark mb-0">
                             {% if conseiller %}
                                 {{ conseiller.firstName }} {{ conseiller.lastName }}
                             {% else %}
-                                Votre équipe {{ event.groupe.nom }}
+                                Votre équipe
+                                <div class="text-muted small fw-normal mt-1">{{ event.groupe.nom|default('Service Client') }}</div>
                             {% endif %}
                         </div>
                     </div>
                 </div>
 
-                {# Bloc Date et Heure #}
+                {# Type d'événement #}
                 <div class="mb-4">
-                    <div class="d-flex mb-3">
-                        <div class="me-3 text-center" style="width: 24px;"><i class="far fa-calendar-alt text-primary fs-5"></i></div>
+                    <div class="small text-muted text-uppercase fw-bold mb-2">Type de rendez-vous</div>
+                    <div class="fw-bold text-dark">{{ event.titre }}</div>
+                </div>
+
+                {# Date et Heure - Style épuré #}
+                <div class="mb-4">
+                    <div class="d-flex align-items-start mb-3">
+                        <i class="far fa-calendar-alt text-primary me-3 mt-1" style="width: 20px;"></i>
                         <div>
-                            <div class="fw-bold text-dark text-capitalize">{{ dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr') }}</div>
-                        </div>
-                    </div>
-                    <div class="d-flex mb-3">
-                        <div class="me-3 text-center" style="width: 24px;"><i class="far fa-clock text-primary fs-5"></i></div>
-                        <div>
-                            <div class="fw-bold text-dark">{{ dateDebut|date('H:i') }} - {{ dateFin|date('H:i') }}</div>
-                            <div class="small text-muted">
-                                Durée :
-                                {% set hours = (event.duree / 60)|round(0, 'floor') %}
-                                {% set minutes = event.duree % 60 %}
-                                <span class="fw-bold">
-                                {% if hours > 0 %}{{ hours }} h {% endif %}{{ minutes > 0 ? minutes ~ ' min' : '' }}
-                            </span>
+                            <div class="small text-muted text-uppercase fw-bold mb-1">Date</div>
+                            <div class="fw-bold text-dark text-capitalize">
+                                {{ dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr') }}
                             </div>
                         </div>
                     </div>
-                    <div class="d-flex">
-                        <div class="me-3 text-center" style="width: 24px;"><i class="fas fa-map-marker-alt text-primary fs-5"></i></div>
+                    
+                    <div class="d-flex align-items-start mb-3">
+                        <i class="far fa-clock text-primary me-3 mt-1" style="width: 20px;"></i>
                         <div>
-                            <div class="fw-bold text-dark">{{ lieu }}</div>
+                            <div class="small text-muted text-uppercase fw-bold mb-1">Horaire</div>
+                            <div class="fw-bold text-primary fs-5">{{ dateDebut|date('H:i') }} - {{ dateFin|date('H:i') }}</div>
+                            <div class="text-muted small mt-1">
+                                Durée :
+                                {% set hours = (event.duree / 60)|round(0, 'floor') %}
+                                {% set minutes = event.duree % 60 %}
+                                <span class="fw-bold text-dark">
+                                    {% if hours > 0 %}{{ hours }} h {% endif %}{{ minutes > 0 ? minutes ~ ' min' : '' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-start">
+                        <i class="fas fa-map-marker-alt text-primary me-3 mt-1" style="width: 20px;"></i>
+                        <div>
+                            <div class="small text-muted text-uppercase fw-bold mb-1">Lieu</div>
+                            <div class="fw-bold text-dark">
+                                {% if lieu == 'visio' %}
+                                    En visioconférence (Teams/Zoom)
+                                {% elseif lieu == 'Cabinet-geneve' %}
+                                    Cabinet de Genève
+                                {% elseif lieu == 'Cabinet-archamps' %}
+                                    Cabinet d'Archamps
+                                {% else %}
+                                    {{ lieu }}
+                                {% endif %}
+                            </div>
+                            {% if client.adresse is defined and client.adresse %}
+                                <div class="text-muted small mt-1">{{ client.adresse }}</div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
 
-                {# Bloc Vos Infos #}
-                <div class="bg-light p-3 rounded-3 mb-5 border">
+                {# Coordonnées client #}
+                <div class="bg-light p-3 rounded mb-4">
                     <div class="small text-muted text-uppercase fw-bold mb-2">Vos coordonnées</div>
-                    <div class="fw-bold text-dark">{{ client.prenom }} {{ client.nom }}</div>
-                    <div class="text-secondary small">{{ client.email }}</div>
-                    <div class="text-secondary small">{{ client.telephone }}</div>
+                    <div class="fw-bold text-dark mb-1">{{ client.prenom }} {{ client.nom }}</div>
+                    <div class="text-muted small">{{ client.email }}</div>
+                    <div class="text-muted small">{{ client.telephone }}</div>
                 </div>
 
                 {# Boutons d'action #}
-                <div class="d-grid gap-3">
-                    {# BOUTON VALIDER avec loader #}
-                    <form id="validateForm" action="{{ path('app_booking_finalize', {'eventId': event.id, 'date': dateParam, 'user': userIdParam}) }}" method="GET">
+                <div class="d-grid gap-2">
+                    <form id="validateForm" action="{{ path('app_booking_finalize', {'eventId': event.id}) }}" method="GET">
+                        <input type="hidden" name="date" value="{{ dateParam }}">
+                        {% if userIdParam %}
+                            <input type="hidden" name="user" value="{{ userIdParam }}">
+                        {% endif %}
                         <button type="submit" id="validateBtn" class="btn btn-primary btn-lg rounded-pill fw-bold py-3 shadow-sm w-100 position-relative" style="min-height: 56px;">
-                            <span id="validateText">Valider</span>
+                            <span id="validateText">
+                                <i class="fas fa-check-circle me-2"></i>Confirmer ce rendez-vous
+                            </span>
                             <span id="validateLoader" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);"></span>
                         </button>
                     </form>
 
-                    {# BOUTON REFUSER #}
                     <a href="{{ path('app_booking_calendar', {'eventId': event.id, 'user': userIdParam}) }}"
-                       class="btn btn-outline-danger btn-lg rounded-pill fw-bold py-3">
-                        Refuser
+                       class="btn btn-outline-secondary btn-lg rounded-pill fw-bold py-3">
+                        <i class="fas fa-arrow-left me-2"></i>Retour au calendrier
                     </a>
                 </div>
 
-                {# Overlay de chargement #}
-                <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center bg-white" style="z-index: 9999; pointer-events: auto;">
-                    <div class="text-center">
-                        <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
-                            <span class="visually-hidden">Chargement...</span>
-                        </div>
-                        <h5 class="fw-bold text-dark mb-2">Validation en cours</h5>
-                        <p class="text-muted small mb-0">Vérification des disponibilités et réservation de la salle...</p>
-                        <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Veuillez patienter</p>
-                    </div>
-                </div>
+            </div>
+        </div>
 
+        {# Overlay de chargement #}
+        <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center" style="background: rgba(255, 255, 255, 0.95); z-index: 9999; backdrop-filter: blur(4px);">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Chargement...</span>
+                </div>
+                <h5 class="fw-bold text-dark mb-2">Validation en cours</h5>
+                <p class="text-muted small mb-0">Veuillez patienter...</p>
             </div>
         </div>
     </div>
@@ -113,13 +144,21 @@
             const loader = document.getElementById('validateLoader');
             const overlay = document.getElementById('loadingOverlay');
 
+            // Log pour debug AVANT de désactiver
+            console.log('=== DÉBUT VALIDATION ===');
+            console.log('Formulaire action:', this.action);
+            console.log('Méthode:', this.method);
+            console.log('Date param:', '{{ dateParam }}');
+            
             // Désactiver le bouton et afficher le loader
             btn.disabled = true;
+            btn.style.opacity = '0.7';
             text.classList.add('d-none');
             loader.classList.remove('d-none');
             overlay.classList.remove('d-none');
-
+            
             // Le formulaire va soumettre normalement, le loader restera jusqu'à la redirection
+            // Ne pas empêcher la soumission avec e.preventDefault()
         });
     </script>
 {% endblock %}

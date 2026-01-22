@@ -1,0 +1,507 @@
+{% extends 'base_public.html.twig' %}
+
+{% block title %}Modifier le rendez-vous - Planifique{% endblock %}
+
+{% block body %}
+    <div class="container d-flex align-items-center justify-content-center min-vh-100 py-5">
+
+        <div class="card border-0 shadow-lg overflow-hidden" style="border-radius: 16px; width: 100%; max-width: 1000px; min-height: 600px;">
+            <div class="row g-0 h-100">
+
+                {# --- GAUCHE --- #}
+                <div class="col-lg-4 bg-white border-end p-4 p-md-5 d-flex flex-column">
+                    <div class="mb-5">
+                        <img src="{{ asset('img/logo.png') }}" alt="Planifique" style="height: 40px; width: auto;">
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="alert alert-info border-0 rounded-pill px-3 py-2 mb-4" style="background-color: #e3f2fd;">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <small class="fw-bold">Modification de rendez-vous</small>
+                        </div>
+
+                        <div class="text-muted small text-uppercase fw-bold ls-1 mb-2">Rendez-vous actuel</div>
+
+                        <div class="d-flex align-items-center mb-4">
+                            {% if rendezvous.conseiller %}
+                                <div class="avatar-initials me-3">{{ rendezvous.conseiller.firstName|first }}{{ rendezvous.conseiller.lastName|first }}</div>
+                                <div class="fw-bold text-dark h5 mb-0">{{ rendezvous.conseiller.firstName }} {{ rendezvous.conseiller.lastName }}</div>
+                            {% else %}
+                                <div class="avatar-initials me-3 bg-warning text-dark"><i class="fas fa-users"></i></div>
+                                <div>
+                                    <div class="fw-bold text-dark h5 mb-0">Notre Équipe</div>
+                                    <small class="text-muted">{{ event.groupe.nom|default('Service Client') }}</small>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <h1 class="fw-bold h4 mb-3 text-dark">{{ event.titre }}</h1>
+
+                        <div class="bg-light p-3 rounded-3 mb-3 border">
+                            <div class="text-muted small text-uppercase fw-bold mb-2">Date actuelle</div>
+                            <div class="fw-bold text-dark">
+                                {{ rendezvous.dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr')|capitalize }}
+                                <br>
+                                <span class="text-primary">{{ rendezvous.dateDebut|date('H:i') }} - {{ rendezvous.dateFin|date('H:i') }}</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center text-secondary mb-2">
+                            <i class="far fa-clock me-3 text-muted" style="width: 20px; text-align: center;"></i>
+                            <span class="fw-bold text-dark">
+                                {% set hours = (event.duree / 60)|round(0, 'floor') %}
+                                {% set minutes = event.duree % 60 %}
+                                {% if hours > 0 %}{{ hours }}h {% endif %}{{ minutes > 0 ? minutes ~ 'min' : '' }}
+                            </span>
+                        </div>
+
+                        {% if lieuChoisi is defined %}
+                            <div class="d-flex align-items-center text-secondary mb-2">
+                                <i class="fas fa-map-marker-alt me-3 text-muted" style="width: 20px; text-align: center;"></i>
+                                <span class="fw-bold text-dark">{{ lieuChoisi }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-auto">
+                        <a href="{{ path('app_booking_cancel', {'token': rendezvous.cancelToken}) }}" class="btn btn-outline-danger btn-sm rounded-pill">
+                            <i class="fas fa-times me-1"></i>Annuler ce rendez-vous
+                        </a>
+                    </div>
+                </div>
+
+                {# --- DROITE : CALENDRIER --- #}
+                <div class="col-lg-8 bg-light p-4 p-md-5 d-flex flex-column">
+                    <div class="mb-4">
+                        <h2 class="h5 fw-bold text-dark mb-2">Choisir une nouvelle date</h2>
+                        <p class="text-muted small mb-0">Sélectionnez un nouveau créneau horaire pour votre rendez-vous.</p>
+                    </div>
+
+                    {# Loader initial #}
+                    <div id="calendar-loader" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white" style="z-index: 1000; border-radius: 0 16px 16px 0;">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                                <span class="visually-hidden">Chargement...</span>
+                            </div>
+                            <div class="fw-bold text-dark">Chargement en cours</div>
+                            <div class="text-muted">Préparation du calendrier...</div>
+                            <div class="text-muted small">Veuillez patienter</div>
+                        </div>
+                    </div>
+
+                    {# Container calendrier #}
+                    <div id="calendar-container" class="flex-grow-1" style="opacity: 0; pointer-events: none; visibility: hidden;">
+                        {# Navigation mois #}
+                        <div class="d-flex align-items-center justify-content-between mb-4">
+                            <button id="prev-month-btn" class="btn btn-outline-secondary rounded-pill" style="width: 45px; height: 45px;">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <h3 id="current-month-label" class="h5 fw-bold text-dark mb-0 text-center flex-grow-1"></h3>
+                            <button id="next-month-btn" class="btn btn-outline-secondary rounded-pill" style="width: 45px; height: 45px;">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+
+                        {# Grille des mois #}
+                        <div id="months-wrapper" class="position-relative">
+                            {% for slot in slotsByDay %}
+                                <div class="month-grid" data-month-key="{{ slot.label|date('Y-m') }}" data-loaded="true" data-label="{{ slot.label|date('Y-m') }}" data-index="{{ loop.index0 }}" style="display: {% if loop.index0 == 0 %}block{% else %}none{% endif %};">
+                                    <div class="calendar-grid mb-4">
+                                        <div class="d-flex text-center text-muted small fw-bold mb-2">
+                                            <div class="flex-fill">Lun</div>
+                                            <div class="flex-fill">Mar</div>
+                                            <div class="flex-fill">Mer</div>
+                                            <div class="flex-fill">Jeu</div>
+                                            <div class="flex-fill">Ven</div>
+                                            <div class="flex-fill">Sam</div>
+                                            <div class="flex-fill">Dim</div>
+                                        </div>
+                                        <div class="calendar-days">
+                                            {% set startPadding = (slot.label|date('N') - 1) %}
+                                            {% for i in range(1, startPadding) %}
+                                                <div class="day-placeholder"></div>
+                                            {% endfor %}
+                                            {% for day in slot.days %}
+                                                {% if day.isPast %}
+                                                    <div class="day-disabled">{{ day.dayNum }}</div>
+                                                {% elseif day.hasAvailability %}
+                                                    <button type="button" class="btn-day" onclick="selectDate('{{ day.dateValue }}')" data-date="{{ day.dateValue }}">
+                                                        <div class="day-num">{{ day.dayNum }}</div>
+                                                        <div class="day-slots">
+                                                            {% for slot in day.slots|slice(0, 3) %}
+                                                                <span class="slot-dot"></span>
+                                                            {% endfor %}
+                                                            {% if day.slots|length > 3 %}
+                                                                <span class="slot-more">+{{ day.slots|length - 3 }}</span>
+                                                            {% endif %}
+                                                        </div>
+                                                    </button>
+                                                {% else %}
+                                                    <div class="day-disabled">{{ day.dayNum }}</div>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+
+                            {# Placeholder pour les mois chargés en AJAX #}
+                            <div id="month-loading" class="text-center py-5" style="display: none;">
+                                <div class="spinner-border text-primary mb-3" role="status">
+                                    <span class="visually-hidden">Chargement...</span>
+                                </div>
+                                <div class="fw-bold text-dark">Chargement en cours</div>
+                                <div class="text-muted">Préparation du mois...</div>
+                                <div class="text-muted small">Veuillez patienter</div>
+                            </div>
+                        </div>
+
+                        {# Panel des créneaux horaires #}
+                        <div id="slots-panel" class="mt-4 border-top pt-4" style="display: none;">
+                            <h4 class="h6 fw-bold text-dark mb-3">Sélectionner un horaire</h4>
+                            <div class="d-flex" style="max-height: 300px;">
+                                <div class="flex-grow-1 overflow-auto custom-scrollbar pe-2">
+                                    <div class="d-grid gap-2" id="slots-list"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Loader pour la sélection de créneau #}
+    <div id="slot-loading" class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center bg-white" style="z-index: 9999; backdrop-filter: blur(2px);">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+            <div class="fw-bold text-dark">Traitement en cours</div>
+            <div class="text-muted">Modification de votre rendez-vous...</div>
+            <div class="text-muted small">Veuillez patienter</div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let calendarReady = false;
+        let currentIndex = 0;
+        let months = Array.from(document.querySelectorAll('.month-grid[data-loaded="true"]'));
+        const label = document.getElementById('current-month-label');
+        const prevBtn = document.getElementById('prev-month-btn');
+        const nextBtn = document.getElementById('next-month-btn');
+        const slotsPanel = document.getElementById('slots-panel');
+        const monthsWrapper = document.getElementById('months-wrapper');
+        const monthLoading = document.getElementById('month-loading');
+        const eventId = {{ event.id }};
+        const userId = {{ userId|default('null') }};
+        const limiteMois = {{ event.limiteMoisReservation|default(12) }};
+        const loadedMonths = new Set();
+        const rendezvousId = {{ rendezvous.id }};
+        const cancelToken = '{{ rendezvous.cancelToken }}';
+
+        // Initialiser le label du mois
+        if (months.length > 0 && months[0].dataset.label) {
+            label.textContent = formatMonthLabel(months[0].dataset.label);
+        }
+
+        function formatMonthLabel(monthKey) {
+            const [year, month] = monthKey.split('-').map(Number);
+            const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+            return months[month - 1] + ' ' + year;
+        }
+
+        function updateCalendar() {
+            months.forEach((month, idx) => {
+                month.style.display = (idx === currentIndex) ? 'block' : 'none';
+            });
+
+            if (months.length > 0 && months[currentIndex]) {
+                label.textContent = formatMonthLabel(months[currentIndex].dataset.label || months[currentIndex].dataset.monthKey);
+            }
+
+            // Activer les boutons seulement si le calendrier est prêt
+            if (calendarReady) {
+                prevBtn.disabled = (currentIndex === 0);
+                nextBtn.disabled = (currentIndex >= limiteMois - 1);
+                prevBtn.style.opacity = (currentIndex === 0) ? '0.3' : '1';
+                nextBtn.style.opacity = (currentIndex >= limiteMois - 1) ? '0.3' : '1';
+            } else {
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+                prevBtn.style.opacity = '0.3';
+                nextBtn.style.opacity = '0.3';
+            }
+        }
+
+        async function loadMonth(monthKey) {
+            if (loadedMonths.has(monthKey)) {
+                return;
+            }
+
+            loadedMonths.add(monthKey);
+            monthLoading.style.display = 'block';
+
+            try {
+                const url = '{{ path('app_booking_calendar_month', {'eventId': event.id}) }}&month=' + monthKey;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error('Erreur de chargement');
+                }
+
+                const data = await response.json();
+                const monthElement = createMonthElement(data, monthKey);
+                monthsWrapper.appendChild(monthElement);
+                months = Array.from(document.querySelectorAll('.month-grid[data-loaded="true"]'));
+                monthLoading.style.display = 'none';
+            } catch (error) {
+                console.error('Erreur lors du chargement du mois:', error);
+                monthLoading.style.display = 'none';
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-danger';
+                errorDiv.textContent = 'Erreur de chargement. Veuillez réessayer.';
+                monthsWrapper.appendChild(errorDiv);
+            }
+        }
+
+        function createMonthElement(monthData, monthKey) {
+            const div = document.createElement('div');
+            div.className = 'month-grid';
+            div.dataset.monthKey = monthKey;
+            div.dataset.loaded = 'true';
+            div.dataset.label = monthData.label;
+            div.dataset.index = getIndexFromMonthKey(monthKey);
+            div.style.display = 'none';
+
+            const [year, month] = monthKey.split('-').map(Number);
+            const firstDay = new Date(year, month - 1, 1);
+            const startPadding = (firstDay.getDay() + 6) % 7;
+
+            let html = '<div class="calendar-grid mb-4">';
+            html += '<div class="d-flex text-center text-muted small fw-bold mb-2">';
+            html += '<div class="flex-fill">Lun</div><div class="flex-fill">Mar</div><div class="flex-fill">Mer</div>';
+            html += '<div class="flex-fill">Jeu</div><div class="flex-fill">Ven</div><div class="flex-fill">Sam</div><div class="flex-fill">Dim</div>';
+            html += '</div><div class="calendar-days">';
+
+            for (let i = 0; i < startPadding; i++) {
+                html += '<div class="day-placeholder"></div>';
+            }
+
+            if (monthData.days && monthData.days.length > 0) {
+                monthData.days.forEach(day => {
+                    if (day.isPast) {
+                        html += `<div class="day-disabled">${day.dayNum}</div>`;
+                    } else if (day.hasAvailability) {
+                        html += `<button type="button" class="btn-day" onclick="selectDate('${day.dateValue}')" data-date="${day.dateValue}">`;
+                        html += `<div class="day-num">${day.dayNum}</div>`;
+                        html += '<div class="day-slots">';
+                        const slots = day.slots || [];
+                        slots.slice(0, 3).forEach(() => {
+                            html += '<span class="slot-dot"></span>';
+                        });
+                        if (slots.length > 3) {
+                            html += `<span class="slot-more">+${slots.length - 3}</span>`;
+                        }
+                        html += '</div></button>';
+                    } else {
+                        html += `<div class="day-disabled">${day.dayNum}</div>`;
+                    }
+                });
+            } else {
+                const daysInMonth = new Date(year, month, 0).getDate();
+                for (let i = 1; i <= daysInMonth; i++) {
+                    html += '<div class="day-disabled">' + i + '</div>';
+                }
+            }
+
+            html += '</div></div>';
+            div.innerHTML = html;
+            return div;
+        }
+
+        function getMonthKeyFromIndex(index) {
+            const now = new Date();
+            const targetMonth = new Date(now.getFullYear(), now.getMonth() + index, 1);
+            return targetMonth.getFullYear() + '-' + String(targetMonth.getMonth() + 1).padStart(2, '0');
+        }
+
+        function getIndexFromMonthKey(monthKey) {
+            const [year, month] = monthKey.split('-').map(Number);
+            const now = new Date();
+            const targetDate = new Date(year, month - 1, 1);
+            const currentDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            const diffMonths = (targetDate.getFullYear() - currentDate.getFullYear()) * 12 + (targetDate.getMonth() - currentDate.getMonth());
+            return diffMonths;
+        }
+
+        async function changeMonth(dir) {
+            if (!calendarReady) return false;
+
+            const newIndex = currentIndex + dir;
+            if (newIndex < 0 || newIndex >= limiteMois) return false;
+
+            const targetMonthKey = getMonthKeyFromIndex(newIndex);
+            if (!loadedMonths.has(targetMonthKey)) {
+                await loadMonth(targetMonthKey);
+                months = Array.from(document.querySelectorAll('.month-grid[data-loaded="true"]'));
+            }
+
+            currentIndex = newIndex;
+            updateCalendar();
+            closeSlots();
+        }
+
+        function showCalendar() {
+            const loader = document.getElementById('calendar-loader');
+            const container = document.getElementById('calendar-container');
+
+            setTimeout(() => {
+                loader.style.opacity = '0';
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    loader.style.visibility = 'hidden';
+                    loader.style.pointerEvents = 'none';
+                    container.style.opacity = '1';
+                    container.style.pointerEvents = 'auto';
+                    container.style.visibility = 'visible';
+                    calendarReady = true;
+                    updateCalendar();
+                }, 300);
+            }, 500);
+        }
+
+        function initCalendar() {
+            document.addEventListener('DOMContentLoaded', showCalendar);
+        }
+
+        initCalendar();
+
+        setTimeout(() => {
+            calendarReady = true;
+            updateCalendar();
+            const loader = document.getElementById('calendar-loader');
+            const container = document.getElementById('calendar-container');
+            if (loader && container) {
+                loader.style.display = 'none';
+                container.style.opacity = '1';
+                container.style.pointerEvents = 'auto';
+                container.style.visibility = 'visible';
+            }
+        }, 1000);
+
+        prevBtn.addEventListener('click', () => changeMonth(-1));
+        nextBtn.addEventListener('click', () => changeMonth(1));
+
+        function selectDate(dateValue) {
+            if (!calendarReady) return;
+
+            document.getElementById('slot-loading').classList.remove('d-none');
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ path('app_booking_modify_confirm', {'token': rendezvous.cancelToken}) }}';
+            
+            const dateInput = document.createElement('input');
+            dateInput.type = 'hidden';
+            dateInput.name = 'date';
+            dateInput.value = dateValue;
+            form.appendChild(dateInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        function closeSlots() {
+            slotsPanel.style.display = 'none';
+        }
+    </script>
+
+    <style>
+        .calendar-grid { margin-bottom: 1.5rem; }
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+        .day-placeholder { height: 60px; }
+        .day-disabled {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #d1d5db;
+            font-weight: 500;
+            border-radius: 8px;
+            background-color: #f9fafb;
+        }
+        .btn-day {
+            height: 60px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+        }
+        .btn-day:hover {
+            border-color: #2563eb;
+            background-color: #eff6ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(37, 99, 235, 0.15);
+        }
+        .day-num {
+            font-weight: 600;
+            color: #111827;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+        .day-slots {
+            display: flex;
+            gap: 2px;
+            align-items: center;
+        }
+        .slot-dot {
+            width: 4px;
+            height: 4px;
+            background-color: #2563eb;
+            border-radius: 50%;
+        }
+        .slot-more {
+            font-size: 9px;
+            color: #6b7280;
+            font-weight: 600;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .avatar-initials {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+    </style>
+{% endblock %}

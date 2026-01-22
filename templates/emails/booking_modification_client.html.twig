@@ -1,0 +1,153 @@
+{# templates/emails/booking_modification_client.html.twig #}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modification de rendez-vous</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f5f7; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+
+{# CONTENEUR PRINCIPAL CENTRÉ #}
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f5f7;">
+    <tr>
+        <td align="center" style="padding: 40px 10px;">
+
+            {# CARTE BLANCHE #}
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow: hidden;">
+
+                {# 1. EN-TÊTE BLEU #}
+                <tr>
+                    <td style="background-color: #2563eb; padding: 30px; text-align: center;">
+                        <img src="{{ absolute_url(asset('img/logo.png')) }}" alt="Planifique" width="150" style="max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto; filter: brightness(0) invert(1);">
+                        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Rendez-vous modifié</h1>
+                    </td>
+                </tr>
+
+                {# 2. MESSAGE #}
+                <tr>
+                    <td style="padding: 40px 40px 20px 40px;">
+                        <p style="margin: 0; color: #374151; font-size: 16px; line-height: 24px;">
+                            Bonjour <strong>{{ rdv.prenom }}</strong>,
+                        </p>
+                        <p style="margin: 15px 0 0 0; color: #374151; font-size: 16px; line-height: 24px;">
+                            Votre rendez-vous <strong>{{ rdv.evenement.titre }}</strong> a été modifié avec succès.
+                        </p>
+                    </td>
+                </tr>
+
+                {# 3. COMPARAISON ANCIENNE / NOUVELLE DATE #}
+                <tr>
+                    <td style="padding: 0 40px;">
+                        {# Ancienne date #}
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 15px;">
+                            <tr>
+                                <td style="padding: 20px;">
+                                    <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 10px;">Ancienne date</div>
+                                    <div style="font-size: 16px; color: #6b7280; font-weight: 600;">
+                                        {{ oldDateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr')|title }}
+                                    </div>
+                                    <div style="font-size: 16px; color: #9ca3af;">
+                                        {{ oldDateDebut|date('H:i') }} - {{ oldDateFin|date('H:i') }}
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        {# Flèche #}
+                        <div style="text-align: center; margin: 10px 0;">
+                            <i class="fas fa-arrow-down" style="color: #2563eb; font-size: 24px;"></i>
+                        </div>
+
+                        {# Nouvelle date #}
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #eff6ff; border-radius: 8px; border: 2px solid #2563eb;">
+                            <tr>
+                                <td style="padding: 20px;">
+                                    <div style="font-size: 12px; color: #2563eb; text-transform: uppercase; font-weight: bold; margin-bottom: 10px;">Nouvelle date</div>
+                                    <div style="font-size: 16px; color: #111827; font-weight: 600;">
+                                        {{ rdv.dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr')|title }}
+                                    </div>
+                                    <div style="font-size: 16px; color: #2563eb; font-weight: 600;">
+                                        {{ rdv.dateDebut|date('H:i') }} - {{ rdv.dateFin|date('H:i') }}
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                {# 4. DÉTAILS COMPLETS #}
+                <tr>
+                    <td style="padding: 30px 40px 20px 40px;">
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+                            <tr>
+                                <td style="padding: 20px;">
+                                    <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                        <tr>
+                                            <td width="30" style="vertical-align: top; padding-right: 15px; padding-bottom: 15px;">
+                                                <img src="https://img.icons8.com/ios-filled/50/2563eb/user-male-circle.png" width="24" height="24" alt="Conseiller">
+                                            </td>
+                                            <td style="padding-bottom: 15px;">
+                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Conseiller</div>
+                                                <div style="font-size: 16px; color: #111827;">
+                                                    {{ rdv.conseiller.firstName }} {{ rdv.conseiller.lastName }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td width="30" style="vertical-align: top; padding-right: 15px;">
+                                                <img src="https://img.icons8.com/ios-filled/50/2563eb/marker.png" width="24" height="24" alt="Lieu">
+                                            </td>
+                                            <td>
+                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Lieu</div>
+                                                <div style="font-size: 16px; color: #111827; font-weight: 600;">
+                                                    {% if rdv.typeLieu == 'Visioconférence' %}
+                                                        🌐 En visioconférence (Teams/Zoom)
+                                                    {% else %}
+                                                        📍 {{ rdv.typeLieu }}
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                {# 5. ACTIONS RAPIDES #}
+                <tr>
+                    <td style="padding: 0 40px 30px 40px;">
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                            <tr>
+                                <td align="center">
+                                    <a href="{{ absolute_url(path('app_booking_cancel', {'token': rdv.cancelToken})) }}" 
+                                       style="display: inline-block; background-color: transparent; color: #dc2626; text-decoration: none; padding: 12px 24px; border: 2px solid #dc2626; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                                        <i class="fas fa-times" style="margin-right: 8px;"></i>Annuler ce rendez-vous
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                {# 6. PIED DE PAGE #}
+                <tr>
+                    <td style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                            Un nouveau fichier ICS a été joint à cet email avec les nouvelles informations.
+                        </p>
+                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #d1d5db;">
+                            &copy; {{ 'now'|date('Y') }} Planifique - Tous droits réservés.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

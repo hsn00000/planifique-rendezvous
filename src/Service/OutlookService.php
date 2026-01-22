@@ -150,6 +150,137 @@ class OutlookService
     }
 
     /**
+     * Supprime un événement Outlook
+     */
+    public function deleteEventFromCalendar(User $user, RendezVous $rendezVous): void
+    {
+        if (!$rendezVous->getOutlookId()) {
+            return; // Pas d'événement Outlook à supprimer
+        }
+
+        $account = $this->accountRepo->findOneBy(['user' => $user]);
+        if (!$account || !$account->getAccessToken()) {
+            return;
+        }
+
+        $this->refreshAccessTokenIfExpired($account);
+        $token = $account->getAccessToken();
+
+        try {
+            $client = new \GuzzleHttp\Client();
+            $client->delete('https://graph.microsoft.com/v1.0/me/events/' . $rendezVous->getOutlookId(), [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            // Logger l'erreur si besoin
+            error_log('Erreur lors de la suppression Outlook: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Met à jour un événement Outlook
+     */
+    public function updateEventInCalendar(User $user, RendezVous $rendezVous): void
+    {
+        if (!$rendezVous->getOutlookId()) {
+            // Si pas d'ID Outlook, créer un nouvel événement
+            $this->addEventToCalendar($user, $rendezVous);
+            return;
+        }
+
+        $account = $this->accountRepo->findOneBy(['user' => $user]);
+        if (!$account || !$account->getAccessToken()) {
+            return;
+        }
+
+        $this->refreshAccessTokenIfExpired($account);
+        $token = $account->getAccessToken();
+
+        // Préparer les données de l'événement (même structure que addEventToCalendar)
+        $attendees = [];
+        if ($rendezVous->getBureau() && $rendezVous->getBureau()->getEmail()) {
+            $attendees[] = [
+                'emailAddress' => [
+                    'address' => $rendezVous->getBureau()->getEmail(),
+                    'name'    => $rendezVous->getBureau()->getNom(),
+                ],
+                'type' => 'resource',
+            ];
+        }
+
+        $lieuTexte = $rendezVous->getTypeLieu();
+        $adresseTexte = $rendezVous->getAdresse() ?: '';
+        if (strcasecmp($lieuTexte, 'Cabinet-geneve') === 0) {
+            $adresseTexte = 'Chemin du Pavillon 2, 1218 Le Grand-Saconnex';
+        } elseif (strcasecmp($lieuTexte, 'Cabinet-archamps') === 0) {
+            $adresseTexte = '160 Rue Georges de Mestral, 74160 Archamps, France';
+        }
+        $lieuComplet = $lieuTexte . ($adresseTexte ? ' - ' . $adresseTexte : '');
+        $bureauNom = $rendezVous->getBureau() ? $rendezVous->getBureau()->getNom() : 'N/A';
+
+        $eventData = [
+            'subject' => 'RDV: ' . $rendezVous->getEvenement()->getTitre() . ' - ' .
+                $rendezVous->getPrenom() . ' ' . $rendezVous->getNom(),
+            'hideAttendees' => true,
+            'body' => [
+                'contentType' => 'HTML',
+                'content' => sprintf(
+                    '<div style="font-family:Segoe UI,Arial,sans-serif;">
+                        <h2 style="margin:0 0 12px 0;color:#0b4db7;">Rendez-vous confirmé</h2>
+                        <p style="margin:0 0 12px 0;">Bonjour %s %s,</p>
+                        <p style="margin:0 0 12px 0;">Récapitulatif (interne) :</p>
+                        <table style="border-collapse:collapse;width:100%%;max-width:520px;">
+                            <tr><td style="padding:6px 0;color:#666;">Type</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s</td></tr>
+                            <tr><td style="padding:6px 0;color:#666;">Date</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s</td></tr>
+                            <tr><td style="padding:6px 0;color:#666;">Horaire</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s - %s</td></tr>
+                            <tr><td style="padding:6px 0;color:#666;">Conseiller</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s %s</td></tr>
+                            <tr><td style="padding:6px 0;color:#666;">Lieu</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s</td></tr>
+                            <tr><td style="padding:6px 0;color:#666;">Bureau</td><td style="padding:6px 0;font-weight:600;color:#111;text-align:right;">%s</td></tr>
+                        </table>
+                    </div>',
+                    $rendezVous->getPrenom(),
+                    $rendezVous->getNom(),
+                    $rendezVous->getEvenement()->getTitre(),
+                    $rendezVous->getDateDebut()->format('d/m/Y'),
+                    $rendezVous->getDateDebut()->format('H:i'),
+                    $rendezVous->getDateFin()->format('H:i'),
+                    $rendezVous->getConseiller()->getFirstName(),
+                    $rendezVous->getConseiller()->getLastName(),
+                    $lieuComplet,
+                    $bureauNom
+                ),
+            ],
+            'start' => [
+                'dateTime' => $rendezVous->getDateDebut()->format('Y-m-d\TH:i:s'),
+                'timeZone' => 'Europe/Paris',
+            ],
+            'end' => [
+                'dateTime' => $rendezVous->getDateFin()->format('Y-m-d\TH:i:s'),
+                'timeZone' => 'Europe/Paris',
+            ],
+            'location' => [
+                'displayName' => $lieuComplet,
+            ],
+            'attendees' => $attendees,
+        ];
+
+        try {
+            $client = new \GuzzleHttp\Client();
+            $client->patch('https://graph.microsoft.com/v1.0/me/events/' . $rendezVous->getOutlookId(), [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type'  => 'application/json',
+                ],
+                'json' => $eventData,
+            ]);
+        } catch (\Exception $e) {
+            error_log('Erreur lors de la mise à jour Outlook: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Synchronise le calendrier : Supprime les RDV locaux si absents d'Outlook
      */
     public function synchronizeCalendar(User $user): void
@@ -208,7 +339,10 @@ class OutlookService
         $endDateTime = (clone $date)->setTime(23, 59, 59)->format('Y-m-d\TH:i:s');
 
         try {
-            $client = new \GuzzleHttp\Client();
+            $client = new \GuzzleHttp\Client([
+                'timeout' => 2, // Timeout réduit à 2 secondes
+                'connect_timeout' => 1
+            ]);
             $response = $client->get('https://graph.microsoft.com/v1.0/me/calendarView', [
                 'headers' => ['Authorization' => 'Bearer ' . $account->getAccessToken()],
                 'query' => [
@@ -230,6 +364,7 @@ class OutlookService
             return $busySlots;
 
         } catch (\Exception $e) {
+            error_log('Erreur getOutlookBusyPeriods pour user ' . $user->getId() . ': ' . $e->getMessage());
             return [];
         }
     }
@@ -398,7 +533,8 @@ class OutlookService
                     'Content-Type'  => 'application/json',
                 ],
                 'json' => $payload,
-                'timeout' => 3, // Timeout de 3 secondes
+                'timeout' => 2, // Timeout réduit à 2 secondes pour améliorer la performance
+                'connect_timeout' => 1, // Timeout de connexion de 1 seconde
             ]);
 
             $data = json_decode($response->getBody()->getContents(), true);

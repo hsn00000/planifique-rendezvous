@@ -1,0 +1,45 @@
+{% extends 'base_public.html.twig' %}
+
+{% block title %}Rendez-vous annulé - Planifique{% endblock %}
+
+{% block body %}
+    <div class="container d-flex align-items-center justify-content-center min-vh-100 py-5">
+        <div class="card border-0 shadow-lg p-5 text-center" style="max-width: 600px; border-radius: 20px; width: 100%;">
+
+            {# Logo #}
+            <div class="mb-4">
+                <img src="{{ asset('img/logo.png') }}" alt="Planifique" style="height: 50px; width: auto;">
+            </div>
+
+            {# Animation Succès #}
+            <div class="mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 text-danger" style="width: 70px; height: 70px;">
+                    <i class="fas fa-check fa-2x"></i>
+                </div>
+            </div>
+
+            <h1 class="h3 fw-bold text-dark mb-2">Rendez-vous annulé</h1>
+            <p class="text-muted mb-4">
+                Votre rendez-vous du <strong>{{ rendezvous.dateDebut|format_datetime(pattern="d MMMM yyyy à H:i", locale='fr')|capitalize }}</strong> a été annulé avec succès.
+                <br>
+                Un email de confirmation vous a été envoyé à <strong>{{ rendezvous.email }}</strong>.
+            </p>
+
+            {# Message #}
+            <div class="bg-light p-4 rounded-3 mb-4 border text-start">
+                <p class="mb-0 text-muted">
+                    <i class="fas fa-info-circle text-primary me-2"></i>
+                    Si vous souhaitez prendre un nouveau rendez-vous, n'hésitez pas à revenir sur notre site.
+                </p>
+            </div>
+
+            {# Bouton #}
+            <div class="d-grid">
+                <a href="{{ path('app_home') }}" class="btn btn-primary btn-lg fw-bold py-3 rounded-pill shadow-sm">
+                    Retour à l'accueil
+                </a>
+            </div>
+
+        </div>
+    </div>
+{% endblock %}

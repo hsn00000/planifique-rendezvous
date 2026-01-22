@@ -44,6 +44,9 @@ class RendezVous
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $outlookId = null;
 
+    #[ORM\Column(length: 64, nullable: true, unique: true)]
+    private ?string $cancelToken = null; // Token sécurisé pour annulation/modification
+
     #[ORM\ManyToOne(inversedBy: 'rendezVouses')]
     private ?Evenement $evenement = null;
 
@@ -198,6 +201,17 @@ class RendezVous
     public function setBureau(?Bureau $bureau): static
     {
         $this->bureau = $bureau;
+        return $this;
+    }
+
+    public function getCancelToken(): ?string
+    {
+        return $this->cancelToken;
+    }
+
+    public function setCancelToken(?string $cancelToken): static
+    {
+        $this->cancelToken = $cancelToken;
         return $this;
     }
 }

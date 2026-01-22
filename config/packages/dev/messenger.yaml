@@ -2,8 +2,12 @@ framework:
     messenger:
         transports:
             sync: 'sync://'
+            async: 'doctrine://default?auto_setup=0'
 
         routing:
+            # En dev, on peut utiliser async pour ne pas bloquer la réponse
+            # Mais il faut lancer le worker : php bin/console messenger:consume async -vv
+            # Pour l'instant, on garde sync pour le débogage, mais on peut passer en async si besoin
             Symfony\Component\Mailer\Messenger\SendEmailMessage: sync
 
 
