@@ -176,7 +176,6 @@ class BookingController extends AbstractController
             'lieuChoisi' => $lieuChoisi
         ]);
     }
-
     /**
      * ÉTAPE 2.5 : RÉCAPITULATIF
      */
@@ -376,6 +375,7 @@ class BookingController extends AbstractController
         if ($dateLimite && $endPeriod < new \DateTime('today')) return [];
 
         $now = new \DateTime();
+        $nowForComparison = clone $now; // Cloner pour éviter de modifier $now
 
         // Chargement des RDV du conseiller
         $allRdvs = $rdvRepo->createQueryBuilder('r')
@@ -424,7 +424,7 @@ class BookingController extends AbstractController
                 'dateObj' => clone $currentDate,
                 'dayNum' => $currentDate->format('d'),
                 'isToday' => $currentDate->format('Y-m-d') === $now->format('Y-m-d'),
-                'isPast' => $currentDate < $now->setTime(0,0,0),
+                'isPast' => $currentDate < (clone $nowForComparison)->setTime(0,0,0),
                 'slots' => [],
                 'hasAvailability' => false
             ];
@@ -457,8 +457,8 @@ class BookingController extends AbstractController
                         $slotEnd = (clone $start)->modify("+$duration minutes");
                         if ($slotEnd > $end) break;
 
-                        // VÉRIFICATION : Le créneau ne doit pas être dans le passé
-                        if ($start < $now) {
+                        // VÉRIFICATION : Le créneau ne doit pas être dans le passé (avec l'heure actuelle)
+                        if ($start < $nowForComparison) {
                             $start->modify("+$increment minutes");
                             continue;
                         }
@@ -475,8 +475,10 @@ class BookingController extends AbstractController
                         }
 
                         // OPTIMISATION : Vérification des salles en mémoire (pas de requête SQL)
+                        // NOTE: On vérifie uniquement la BDD locale ici pour des raisons de performance.
+                        // La vérification Outlook sera faite lors de la finalisation de la réservation.
                         if ($isFree && in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps']) && !empty($allBureaux)) {
-                            // On vérifie en mémoire quels bureaux sont occupés pour ce créneau
+                            // On vérifie en mémoire quels bureaux sont occupés pour ce créneau (BDD locale)
                             $occupiedBureauIds = [];
                             foreach ($bureauxRdvsDuJour as $rdv) {
                                 $bureau = $rdv->getBureau();
@@ -489,7 +491,7 @@ class BookingController extends AbstractController
                             }
                             $occupiedBureauIds = array_unique($occupiedBureauIds);
 
-                            // Vérifier s'il reste au moins un bureau libre
+                            // Vérifier s'il reste au moins un bureau libre en BDD locale
                             $hasFreeBureau = false;
                             foreach ($allBureaux as $bureau) {
                                 if (!in_array($bureau->getId(), $occupiedBureauIds, true)) {
@@ -499,7 +501,7 @@ class BookingController extends AbstractController
                             }
 
                             if (!$hasFreeBureau) {
-                                $isFree = false; // Aucune salle libre → on masque ce créneau
+                                $isFree = false; // Aucune salle libre en BDD → on masque ce créneau
                             }
                         }
 
