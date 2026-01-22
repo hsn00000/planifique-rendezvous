@@ -18,6 +18,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 class BookingController extends AbstractController
@@ -403,7 +404,8 @@ class BookingController extends AbstractController
         BureauRepository $bureauRepo,
         EntityManagerInterface $em,
         MailerInterface $mailer,
-        OutlookService $outlookService
+        OutlookService $outlookService,
+        ValidatorInterface $validator
     ): Response {
         $session = $request->getSession();
         $data = $session->get('temp_booking_data');
@@ -500,6 +502,16 @@ class BookingController extends AbstractController
             }
 
             $rendezVous->setBureau($bureauLibre);
+        }
+
+        // --- VALIDATION FINALE : Vérifier qu'il n'y a pas de chevauchement ---
+        $violations = $validator->validate($rendezVous);
+        
+        if (count($violations) > 0) {
+            foreach ($violations as $violation) {
+                $this->addFlash('danger', $violation->getMessage());
+            }
+            return $this->redirectToRoute('app_booking_calendar', ['eventId' => $eventId]);
         }
 
         $em->persist($rendezVous);
