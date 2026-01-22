@@ -42,14 +42,14 @@ class EvenementCrudController extends AbstractCrudController
             IntegerField::new('delaiMinimumReservation', 'Délai minimum de réservation (min)')
                 ->setHelp('Temps minimum (en minutes) entre maintenant et le début d\'un créneau pour qu\'il soit proposé. Exemple : si vous mettez 120 (2h) et qu\'il est 10h00, seuls les créneaux à partir de 12h00 seront affichés. Les créneaux entre 10h00 et 12h00 seront masqués. Utile pour éviter les réservations de dernière minute et laisser le temps de préparation. Mettez 0 pour autoriser toutes les réservations futures.')
                 ->setColumns(6),
+            IntegerField::new('limiteMoisReservation', 'Limite de réservation (mois)')
+                ->setHelp('Nombre maximum de mois à l\'avance pour les réservations. Exemple : 12 = les clients peuvent réserver jusqu\'à 12 mois à l\'avance. Par défaut : 12 mois.')
+                ->setColumns(6),
 
             FormField::addPanel('Options'),
             AssociationField::new('groupe', 'Groupe associé'),
             BooleanField::new('isRoundRobin', 'Attribution Auto (Round Robin)')
                 ->setHelp('Si coché, le client ne choisit pas le conseiller.'),
-
-            DateField::new('dateLimite', 'Date Limite (Optionnel)')
-                ->setHelp('Aucun RDV ne pourra être pris après cette date.'),
 
             TextEditorField::new('description', 'Description'),
         ];

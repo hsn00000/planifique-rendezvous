@@ -32,9 +32,6 @@ class Evenement
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private ?bool $isRoundRobin = false;
 
-    #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
-    private ?\DateTimeInterface $dateLimite = null;
-
     #[ORM\Column(options: ['default' => 0])]
     private ?int $tamponAvant = 0; // En minutes (ex: 30)
 
@@ -43,6 +40,9 @@ class Evenement
 
     #[ORM\Column(options: ['default' => 0])]
     private ?int $delaiMinimumReservation = 0; // Délai minimum en minutes avant de pouvoir réserver (ex: 120 = 2h)
+
+    #[ORM\Column(options: ['default' => 12])]
+    private ?int $limiteMoisReservation = 12; // Limite en mois pour les réservations futures (ex: 12 = 1 an maximum)
 
     #[ORM\ManyToOne(inversedBy: 'evenements')]
     #[ORM\JoinColumn(nullable: false)]
@@ -134,17 +134,6 @@ class Evenement
         return $this;
     }
 
-    public function getDateLimite(): ?\DateTimeInterface
-    {
-        return $this->dateLimite;
-    }
-
-    public function setDateLimite(?\DateTimeInterface $dateLimite): static
-    {
-        $this->dateLimite = $dateLimite;
-        return $this;
-    }
-
     public function getTamponAvant(): ?int
     {
         return $this->tamponAvant;
@@ -175,6 +164,17 @@ class Evenement
     public function setDelaiMinimumReservation(int $delaiMinimumReservation): static
     {
         $this->delaiMinimumReservation = $delaiMinimumReservation;
+        return $this;
+    }
+
+    public function getLimiteMoisReservation(): ?int
+    {
+        return $this->limiteMoisReservation;
+    }
+
+    public function setLimiteMoisReservation(int $limiteMoisReservation): static
+    {
+        $this->limiteMoisReservation = $limiteMoisReservation;
         return $this;
     }
 

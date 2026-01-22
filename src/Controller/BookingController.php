@@ -178,7 +178,8 @@ class BookingController extends AbstractController
             'slotsByDay' => $slotsByDay,
             'lieuChoisi' => $lieuChoisi,
             'eventId' => $eventId,
-            'userId' => $targetUserId
+            'userId' => $targetUserId,
+            'limiteMois' => $event->getLimiteMoisReservation() ?? 12
         ]);
     }
 
@@ -230,6 +231,20 @@ class BookingController extends AbstractController
             $monthStart = new \DateTime($month . '-01');
             $monthEnd = (clone $monthStart)->modify('last day of this month');
             
+            // Vérifier que le mois demandé n'est pas au-delà de la limite
+            $now = new \DateTime();
+            $maxMonthsAhead = $event->getLimiteMoisReservation() ?? 12; // Utiliser la limite paramétrable de l'événement
+            $maxDate = (clone $now)->modify("+$maxMonthsAhead months")->modify('last day of this month');
+            
+            if ($monthStart > $maxDate) {
+                // Si le mois demandé est au-delà de la limite, retourner un mois vide
+                $formattedData = [
+                    'label' => $this->formatMonthLabel($monthStart),
+                    'days' => []
+                ];
+                return new \Symfony\Component\HttpFoundation\JsonResponse($formattedData);
+            }
+            
             $slots = $this->generateSlotsForMonth(
                 $calculationUser,
                 $event,
@@ -246,29 +261,39 @@ class BookingController extends AbstractController
             $monthKey = $monthStart->format('Y-m');
             $monthData = null;
             
-            // Les slots sont indexés par clé de mois (Y-m) ou dans un tableau
-            if (isset($slots[$monthKey])) {
-                // Si les slots sont indexés directement par la clé du mois
-                $monthData = $slots[$monthKey];
-            } else {
-                // Chercher le mois dans les résultats (tableau indexé numériquement)
-                foreach ($slots as $slot) {
-                    if (isset($slot['label'])) {
-                        if ($slot['label'] instanceof \DateTime) {
-                            $slotMonthKey = $slot['label']->format('Y-m');
-                            if ($slotMonthKey === $monthKey) {
-                                $monthData = $slot;
-                                break;
-                            }
-                        } elseif (is_string($slot['label'])) {
-                            // Si le label est déjà une string, extraire la clé
-                            $slotMonthKey = $slot['label'];
-                            if (strpos($slotMonthKey, $monthKey) !== false) {
-                                $monthData = $slot;
+            // generateSlotsForMonth retourne un tableau indexé numériquement (array_values)
+            // Chercher le mois dans les résultats
+            foreach ($slots as $slot) {
+                if (!isset($slot['label'])) {
+                    continue;
+                }
+                
+                $slotMonthKey = null;
+                if ($slot['label'] instanceof \DateTime) {
+                    $slotMonthKey = $slot['label']->format('Y-m');
+                } elseif (is_string($slot['label'])) {
+                    // Si le label est une string, essayer d'extraire la clé
+                    // Le label peut être "Mars 2026" ou "2026-03" selon le format
+                    if (preg_match('/(\d{4})-(\d{2})/', $slot['label'], $matches)) {
+                        $slotMonthKey = $matches[1] . '-' . $matches[2];
+                    } elseif (preg_match('/(\d{4})/', $slot['label'], $matches)) {
+                        // Si on trouve juste l'année, chercher le mois dans le label
+                        $months = ['janvier' => '01', 'février' => '02', 'mars' => '03', 'avril' => '04',
+                                  'mai' => '05', 'juin' => '06', 'juillet' => '07', 'août' => '08',
+                                  'septembre' => '09', 'octobre' => '10', 'novembre' => '11', 'décembre' => '12'];
+                        $labelLower = mb_strtolower($slot['label']);
+                        foreach ($months as $monthName => $monthNum) {
+                            if (strpos($labelLower, $monthName) !== false) {
+                                $slotMonthKey = $matches[1] . '-' . $monthNum;
                                 break;
                             }
                         }
                     }
+                }
+                
+                if ($slotMonthKey === $monthKey) {
+                    $monthData = $slot;
+                    break;
                 }
             }
             
@@ -280,6 +305,9 @@ class BookingController extends AbstractController
                 ];
             }
         } catch (\Exception $e) {
+            // Logger l'erreur pour le débogage
+            error_log('Erreur dans loadMonth: ' . $e->getMessage() . ' - ' . $e->getTraceAsString());
+            
             // En cas d'erreur, retourner un mois vide plutôt qu'une erreur pour éviter de bloquer le calendrier
             $monthStart = new \DateTime($month . '-01');
             $formattedData = [
@@ -510,11 +538,19 @@ class BookingController extends AbstractController
         $duration = $event->getDuree();
         $increment = 30;
         $startPeriod = new \DateTime('first day of this month');
-        $dateLimite = $event->getDateLimite();
+        
+        // Limite maximale : utiliser la valeur paramétrable de l'événement (par défaut 12 mois)
+        $maxMonthsAhead = $event->getLimiteMoisReservation() ?? 12;
+        $maxDate = (clone $startPeriod)->modify("+$maxMonthsAhead months")->modify('last day of this month');
+        
         // Chargement progressif : charger seulement X mois initialement (par défaut 2)
         // Les autres mois seront chargés via AJAX quand l'utilisateur navigue
-        $endPeriod = $dateLimite ? clone $dateLimite : (clone $startPeriod)->modify("+$monthsToLoad months")->modify('last day of this month');
-        if ($dateLimite && $endPeriod < new \DateTime('today')) return [];
+        $requestedEndPeriod = (clone $startPeriod)->modify("+$monthsToLoad months")->modify('last day of this month');
+        
+        // Utiliser le minimum entre la demande et la limite max
+        $endPeriod = $requestedEndPeriod > $maxDate ? $maxDate : $requestedEndPeriod;
+        
+        if ($endPeriod < new \DateTime('today')) return [];
 
         return $this->generateSlotsForMonth($user, $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, $lieu, $startPeriod, $endPeriod);
     }

@@ -200,6 +200,7 @@
         const monthLoading = document.getElementById('month-loading');
         const eventId = {{ event.id }};
         const userId = {{ userId|default('null') }};
+        const limiteMois = {{ limiteMois|default(12) }}; // Limite de réservation en mois (paramétrable en admin)
         const loadedMonths = new Set(); // Cache des mois déjà chargés
         
         // Initialiser le cache avec les mois déjà chargés
@@ -240,9 +241,9 @@
             // Activer les boutons seulement si le calendrier est prêt
             if (calendarReady) {
                 prevBtn.disabled = (currentIndex === 0);
-                nextBtn.disabled = false; // On peut toujours aller vers le futur
+                nextBtn.disabled = (currentIndex >= limiteMois - 1); // Désactiver après la limite configurée
                 prevBtn.style.opacity = (currentIndex === 0) ? '0.3' : '1';
-                nextBtn.style.opacity = '1';
+                nextBtn.style.opacity = (currentIndex >= limiteMois - 1) ? '0.3' : '1';
             } else {
                 prevBtn.disabled = true;
                 nextBtn.disabled = true;
@@ -264,28 +265,42 @@
 
             try {
                 const url = `{{ path('app_booking_calendar_month', {'eventId': event.id}) }}?month=${monthKey}${userId ? '&user=' + userId : ''}`;
+                console.log('Chargement du mois:', monthKey, 'URL:', url);
+                
                 const response = await fetch(url);
+                console.log('Réponse reçue:', response.status, response.statusText);
                 
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || errorData.message || 'Erreur lors du chargement');
+                    let errorData = {};
+                    try {
+                        errorData = await response.json();
+                    } catch (e) {
+                        errorData = { error: `Erreur HTTP ${response.status}` };
+                    }
+                    console.error('Erreur HTTP:', errorData);
+                    throw new Error(errorData.error || errorData.message || `Erreur ${response.status} lors du chargement`);
                 }
 
                 const monthData = await response.json();
+                console.log('Données reçues:', monthData);
                 
                 // Vérifier si la réponse contient une erreur
                 if (monthData.error) {
+                    console.error('Erreur dans les données:', monthData);
                     throw new Error(monthData.message || monthData.error);
                 }
                 
                 // Vérifier que les données sont valides
                 if (!monthData || !monthData.label) {
+                    console.error('Données invalides:', monthData);
                     throw new Error('Données du mois invalides');
                 }
                 
                 // Créer l'élément HTML pour le mois
                 const monthElement = createMonthElement(monthData, monthKey);
-                monthsWrapper.insertBefore(monthElement, monthLoading);
+                
+                // Insérer le mois dans le wrapper (monthLoading n'est pas un enfant direct, donc on utilise appendChild)
+                monthsWrapper.appendChild(monthElement);
                 
                 // Mettre à jour la liste des mois
                 months = Array.from(document.querySelectorAll('.month-grid[data-loaded="true"]'));
@@ -310,10 +325,15 @@
                 monthLoading.style.display = 'none';
                 monthLoading.style.pointerEvents = 'none';
                 
+                // Supprimer les anciens messages d'erreur avant d'en ajouter un nouveau
+                const existingErrors = monthsWrapper.querySelectorAll('.alert-danger');
+                existingErrors.forEach(err => err.remove());
+                
                 // Afficher un message d'erreur plus clair
                 const errorMsg = document.createElement('div');
                 errorMsg.className = 'alert alert-danger text-center m-3';
-                errorMsg.innerHTML = '<strong>Erreur de chargement</strong><br><small>Veuillez réessayer ou rafraîchir la page.</small>';
+                errorMsg.id = 'month-loading-error';
+                errorMsg.innerHTML = '<strong>Erreur de chargement</strong><br><small>Veuillez réessayer ou rafraîchir la page.</small><br><small style="font-size: 0.7rem; color: #666;">' + (error.message || '') + '</small>';
                 monthsWrapper.appendChild(errorMsg);
                 
                 // Retirer le message d'erreur après 5 secondes
@@ -425,6 +445,12 @@
             
             // Vérifier que l'index est valide avant de charger
             if (newIndex < 0) {
+                return false;
+            }
+            
+            // Limite maximale : utiliser la limite configurée pour l'événement
+            if (newIndex >= limiteMois) {
+                // Empêcher la navigation au-delà de la limite configurée
                 return false;
             }
             
