@@ -167,7 +167,7 @@ class BookingController extends AbstractController
 
         $outlookService->synchronizeCalendar($calculationUser);
 
-        $slotsByDay = $this->generateSlots($calculationUser, $event, $rdvRepo, $dispoRepo, $bureauRepo, $lieuChoisi);
+        $slotsByDay = $this->generateSlots($calculationUser, $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, $lieuChoisi);
 
         return $this->render('booking/index.html.twig', [
             'conseiller' => $viewUser,
@@ -176,6 +176,7 @@ class BookingController extends AbstractController
             'lieuChoisi' => $lieuChoisi
         ]);
     }
+
     /**
      * ÉTAPE 2.5 : RÉCAPITULATIF
      */
@@ -364,7 +365,7 @@ class BookingController extends AbstractController
     // --- FONCTIONS PRIVÉES ---
     // =========================================================================
 
-    private function generateSlots($user, $event, $rdvRepo, $dispoRepo, $bureauRepo, string $lieu): array
+    private function generateSlots($user, $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, string $lieu): array
     {
         $calendarData = [];
         $duration = $event->getDuree();
@@ -376,6 +377,8 @@ class BookingController extends AbstractController
 
         $now = new \DateTime();
         $nowForComparison = clone $now; // Cloner pour éviter de modifier $now
+        // Ajouter une marge de sécurité de 1 minute pour éviter les problèmes de timing
+        $nowForComparison->modify('+1 minute');
 
         // Chargement des RDV du conseiller
         $allRdvs = $rdvRepo->createQueryBuilder('r')
@@ -457,8 +460,11 @@ class BookingController extends AbstractController
                         $slotEnd = (clone $start)->modify("+$duration minutes");
                         if ($slotEnd > $end) break;
 
-                        // VÉRIFICATION : Le créneau ne doit pas être dans le passé (avec l'heure actuelle)
-                        if ($start < $nowForComparison) {
+                        // VÉRIFICATION : Le créneau ne doit pas être dans le passé (avec l'heure actuelle + marge)
+                        // On compare avec l'heure actuelle en tenant compte des minutes
+                        $slotStartTimestamp = $start->getTimestamp();
+                        $nowTimestamp = $nowForComparison->getTimestamp();
+                        if ($slotStartTimestamp < $nowTimestamp) {
                             $start->modify("+$increment minutes");
                             continue;
                         }
@@ -475,8 +481,6 @@ class BookingController extends AbstractController
                         }
 
                         // OPTIMISATION : Vérification des salles en mémoire (pas de requête SQL)
-                        // NOTE: On vérifie uniquement la BDD locale ici pour des raisons de performance.
-                        // La vérification Outlook sera faite lors de la finalisation de la réservation.
                         if ($isFree && in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps']) && !empty($allBureaux)) {
                             // On vérifie en mémoire quels bureaux sont occupés pour ce créneau (BDD locale)
                             $occupiedBureauIds = [];
@@ -491,17 +495,35 @@ class BookingController extends AbstractController
                             }
                             $occupiedBureauIds = array_unique($occupiedBureauIds);
 
-                            // Vérifier s'il reste au moins un bureau libre en BDD locale
-                            $hasFreeBureau = false;
+                            // Filtrer les bureaux libres en BDD locale
+                            $freeBureauxInBdd = [];
                             foreach ($allBureaux as $bureau) {
                                 if (!in_array($bureau->getId(), $occupiedBureauIds, true)) {
-                                    $hasFreeBureau = true;
-                                    break;
+                                    $freeBureauxInBdd[] = $bureau;
                                 }
                             }
 
-                            if (!$hasFreeBureau) {
+                            // Vérifier s'il reste au moins un bureau libre en BDD locale
+                            if (empty($freeBureauxInBdd)) {
                                 $isFree = false; // Aucune salle libre en BDD → on masque ce créneau
+                            } else {
+                                // Vérification Outlook : au moins une salle doit être libre côté Outlook
+                                // OPTIMISATION : On vérifie Outlook seulement pour les 7 prochains jours pour éviter les timeouts
+                                $daysFromNow = (int)(($currentDate->getTimestamp() - $now->getTimestamp()) / 86400);
+                                if ($daysFromNow >= 0 && $daysFromNow <= 7) {
+                                    // On vérifie seulement si au moins une salle est libre (s'arrête dès qu'une est trouvée)
+                                    try {
+                                        $hasFreeRoomOutlook = $outlookService->hasAtLeastOneFreeRoomOnOutlook($user, $freeBureauxInBdd, $start, $slotEnd);
+                                        if (!$hasFreeRoomOutlook) {
+                                            $isFree = false; // Aucune salle libre côté Outlook → on masque ce créneau
+                                        }
+                                    } catch (\Exception $e) {
+                                        // En cas d'erreur/timeout Outlook, on considère le créneau comme disponible
+                                        // pour éviter de bloquer l'affichage (la vérification sera faite lors de la finalisation)
+                                        // $isFree reste true
+                                    }
+                                }
+                                // Pour les jours au-delà de 7 jours, on se base uniquement sur la BDD locale
                             }
                         }
 

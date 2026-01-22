@@ -261,6 +261,7 @@ class OutlookService
                     'Content-Type'  => 'application/json',
                 ],
                 'json' => $payload,
+                'timeout' => 2
             ]);
 
             $data = json_decode($response->getBody()->getContents(), true);
@@ -348,5 +349,42 @@ class OutlookService
                 // Optionnel: log
             }
         }
+    }
+
+    /**
+     * Vérifie rapidement si au moins une salle est libre côté Outlook (optimisé pour l'affichage du calendrier)
+     * Retourne true si au moins une salle est libre, false sinon
+     */
+    public function hasAtLeastOneFreeRoomOnOutlook(User $user, array $bureaux, \DateTimeInterface $start, \DateTimeInterface $end): bool
+    {
+        $account = $this->accountRepo->findOneBy(['user' => $user]);
+        if (!$account || !$account->getAccessToken()) {
+            // Si pas de token, on considère comme non-disponible (sécurité)
+            return false;
+        }
+
+        $this->refreshAccessTokenIfExpired($account);
+        $token = $account->getAccessToken();
+
+        // On teste chaque bureau et on s'arrête dès qu'on trouve une salle libre
+        foreach ($bureaux as $bureau) {
+            if (!$bureau->getEmail()) {
+                // Une salle sans email ne peut pas être vérifiée → on la considère comme disponible
+                return true;
+            }
+
+            try {
+                if ($this->isRoomFreeOnOutlook($token, $bureau->getEmail(), $start, $end)) {
+                    // Au moins une salle est libre → on retourne true immédiatement
+                    return true;
+                }
+            } catch (\Exception $e) {
+                // Si erreur Graph, on continue avec la salle suivante
+                continue;
+            }
+        }
+
+        // Aucune salle libre trouvée
+        return false;
     }
 }
