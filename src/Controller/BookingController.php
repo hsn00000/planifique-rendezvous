@@ -375,6 +375,9 @@ class BookingController extends AbstractController
         $endPeriod = $dateLimite ? clone $dateLimite : (clone $startPeriod)->modify('+12 months')->modify('last day of this month');
         if ($dateLimite && $endPeriod < new \DateTime('today')) return [];
 
+        $now = new \DateTime();
+
+        // Chargement des RDV du conseiller
         $allRdvs = $rdvRepo->createQueryBuilder('r')
             ->where('r.conseiller = :user')
             ->andWhere('r.dateDebut BETWEEN :start AND :end')
@@ -383,9 +386,34 @@ class BookingController extends AbstractController
             ->setParameter('end', $endPeriod)
             ->getQuery()->getResult();
 
+        // OPTIMISATION : Pré-charger tous les RDV avec bureau pour ce lieu (une seule requête)
+        $allBureauxRdvs = [];
+        if (in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps'])) {
+            $entityManager = $rdvRepo->getEntityManager();
+            $query = $entityManager->createQuery(
+                'SELECT r, b
+             FROM App\Entity\RendezVous r
+             INNER JOIN r.bureau b
+             WHERE b.lieu = :lieu
+             AND r.dateDebut >= :start
+             AND r.dateDebut <= :end'
+            )->setParameters([
+                'lieu' => $lieu,
+                'start' => $startPeriod,
+                'end' => $endPeriod
+            ]);
+            $allBureauxRdvs = $query->getResult();
+        }
+
         $disposHebdo = $dispoRepo->findBy(['user' => $user]);
         $rulesByDay = [];
         foreach ($disposHebdo as $dispo) $rulesByDay[$dispo->getJourSemaine()][] = $dispo;
+
+        // Récupérer tous les bureaux du lieu une seule fois
+        $allBureaux = [];
+        if (in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps'])) {
+            $allBureaux = $bureauRepo->findBy(['lieu' => $lieu]);
+        }
 
         $currentDate = clone $startPeriod;
         while ($currentDate <= $endPeriod) {
@@ -395,8 +423,8 @@ class BookingController extends AbstractController
             $dayData = [
                 'dateObj' => clone $currentDate,
                 'dayNum' => $currentDate->format('d'),
-                'isToday' => $currentDate->format('Y-m-d') === (new \DateTime())->format('Y-m-d'),
-                'isPast' => $currentDate < new \DateTime('today'),
+                'isToday' => $currentDate->format('Y-m-d') === $now->format('Y-m-d'),
+                'isPast' => $currentDate < $now->setTime(0,0,0),
                 'slots' => [],
                 'hasAvailability' => false
             ];
@@ -405,6 +433,14 @@ class BookingController extends AbstractController
                 $dayStartFilter = (clone $currentDate)->setTime(0,0,0);
                 $dayEndFilter = (clone $currentDate)->setTime(23,59,59);
                 $rdvsDuJour = array_filter($allRdvs, fn($r) => $r->getDateDebut() >= $dayStartFilter && $r->getDateDebut() <= $dayEndFilter);
+
+                // OPTIMISATION : Filtrer les RDV avec bureau pour ce jour une seule fois
+                $bureauxRdvsDuJour = [];
+                if (in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps'])) {
+                    $bureauxRdvsDuJour = array_filter($allBureauxRdvs, function($r) use ($dayStartFilter, $dayEndFilter) {
+                        return $r->getDateDebut() >= $dayStartFilter && $r->getDateDebut() <= $dayEndFilter;
+                    });
+                }
 
                 foreach ($rulesByDay[$dayOfWeek] as $rule) {
                     if ($rule->isEstBloque()) continue;
@@ -421,6 +457,12 @@ class BookingController extends AbstractController
                         $slotEnd = (clone $start)->modify("+$duration minutes");
                         if ($slotEnd > $end) break;
 
+                        // VÉRIFICATION : Le créneau ne doit pas être dans le passé
+                        if ($start < $now) {
+                            $start->modify("+$increment minutes");
+                            continue;
+                        }
+
                         $isFree = true;
 
                         // dispo conseiller + tampons (RDV existants)
@@ -432,11 +474,31 @@ class BookingController extends AbstractController
                             if ($start < $busyEnd && $slotEnd > $busyStart) { $isFree = false; break; }
                         }
 
-                        // dispo salle si cabinet (vérifie qu'au moins UNE salle est libre)
-                        if ($isFree && in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps'])) {
-                            // On vérifie qu'il existe AU MOINS une salle libre (pas juste la première)
-                            $freeBureaux = $bureauRepo->findAvailableBureaux($lieu, $start, $slotEnd);
-                            if (empty($freeBureaux)) {
+                        // OPTIMISATION : Vérification des salles en mémoire (pas de requête SQL)
+                        if ($isFree && in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps']) && !empty($allBureaux)) {
+                            // On vérifie en mémoire quels bureaux sont occupés pour ce créneau
+                            $occupiedBureauIds = [];
+                            foreach ($bureauxRdvsDuJour as $rdv) {
+                                $bureau = $rdv->getBureau();
+                                if ($bureau) {
+                                    // Vérifier si ce RDV chevauche notre créneau
+                                    if ($start < $rdv->getDateFin() && $slotEnd > $rdv->getDateDebut()) {
+                                        $occupiedBureauIds[] = $bureau->getId();
+                                    }
+                                }
+                            }
+                            $occupiedBureauIds = array_unique($occupiedBureauIds);
+
+                            // Vérifier s'il reste au moins un bureau libre
+                            $hasFreeBureau = false;
+                            foreach ($allBureaux as $bureau) {
+                                if (!in_array($bureau->getId(), $occupiedBureauIds, true)) {
+                                    $hasFreeBureau = true;
+                                    break;
+                                }
+                            }
+
+                            if (!$hasFreeBureau) {
                                 $isFree = false; // Aucune salle libre → on masque ce créneau
                             }
                         }
