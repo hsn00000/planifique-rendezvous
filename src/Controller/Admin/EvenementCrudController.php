@@ -40,7 +40,7 @@ class EvenementCrudController extends AbstractCrudController
                 ->setHelp('Temps bloqué après la fin pour le debriefing ou le trajet.')
                 ->setColumns(6),
             IntegerField::new('delaiMinimumReservation', 'Délai minimum de réservation (min)')
-                ->setHelp('Délai minimum en minutes avant de pouvoir réserver un créneau (ex: 120 = 2h). Les créneaux dans ce délai ne seront pas affichés.')
+                ->setHelp('Temps minimum (en minutes) entre maintenant et le début d\'un créneau pour qu\'il soit proposé. Exemple : si vous mettez 120 (2h) et qu\'il est 10h00, seuls les créneaux à partir de 12h00 seront affichés. Les créneaux entre 10h00 et 12h00 seront masqués. Utile pour éviter les réservations de dernière minute et laisser le temps de préparation. Mettez 0 pour autoriser toutes les réservations futures.')
                 ->setColumns(6),
 
             FormField::addPanel('Options'),
