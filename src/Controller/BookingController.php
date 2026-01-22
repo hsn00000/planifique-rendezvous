@@ -420,8 +420,7 @@ class BookingController extends AbstractController
             $allBureaux = $bureauRepo->findBy(['lieu' => $lieu]);
         }
 
-        // OPTIMISATION CRITIQUE : Cache pour les vérifications Outlook par demi-journée
-        // Évite les centaines d'appels API (un par créneau) en vérifiant seulement 2 fois par jour
+        // OPTIMISATION CRITIQUE : Cache pour les vérifications Outlook par créneau horaire
         $outlookDayCache = [];
 
         $currentDate = clone $startPeriod;
@@ -467,7 +466,6 @@ class BookingController extends AbstractController
                         if ($slotEnd > $end) break;
 
                         // VÉRIFICATION : Le créneau doit respecter le délai minimum de réservation
-                        // Utilise le délai configuré par l'admin au lieu de vérifier l'heure actuelle à chaque fois
                         if ($start < $minBookingTime) {
                             $start->modify("+$increment minutes");
                             continue;
@@ -511,31 +509,31 @@ class BookingController extends AbstractController
                             if (empty($freeBureauxInBdd)) {
                                 $isFree = false; // Aucune salle libre en BDD → on masque ce créneau
                             } else {
-                                // OPTIMISATION CRITIQUE : Vérification Outlook avec cache par demi-journée
-                                // Réduit les appels API de ~280 (un par créneau) à ~14 (2 par jour × 7 jours)
+                                // OPTIMISATION CRITIQUE : Vérification Outlook avec cache par créneau horaire
+                                // Augmenté à 30 jours pour couvrir plus de dates futures
                                 $daysFromNow = (int)(($currentDate->getTimestamp() - $now->getTimestamp()) / 86400);
-                                if ($daysFromNow >= 0 && $daysFromNow <= 7) {
-                                    // Clé du cache : date + période (matin = avant 13h, après-midi = 13h et après)
-                                    $period = (int)$start->format('H') < 13 ? 'morning' : 'afternoon';
-                                    $cacheKey = $currentDate->format('Y-m-d') . '_' . $period;
-                                    
+                                if ($daysFromNow >= 0 && $daysFromNow <= 30) {
+                                    // Clé du cache : date + heure (par tranche de 1h pour plus de précision)
+                                    $hourSlot = (int)$start->format('H');
+                                    $cacheKey = $currentDate->format('Y-m-d') . '_' . $hourSlot;
+
                                     if (!isset($outlookDayCache[$cacheKey])) {
-                                        // Vérifier une seule fois par demi-journée pour toutes les salles libres en BDD
-                                        $periodStart = (clone $currentDate)->setTime($period === 'morning' ? 8 : 13, 0, 0);
-                                        $periodEnd = (clone $currentDate)->setTime($period === 'morning' ? 13 : 18, 0, 0);
+                                        // Vérifier par tranche d'1h pour plus de précision (au lieu de demi-journée)
+                                        $hourStart = (clone $currentDate)->setTime($hourSlot, 0, 0);
+                                        $hourEnd = (clone $currentDate)->setTime($hourSlot + 1, 0, 0);
                                         try {
-                                            $outlookDayCache[$cacheKey] = $outlookService->hasAtLeastOneFreeRoomOnOutlook($user, $freeBureauxInBdd, $periodStart, $periodEnd);
+                                            $outlookDayCache[$cacheKey] = $outlookService->hasAtLeastOneFreeRoomOnOutlook($user, $freeBureauxInBdd, $hourStart, $hourEnd);
                                         } catch (\Exception $e) {
-                                            // En cas d'erreur/timeout Outlook, on bloque la période par sécurité
+                                            // En cas d'erreur/timeout Outlook, on bloque la tranche horaire par sécurité
                                             $outlookDayCache[$cacheKey] = false;
                                         }
                                     }
-                                    // Utiliser le résultat du cache pour cette période
+                                    // Utiliser le résultat du cache pour cette tranche horaire
                                     if (!$outlookDayCache[$cacheKey]) {
-                                        $isFree = false; // Aucune salle libre côté Outlook pour cette période → on masque ce créneau
+                                        $isFree = false; // Aucune salle libre côté Outlook pour cette tranche horaire → on masque ce créneau
                                     }
                                 }
-                                // Pour les jours au-delà de 7 jours, on se base uniquement sur la BDD locale
+                                // Pour les jours au-delà de 30 jours, on se base uniquement sur la BDD locale
                             }
                         }
 
