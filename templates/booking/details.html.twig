@@ -57,7 +57,6 @@
                 <div class="col-lg-7 bg-white p-5">
 
                     <div class="text-center mb-5">
-                        {# --- MODIFICATION ICI : Étape 1 sur 3 --- #}
                         <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill fw-bold mb-3 text-uppercase" style="font-size: 0.7rem; letter-spacing: 1px;">
                             Étape 1 sur 3
                         </span>
@@ -66,7 +65,6 @@
                         <p class="text-muted small">Remplissez ce formulaire pour accéder au calendrier.</p>
                     </div>
 
-                    {# Le reste du formulaire est inchangé #}
                     {{ form_start(form, {'attr': {'data-turbo': 'false', 'id': 'booking-form'}}) }}
 
                     <div class="row g-4 mb-4">
@@ -108,13 +106,26 @@
                     </div>
 
                     <div class="d-grid mt-5">
-                        <button type="submit" class="btn btn-primary btn-lg py-3 rounded-pill fw-bold text-uppercase ls-1 shadow-sm">
-                            Suivant : Choisir l'heure <i class="fas fa-arrow-right ms-2"></i>
+                        <button type="submit" id="submit-btn" class="btn btn-primary btn-lg py-3 rounded-pill fw-bold text-uppercase ls-1 shadow-sm position-relative" style="min-height: 56px;">
+                            <span id="submit-text">Suivant : Choisir l'heure <i class="fas fa-arrow-right ms-2"></i></span>
+                            <span id="submit-loader" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);"></span>
                         </button>
                     </div>
 
                     {{ form_end(form) }}
                 </div>
+            </div>
+        </div>
+
+        {# Loader plein écran pour le chargement #}
+        <div id="form-loading" class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center bg-white" style="z-index: 10000; pointer-events: auto;">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
+                    <span class="visually-hidden">Chargement...</span>
+                </div>
+                <h5 class="fw-bold text-dark mb-2">Chargement en cours</h5>
+                <p class="text-muted small mb-0">Préparation du calendrier...</p>
+                <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Veuillez patienter</p>
             </div>
         </div>
     </div>
@@ -144,6 +155,21 @@
             selectLieu.addEventListener('change', toggleAdresse);
             toggleAdresse();
         }
+
+        // Gérer le loader lors de la soumission du formulaire
+        document.getElementById('booking-form').addEventListener('submit', function(e) {
+            const btn = document.getElementById('submit-btn');
+            const text = document.getElementById('submit-text');
+            const loader = document.getElementById('submit-loader');
+            const formLoader = document.getElementById('form-loading');
+
+            // Désactiver le bouton et afficher les loaders
+            btn.disabled = true;
+            text.classList.add('d-none');
+            loader.classList.remove('d-none');
+            formLoader.classList.remove('d-none');
+            formLoader.style.display = 'flex';
+        });
 
         document.addEventListener('DOMContentLoaded', initAddressLogic);
         document.addEventListener('turbo:load', initAddressLogic);

@@ -64,14 +64,14 @@
                 <div class="col-lg-8 bg-white position-relative d-flex flex-column">
 
                     {# Loader initial - reste affiché jusqu'à ce que le calendrier soit prêt #}
-                    <div id="calendar-loader" class="p-4 p-md-5 flex-grow-1 h-100 d-flex flex-column align-items-center justify-content-center position-absolute top-0 start-0 w-100 h-100 bg-white" style="z-index: 1000; pointer-events: auto;">
+                    <div id="calendar-loader" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white" style="z-index: 1000; pointer-events: auto;">
                         <div class="text-center">
                             <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
                                 <span class="visually-hidden">Chargement...</span>
                             </div>
                             <h5 class="fw-bold text-dark mb-2">Chargement du calendrier</h5>
                             <p class="text-muted small mb-0">Vérification des disponibilités en cours...</p>
-                            <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Cela peut prendre quelques secondes</p>
+                            <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Veuillez patienter, cela peut prendre quelques secondes</p>
                         </div>
                     </div>
 
@@ -138,18 +138,30 @@
                                     <p class="text-muted">Aucune disponibilité.</p>
                                 </div>
                             {% endfor %}
-
-                            {# Placeholder pour les mois non chargés #}
-                            <div id="month-loading" class="month-grid d-none w-100" style="min-height: 300px;">
-                                <div class="d-flex align-items-center justify-content-center h-100">
-                                    <div class="text-center">
-                                        <div class="spinner-border text-primary mb-3" role="status">
-                                            <span class="visually-hidden">Chargement...</span>
-                                        </div>
-                                        <p class="text-muted small mb-0">Chargement du mois...</p>
-                                    </div>
-                                </div>
+                        </div>
+                        
+                    {# Loader pour le chargement d'un mois (affiché au centre de la page) #}
+                    <div id="month-loading" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center bg-white" style="z-index: 999; pointer-events: auto;">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
+                                <span class="visually-hidden">Chargement...</span>
                             </div>
+                            <h5 class="fw-bold text-dark mb-2">Chargement du mois</h5>
+                            <p class="text-muted small mb-0">Vérification des disponibilités en cours...</p>
+                            <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Veuillez patienter</p>
+                        </div>
+                    </div>
+                    </div>
+                    
+                    {# Loader pour le chargement après avoir cliqué sur un créneau horaire #}
+                    <div id="slot-loading" class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center bg-white" style="z-index: 10000; pointer-events: auto;">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
+                                <span class="visually-hidden">Chargement...</span>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-2">Chargement de la page</h5>
+                            <p class="text-muted small mb-0">Préparation du récapitulatif...</p>
+                            <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Veuillez patienter</p>
                         </div>
                     </div>
 
@@ -189,7 +201,7 @@
         const eventId = {{ event.id }};
         const userId = {{ userId|default('null') }};
         const loadedMonths = new Set(); // Cache des mois déjà chargés
-
+        
         // Initialiser le cache avec les mois déjà chargés
         months.forEach(m => {
             if (m.dataset.monthKey) {
@@ -206,8 +218,11 @@
                     m.classList.add('d-none');
                 }
             });
+            
+            // Masquer le loader de mois
             monthLoading.classList.add('d-none');
-
+            monthLoading.style.display = 'none';
+            
             // Activer les boutons seulement si le calendrier est prêt
             if (calendarReady) {
                 prevBtn.disabled = false;
@@ -228,39 +243,61 @@
                 return; // Déjà chargé
             }
 
-            // Afficher le loader
+            // Afficher le loader au centre de la page
             monthLoading.classList.remove('d-none');
-            monthLoading.style.display = 'block';
+            monthLoading.style.display = 'flex';
+            monthLoading.style.pointerEvents = 'auto';
 
             try {
                 const url = `{{ path('app_booking_calendar_month', {'eventId': event.id}) }}?month=${monthKey}${userId ? '&user=' + userId : ''}`;
                 const response = await fetch(url);
-
+                
                 if (!response.ok) {
                     throw new Error('Erreur lors du chargement');
                 }
 
                 const monthData = await response.json();
-
+                
                 // Créer l'élément HTML pour le mois
                 const monthElement = createMonthElement(monthData, monthKey);
                 monthsWrapper.insertBefore(monthElement, monthLoading);
-
+                
                 // Mettre à jour la liste des mois
                 months = Array.from(document.querySelectorAll('.month-grid[data-loaded="true"]'));
-
+                
                 // Marquer comme chargé
                 loadedMonths.add(monthKey);
-
-                // Si c'est le mois actuel, l'afficher
-                if (currentIndex === months.length - 1) {
+                
+                // Masquer le loader AVANT de mettre à jour le calendrier
+                monthLoading.classList.add('d-none');
+                monthLoading.style.display = 'none';
+                monthLoading.style.pointerEvents = 'none';
+                
+                // Trouver l'index du mois chargé et mettre à jour si nécessaire
+                const loadedMonthIndex = months.findIndex(m => m.dataset.monthKey === monthKey);
+                if (loadedMonthIndex !== -1 && loadedMonthIndex === currentIndex) {
                     updateCalendar();
                 }
             } catch (error) {
                 console.error('Erreur lors du chargement du mois:', error);
-                label.textContent = 'Erreur de chargement';
-            } finally {
+                
+                // Masquer le loader
                 monthLoading.classList.add('d-none');
+                monthLoading.style.display = 'none';
+                monthLoading.style.pointerEvents = 'none';
+                
+                // Afficher un message d'erreur plus clair
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'alert alert-danger text-center m-3';
+                errorMsg.innerHTML = '<strong>Erreur de chargement</strong><br><small>Veuillez réessayer ou rafraîchir la page.</small>';
+                monthsWrapper.appendChild(errorMsg);
+                
+                // Retirer le message d'erreur après 5 secondes
+                setTimeout(() => {
+                    if (errorMsg.parentNode) {
+                        errorMsg.remove();
+                    }
+                }, 5000);
             }
         }
 
@@ -272,10 +309,10 @@
             div.dataset.loaded = 'true';
             div.dataset.label = monthData.label || '';
             div.dataset.index = months.length; // Index pour la navigation
-
+            
             const calendarGrid = document.createElement('div');
             calendarGrid.className = 'calendar-grid';
-
+            
             // Padding pour le premier jour
             if (monthData.days && monthData.days.length > 0) {
                 const firstDay = monthData.days[0];
@@ -286,7 +323,7 @@
                     calendarGrid.appendChild(document.createElement('div'));
                 }
             }
-
+            
             // Ajouter les jours
             if (monthData.days) {
                 monthData.days.forEach(day => {
@@ -294,12 +331,12 @@
                         const btn = document.createElement('button');
                         btn.className = 'btn btn-day' + (day.isToday ? ' today' : '');
                         btn.textContent = day.dayNum;
-
+                        
                         // Formater la date pour l'affichage
                         const dateObj = new Date(day.dateObj + 'T00:00:00');
                         const dateText = dateObj.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                         const dateValue = day.dateValue || day.dateObj;
-
+                        
                         btn.onclick = () => selectDate(btn, day.slots, dateText, dateValue);
                         calendarGrid.appendChild(btn);
                     } else {
@@ -310,7 +347,7 @@
                     }
                 });
             }
-
+            
             div.appendChild(calendarGrid);
             return div;
         }
@@ -328,20 +365,21 @@
             }
 
             const newIndex = currentIndex + dir;
-
+            
             // Charger le mois suivant/précédent s'il n'est pas encore chargé
             const targetMonthKey = getMonthKeyFromIndex(newIndex);
             if (!loadedMonths.has(targetMonthKey)) {
                 await loadMonth(targetMonthKey);
+                // Mettre à jour la liste des mois après le chargement
+                months = Array.from(document.querySelectorAll('.month-grid[data-loaded="true"]'));
             }
 
-            if (dir === 1 && newIndex < months.length) {
+            // Vérifier que l'index est valide
+            if (newIndex >= 0 && newIndex < months.length) {
                 currentIndex = newIndex;
-            } else if (dir === -1 && newIndex >= 0) {
-                currentIndex = newIndex;
-            }
-
             updateCalendar();
+            }
+            
             closeSlots();
         }
 
@@ -349,7 +387,7 @@
         function showCalendar() {
             const loader = document.getElementById('calendar-loader');
             const container = document.getElementById('calendar-container');
-
+            
             if (!loader || !container) {
                 console.error('Éléments du calendrier non trouvés');
                 return;
@@ -363,7 +401,7 @@
             // Masquer le loader et afficher le calendrier
             loader.style.transition = 'opacity 0.3s ease';
             container.style.transition = 'opacity 0.3s ease';
-
+            
             setTimeout(function() {
                 loader.style.opacity = '0';
                 setTimeout(function() {
@@ -371,18 +409,18 @@
                     loader.style.display = 'none';
                     loader.style.visibility = 'hidden';
                     loader.style.pointerEvents = 'none';
-
+                    
                     // Activer le calendrier
                     container.style.opacity = '1';
                     container.style.pointerEvents = 'auto';
                     container.style.visibility = 'visible';
-
+                    
                     // Marquer le calendrier comme prêt
                     calendarReady = true;
-
+                    
                     // Réactiver les boutons de navigation
                     updateCalendar();
-
+                    
                     console.log('Calendrier activé et prêt');
                 }, 300);
             }, 100);
@@ -409,26 +447,26 @@
                 console.log('Fallback: activation forcée du calendrier');
                 const loader = document.getElementById('calendar-loader');
                 const container = document.getElementById('calendar-container');
-
+                
                 if (loader) {
                     loader.style.display = 'none';
                     loader.style.visibility = 'hidden';
                     loader.style.pointerEvents = 'none';
                     loader.style.opacity = '0';
                 }
-
+                
                 if (container) {
                     container.style.opacity = '1';
                     container.style.pointerEvents = 'auto';
                     container.style.visibility = 'visible';
                 }
-
+                
                 calendarReady = true;
-
+                
                 if (months.length > 0) {
                     updateCalendar();
                 }
-
+                
                 console.log('Calendrier activé par fallback');
             }
         }, 1000);
@@ -460,10 +498,18 @@
                 }
 
                 link.href = url;
-                link.className = 'btn btn-outline-primary fw-bold w-100 py-3 mb-2 slot-btn';
+                link.className = 'btn btn-outline-primary fw-bold w-100 py-3 mb-2 slot-btn position-relative';
                 link.textContent = time;
 
-                // PLUS AUCUN POPUP JS ICI -> C'est direct vers la page résumé
+                // Ajouter un loader au clic
+                link.addEventListener('click', function(e) {
+                    // Afficher le loader au centre de la page
+                    const slotLoader = document.getElementById('slot-loading');
+                    if (slotLoader) {
+                        slotLoader.classList.remove('d-none');
+                        slotLoader.style.display = 'flex';
+                    }
+                });
 
                 list.appendChild(link);
             });

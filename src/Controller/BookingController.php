@@ -228,7 +228,7 @@ class BookingController extends AbstractController
         // Générer les créneaux pour le mois spécifique
         $monthStart = new \DateTime($month . '-01');
         $monthEnd = (clone $monthStart)->modify('last day of this month');
-
+        
         $slots = $this->generateSlotsForMonth(
             $calculationUser,
             $event,
@@ -244,7 +244,7 @@ class BookingController extends AbstractController
         // Retourner seulement le mois demandé au format attendu par le frontend
         $monthKey = $monthStart->format('Y-m');
         $monthData = null;
-
+        
         // Chercher le mois dans les résultats
         foreach ($slots as $slot) {
             if ($slot['label'] instanceof \DateTime) {
@@ -255,30 +255,30 @@ class BookingController extends AbstractController
                 }
             }
         }
-
+        
         if (!$monthData) {
             return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => 'Mois non trouvé'], 404);
         }
 
         // Formater les données pour le frontend
         $formattedData = [
-            'label' => $monthData['label'] instanceof \DateTime
-                ? $monthData['label']->format('F Y')
+            'label' => $monthData['label'] instanceof \DateTime 
+                ? $this->formatMonthLabel($monthData['label'])
                 : $monthData['label'],
             'days' => array_map(function($day) {
                 return [
-                    'dateObj' => $day['dateObj'] instanceof \DateTime
-                        ? $day['dateObj']->format('Y-m-d')
+                    'dateObj' => $day['dateObj'] instanceof \DateTime 
+                        ? $day['dateObj']->format('Y-m-d') 
                         : $day['dateObj'],
                     'dayNum' => $day['dayNum'],
                     'isToday' => $day['isToday'] ?? false,
                     'hasAvailability' => $day['hasAvailability'] ?? false,
                     'slots' => $day['slots'] ?? [],
-                    'dateText' => $day['dateObj'] instanceof \DateTime
-                        ? $day['dateObj']->format('Y-m-d')
+                    'dateText' => $day['dateObj'] instanceof \DateTime 
+                        ? $day['dateObj']->format('Y-m-d') 
                         : '',
-                    'dateValue' => $day['dateObj'] instanceof \DateTime
-                        ? $day['dateObj']->format('Y-m-d')
+                    'dateValue' => $day['dateObj'] instanceof \DateTime 
+                        ? $day['dateObj']->format('Y-m-d') 
                         : ''
                 ];
             }, $monthData['days'] ?? [])
@@ -541,7 +541,7 @@ class BookingController extends AbstractController
 
         // OPTIMISATION CRITIQUE : Cache pour les vérifications Outlook par demi-journée
         // Évite les centaines d'appels API (un par créneau) en vérifiant seulement 2 fois par jour
-        // Limité aux 3 prochains mois (90 jours) pour équilibrer performance et précision
+        // Limité aux 30 prochains jours (1 mois) pour équilibrer performance et précision
         $outlookDayCache = [];
 
         $currentDate = clone $startPeriod;
@@ -638,7 +638,7 @@ class BookingController extends AbstractController
                                     // Clé du cache : date + période (matin = avant 13h, après-midi = 13h et après)
                                     $period = (int)$start->format('H') < 13 ? 'morning' : 'afternoon';
                                     $cacheKey = $currentDate->format('Y-m-d') . '_' . $period;
-
+                                    
                                     if (!isset($outlookDayCache[$cacheKey])) {
                                         // Vérifier une seule fois par demi-journée pour toutes les salles libres en BDD
                                         $periodStart = (clone $currentDate)->setTime($period === 'morning' ? 8 : 13, 0, 0);
@@ -785,5 +785,22 @@ class BookingController extends AbstractController
             ->attach($icsContent, 'rendez-vous.ics', 'application/octet-stream');
 
         $mailer->send($email);
+    }
+
+    /**
+     * Formate un DateTime en label de mois en français (ex: "Mars 2026")
+     */
+    private function formatMonthLabel(\DateTime $date): string
+    {
+        $months = [
+            1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
+            5 => 'Mai', 6 => 'Juin', 7 => 'Juillet', 8 => 'Août',
+            9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre'
+        ];
+        
+        $month = (int)$date->format('n');
+        $year = $date->format('Y');
+        
+        return $months[$month] . ' ' . $year;
     }
 }

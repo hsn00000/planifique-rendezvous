@@ -91,15 +91,14 @@
                 </div>
 
                 {# Overlay de chargement #}
-                <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="background: rgba(0,0,0,0.5); z-index: 9999; backdrop-filter: blur(2px);">
-                    <div class="d-flex align-items-center justify-content-center h-100">
-                        <div class="text-center text-white">
-                            <div class="spinner-border spinner-border-lg mb-3" role="status" style="width: 3rem; height: 3rem;">
-                                <span class="visually-hidden">Chargement...</span>
-                            </div>
-                            <div class="fs-5 fw-bold">Validation en cours...</div>
-                            <div class="small mt-2 opacity-75">Vérification des disponibilités et réservation de la salle</div>
+                <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center bg-white" style="z-index: 9999; pointer-events: auto;">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
+                            <span class="visually-hidden">Chargement...</span>
                         </div>
+                        <h5 class="fw-bold text-dark mb-2">Validation en cours</h5>
+                        <p class="text-muted small mb-0">Vérification des disponibilités et réservation de la salle...</p>
+                        <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Veuillez patienter</p>
                     </div>
                 </div>
 
