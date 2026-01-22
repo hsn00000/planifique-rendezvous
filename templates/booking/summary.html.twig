@@ -76,7 +76,7 @@
                         <div>
                             <div class="small text-muted text-uppercase fw-bold mb-1">Lieu</div>
                             <div class="fw-bold text-dark">
-                                {% if lieu == 'visio' %}
+                                {% if lieu == 'visio' or lieu == 'Visioconférence' %}
                                     En visioconférence (Teams/Zoom)
                                 {% elseif lieu == 'Cabinet-geneve' %}
                                     Cabinet de Genève
@@ -86,6 +86,16 @@
                                     {{ lieu }}
                                 {% endif %}
                             </div>
+                            {% if lieu == 'visio' or lieu == 'Visioconférence' %}
+                                <div class="alert alert-info mt-3 mb-0" style="background-color: #eff6ff; border-left: 4px solid #2563eb; border-radius: 4px; padding: 12px;">
+                                    <div class="fw-bold text-primary mb-1" style="font-size: 14px;">
+                                        📧 Connexion en tant qu'invité
+                                    </div>
+                                    <div class="text-dark small" style="line-height: 1.5;">
+                                        Vous recevrez un lien de connexion par email. Vous pourrez vous connecter en tant qu'invité grâce à votre adresse email : <strong>{{ client.email }}</strong>
+                                    </div>
+                                </div>
+                            {% endif %}
                             {% if client.adresse is defined and client.adresse %}
                                 <div class="text-muted small mt-1">{{ client.adresse }}</div>
                             {% endif %}
@@ -103,11 +113,12 @@
 
                 {# Boutons d'action #}
                 <div class="d-grid gap-2">
-                    <form id="validateForm" action="{{ path('app_booking_finalize', {'eventId': event.id}) }}" method="GET">
+                    <form id="validateForm" action="{{ path('app_booking_finalize', {'eventId': event.id}) }}" method="POST">
                         <input type="hidden" name="date" value="{{ dateParam }}">
                         {% if userIdParam %}
                             <input type="hidden" name="user" value="{{ userIdParam }}">
                         {% endif %}
+                        <input type="hidden" name="lieu" value="{{ lieu }}">
                         <button type="submit" id="validateBtn" class="btn btn-primary btn-lg rounded-pill fw-bold py-3 shadow-sm w-100 position-relative" style="min-height: 56px;">
                             <span id="validateText">
                                 <i class="fas fa-check-circle me-2"></i>Confirmer ce rendez-vous

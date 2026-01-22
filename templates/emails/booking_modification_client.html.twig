@@ -101,12 +101,24 @@
                                             <td>
                                                 <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Lieu</div>
                                                 <div style="font-size: 16px; color: #111827; font-weight: 600;">
-                                                    {% if rdv.typeLieu == 'Visioconférence' %}
+                                                    {% if rdv.typeLieu == 'Visioconférence' or rdv.typeLieu == 'visio' %}
                                                         🌐 En visioconférence (Teams/Zoom)
                                                     {% else %}
                                                         📍 {{ rdv.typeLieu }}
                                                     {% endif %}
                                                 </div>
+
+                                                {# Message spécial pour la visioconférence #}
+                                                {% if rdv.typeLieu == 'Visioconférence' or rdv.typeLieu == 'visio' %}
+                                                    <div style="margin-top: 12px; padding: 12px; background-color: #eff6ff; border-left: 4px solid #2563eb; border-radius: 4px;">
+                                                        <div style="font-size: 14px; color: #1e40af; font-weight: 600; margin-bottom: 4px;">
+                                                            📧 Connexion en tant qu'invité
+                                                        </div>
+                                                        <div style="font-size: 13px; color: #1e3a8a; line-height: 1.5;">
+                                                            Vous recevrez un lien de connexion par email. Vous pourrez vous connecter en tant qu'invité grâce à votre adresse email : <strong>{{ rdv.email }}</strong>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
                                             </td>
                                         </tr>
                                     </table>

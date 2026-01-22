@@ -86,12 +86,24 @@
                                             <td>
                                                 <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Où ?</div>
                                                 <div style="font-size: 16px; color: #111827; font-weight: 600;">
-                                                    {% if rdv.typeLieu == 'visio' %}
+                                                    {% if rdv.typeLieu == 'visio' or rdv.typeLieu == 'Visioconférence' %}
                                                         🌐 En visioconférence (Teams/Zoom)
                                                     {% else %}
                                                         📍 {{ rdv.typeLieu }}
                                                     {% endif %}
                                                 </div>
+
+                                                {# Message spécial pour la visioconférence #}
+                                                {% if rdv.typeLieu == 'visio' or rdv.typeLieu == 'Visioconférence' %}
+                                                    <div style="margin-top: 12px; padding: 12px; background-color: #eff6ff; border-left: 4px solid #2563eb; border-radius: 4px;">
+                                                        <div style="font-size: 14px; color: #1e40af; font-weight: 600; margin-bottom: 4px;">
+                                                            📧 Connexion en tant qu'invité
+                                                        </div>
+                                                        <div style="font-size: 13px; color: #1e3a8a; line-height: 1.5;">
+                                                            Vous recevrez un lien de connexion par email. Vous pourrez vous connecter en tant qu'invité grâce à votre adresse email : <strong>{{ rdv.email }}</strong>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
 
                                                 {# Affichage intelligent de l'adresse #}
                                                 {% if rdv.adresse %}
@@ -99,7 +111,7 @@
                                                         {{ rdv.adresse }}
                                                     </div>
                                                     {# Lien Google Maps si c'est un lieu physique #}
-                                                    {% if rdv.typeLieu != 'visio' %}
+                                                    {% if rdv.typeLieu != 'visio' and rdv.typeLieu != 'Visioconférence' %}
                                                         <div style="margin-top: 8px;">
                                                             <a href="https://www.google.com/maps/search/?api=1&query={{ rdv.adresse|url_encode }}" style="color: #2563eb; text-decoration: none; font-size: 13px; font-weight: 500;">
                                                                 Voir sur la carte &rarr;
