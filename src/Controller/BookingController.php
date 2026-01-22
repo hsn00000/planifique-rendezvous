@@ -225,52 +225,81 @@ class BookingController extends AbstractController
             return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => 'Utilisateur non trouvé'], 404);
         }
 
-        // Générer les créneaux pour le mois spécifique
-        $monthStart = new \DateTime($month . '-01');
-        $monthEnd = (clone $monthStart)->modify('last day of this month');
-        
-        $slots = $this->generateSlotsForMonth(
-            $calculationUser,
-            $event,
-            $rdvRepo,
-            $dispoRepo,
-            $bureauRepo,
-            $outlookService,
-            $lieuChoisi,
-            $monthStart,
-            $monthEnd
-        );
+        try {
+            // Générer les créneaux pour le mois spécifique
+            $monthStart = new \DateTime($month . '-01');
+            $monthEnd = (clone $monthStart)->modify('last day of this month');
+            
+            $slots = $this->generateSlotsForMonth(
+                $calculationUser,
+                $event,
+                $rdvRepo,
+                $dispoRepo,
+                $bureauRepo,
+                $outlookService,
+                $lieuChoisi,
+                $monthStart,
+                $monthEnd
+            );
 
-        // Retourner seulement le mois demandé au format attendu par le frontend
-        $monthKey = $monthStart->format('Y-m');
-        $monthData = null;
-        
-        // Chercher le mois dans les résultats
-        foreach ($slots as $slot) {
-            if ($slot['label'] instanceof \DateTime) {
-                $slotMonthKey = $slot['label']->format('Y-m');
-                if ($slotMonthKey === $monthKey) {
-                    $monthData = $slot;
-                    break;
+            // Retourner seulement le mois demandé au format attendu par le frontend
+            $monthKey = $monthStart->format('Y-m');
+            $monthData = null;
+            
+            // Les slots sont indexés par clé de mois (Y-m) ou dans un tableau
+            if (isset($slots[$monthKey])) {
+                // Si les slots sont indexés directement par la clé du mois
+                $monthData = $slots[$monthKey];
+            } else {
+                // Chercher le mois dans les résultats (tableau indexé numériquement)
+                foreach ($slots as $slot) {
+                    if (isset($slot['label'])) {
+                        if ($slot['label'] instanceof \DateTime) {
+                            $slotMonthKey = $slot['label']->format('Y-m');
+                            if ($slotMonthKey === $monthKey) {
+                                $monthData = $slot;
+                                break;
+                            }
+                        } elseif (is_string($slot['label'])) {
+                            // Si le label est déjà une string, extraire la clé
+                            $slotMonthKey = $slot['label'];
+                            if (strpos($slotMonthKey, $monthKey) !== false) {
+                                $monthData = $slot;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
-        }
-        
-        if (!$monthData) {
-            return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => 'Mois non trouvé'], 404);
+            
+            // Si le mois n'est pas trouvé, créer un mois vide plutôt que de retourner une erreur
+            if (!$monthData) {
+                $monthData = [
+                    'label' => $monthStart,
+                    'days' => []
+                ];
+            }
+        } catch (\Exception $e) {
+            // En cas d'erreur, retourner un mois vide plutôt qu'une erreur pour éviter de bloquer le calendrier
+            $monthStart = new \DateTime($month . '-01');
+            $formattedData = [
+                'label' => $this->formatMonthLabel($monthStart),
+                'days' => []
+            ];
+            return new \Symfony\Component\HttpFoundation\JsonResponse($formattedData);
         }
 
         // Formater les données pour le frontend
         $formattedData = [
             'label' => $monthData['label'] instanceof \DateTime 
                 ? $this->formatMonthLabel($monthData['label'])
-                : $monthData['label'],
+                : ($monthData['label'] ?? $this->formatMonthLabel($monthStart)),
             'days' => array_map(function($day) {
                 return [
                     'dateObj' => $day['dateObj'] instanceof \DateTime 
                         ? $day['dateObj']->format('Y-m-d') 
                         : $day['dateObj'],
-                    'dayNum' => $day['dayNum'],
+                    'dayNum' => $day['dayNum'] ?? '',
                     'isToday' => $day['isToday'] ?? false,
                     'hasAvailability' => $day['hasAvailability'] ?? false,
                     'slots' => $day['slots'] ?? [],

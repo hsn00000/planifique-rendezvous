@@ -210,10 +210,24 @@
         });
 
         function updateCalendar() {
-            months.forEach((m, index) => {
-                if (index === currentIndex) {
+            // Trouver le mois correspondant à l'index actuel en utilisant data-index ou data-month-key
+            const targetMonthKey = getMonthKeyFromIndex(currentIndex);
+            const targetMonth = Array.from(months).find(m => {
+                const monthKey = m.dataset.monthKey;
+                const monthIndex = m.dataset.index ? parseInt(m.dataset.index) : null;
+                return monthKey === targetMonthKey || monthIndex === currentIndex;
+            });
+            
+            months.forEach((m) => {
+                const monthKey = m.dataset.monthKey;
+                const monthIndex = m.dataset.index ? parseInt(m.dataset.index) : null;
+                const isTarget = monthKey === targetMonthKey || monthIndex === currentIndex;
+                
+                if (isTarget) {
                     m.classList.remove('d-none');
-                    label.textContent = m.dataset.label;
+                    if (targetMonth) {
+                        label.textContent = targetMonth.dataset.label || m.dataset.label;
+                    }
                 } else {
                     m.classList.add('d-none');
                 }
@@ -225,9 +239,9 @@
             
             // Activer les boutons seulement si le calendrier est prêt
             if (calendarReady) {
-                prevBtn.disabled = false;
-                nextBtn.disabled = false;
-                prevBtn.style.opacity = '1';
+                prevBtn.disabled = (currentIndex === 0);
+                nextBtn.disabled = false; // On peut toujours aller vers le futur
+                prevBtn.style.opacity = (currentIndex === 0) ? '0.3' : '1';
                 nextBtn.style.opacity = '1';
             } else {
                 prevBtn.disabled = true;
@@ -253,10 +267,21 @@
                 const response = await fetch(url);
                 
                 if (!response.ok) {
-                    throw new Error('Erreur lors du chargement');
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || errorData.message || 'Erreur lors du chargement');
                 }
 
                 const monthData = await response.json();
+                
+                // Vérifier si la réponse contient une erreur
+                if (monthData.error) {
+                    throw new Error(monthData.message || monthData.error);
+                }
+                
+                // Vérifier que les données sont valides
+                if (!monthData || !monthData.label) {
+                    throw new Error('Données du mois invalides');
+                }
                 
                 // Créer l'élément HTML pour le mois
                 const monthElement = createMonthElement(monthData, monthKey);
@@ -273,11 +298,10 @@
                 monthLoading.style.display = 'none';
                 monthLoading.style.pointerEvents = 'none';
                 
-                // Trouver l'index du mois chargé et mettre à jour si nécessaire
-                const loadedMonthIndex = months.findIndex(m => m.dataset.monthKey === monthKey);
-                if (loadedMonthIndex !== -1 && loadedMonthIndex === currentIndex) {
-                    updateCalendar();
-                }
+                // Mettre à jour la liste des mois après l'insertion
+                months = Array.from(document.querySelectorAll('.month-grid[data-loaded="true"]'));
+                
+                // Ne pas mettre à jour currentIndex ici - laisser changeMonth() le faire
             } catch (error) {
                 console.error('Erreur lors du chargement du mois:', error);
                 
@@ -308,24 +332,45 @@
             div.dataset.monthKey = monthKey;
             div.dataset.loaded = 'true';
             div.dataset.label = monthData.label || '';
-            div.dataset.index = months.length; // Index pour la navigation
+            div.dataset.index = getIndexFromMonthKey(monthKey); // Index calculé à partir de la clé
             
             const calendarGrid = document.createElement('div');
             calendarGrid.className = 'calendar-grid';
             
-            // Padding pour le premier jour
-            if (monthData.days && monthData.days.length > 0) {
-                const firstDay = monthData.days[0];
-                const firstDate = new Date(firstDay.dateObj + 'T00:00:00');
+            // Si le mois n'a pas de jours, créer un mois vide avec tous les jours désactivés
+            if (!monthData.days || monthData.days.length === 0) {
+                // Calculer le premier jour du mois et le padding
+                const [year, month] = monthKey.split('-').map(Number);
+                const firstDate = new Date(year, month - 1, 1);
                 const dayOfWeek = firstDate.getDay();
                 const startPadding = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                
+                // Ajouter le padding
                 for (let i = 0; i < startPadding; i++) {
                     calendarGrid.appendChild(document.createElement('div'));
                 }
-            }
-            
-            // Ajouter les jours
-            if (monthData.days) {
+                
+                // Ajouter tous les jours du mois comme désactivés
+                const daysInMonth = new Date(year, month, 0).getDate();
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const divDay = document.createElement('div');
+                    divDay.className = 'day-disabled';
+                    divDay.textContent = day;
+                    calendarGrid.appendChild(divDay);
+                }
+            } else {
+                // Padding pour le premier jour
+                const firstDay = monthData.days[0];
+                if (firstDay && firstDay.dateObj) {
+                    const firstDate = new Date(firstDay.dateObj + 'T00:00:00');
+                    const dayOfWeek = firstDate.getDay();
+                    const startPadding = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                    for (let i = 0; i < startPadding; i++) {
+                        calendarGrid.appendChild(document.createElement('div'));
+                    }
+                }
+                
+                // Ajouter les jours
                 monthData.days.forEach(day => {
                     if (day.hasAvailability) {
                         const btn = document.createElement('button');
@@ -358,6 +403,18 @@
             const targetMonth = new Date(now.getFullYear(), now.getMonth() + index, 1);
             return targetMonth.getFullYear() + '-' + String(targetMonth.getMonth() + 1).padStart(2, '0');
         }
+        
+        // Calculer l'index à partir de la clé du mois (pour trouver le mois initial)
+        function getIndexFromMonthKey(monthKey) {
+            const [year, month] = monthKey.split('-').map(Number);
+            const now = new Date();
+            const targetDate = new Date(year, month - 1, 1);
+            const currentDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            
+            const diffMonths = (targetDate.getFullYear() - currentDate.getFullYear()) * 12 + 
+                              (targetDate.getMonth() - currentDate.getMonth());
+            return diffMonths;
+        }
 
         async function changeMonth(dir) {
             if (!calendarReady) {
@@ -365,6 +422,11 @@
             }
 
             const newIndex = currentIndex + dir;
+            
+            // Vérifier que l'index est valide avant de charger
+            if (newIndex < 0) {
+                return false;
+            }
             
             // Charger le mois suivant/précédent s'il n'est pas encore chargé
             const targetMonthKey = getMonthKeyFromIndex(newIndex);
@@ -374,11 +436,9 @@
                 months = Array.from(document.querySelectorAll('.month-grid[data-loaded="true"]'));
             }
 
-            // Vérifier que l'index est valide
-            if (newIndex >= 0 && newIndex < months.length) {
-                currentIndex = newIndex;
+            // Utiliser l'index calculé directement (les mois sont chargés dans l'ordre)
+            currentIndex = newIndex;
             updateCalendar();
-            }
             
             closeSlots();
         }
