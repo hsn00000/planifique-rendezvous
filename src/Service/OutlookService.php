@@ -352,7 +352,7 @@ class OutlookService
     }
 
     /**
-     * Vérifie rapidement si au moins une salle est libre côté Outlook (optimisé pour l'affichage du calendrier)
+     * Vérifie rapidement si au moins une salle est libre côté Outlook (optimisé avec batch API)
      * Retourne true si au moins une salle est libre, false sinon
      */
     public function hasAtLeastOneFreeRoomOnOutlook(User $user, array $bureaux, \DateTimeInterface $start, \DateTimeInterface $end): bool
@@ -366,25 +366,59 @@ class OutlookService
         $this->refreshAccessTokenIfExpired($account);
         $token = $account->getAccessToken();
 
-        // On teste chaque bureau et on s'arrête dès qu'on trouve une salle libre
-        foreach ($bureaux as $bureau) {
-            if (!$bureau->getEmail()) {
-                // Une salle sans email ne peut pas être vérifiée → on la considère comme disponible
-                return true;
-            }
+        // Filtrer les bureaux avec email
+        $bureauxWithEmail = array_filter($bureaux, fn($b) => !empty($b->getEmail()));
 
-            try {
-                if ($this->isRoomFreeOnOutlook($token, $bureau->getEmail(), $start, $end)) {
-                    // Au moins une salle est libre → on retourne true immédiatement
-                    return true;
-                }
-            } catch (\Exception $e) {
-                // Si erreur Graph, on continue avec la salle suivante
-                continue;
-            }
+        // Si aucun bureau n'a d'email, on considère comme disponible
+        if (empty($bureauxWithEmail)) {
+            return true;
         }
 
-        // Aucune salle libre trouvée
-        return false;
+        // OPTIMISATION : Utiliser l'API batch pour vérifier toutes les salles en une seule requête
+        try {
+            $roomEmails = array_map(fn($b) => $b->getEmail(), $bureauxWithEmail);
+
+            $client = new \GuzzleHttp\Client();
+            $payload = [
+                'schedules' => $roomEmails,
+                'startTime' => [
+                    'dateTime' => $start->format('Y-m-d\TH:i:s'),
+                    'timeZone' => 'Europe/Paris',
+                ],
+                'endTime' => [
+                    'dateTime' => $end->format('Y-m-d\TH:i:s'),
+                    'timeZone' => 'Europe/Paris',
+                ],
+                'availabilityViewInterval' => 30,
+            ];
+
+            $response = $client->post('https://graph.microsoft.com/v1.0/me/calendar/getSchedule', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type'  => 'application/json',
+                ],
+                'json' => $payload,
+                'timeout' => 3, // Timeout de 3 secondes
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
+            $schedules = $data['value'] ?? [];
+
+            // Vérifier si au moins une salle est libre
+            foreach ($schedules as $schedule) {
+                $view = $schedule['availabilityView'] ?? '';
+                if (is_string($view) && $view !== '' && !preg_match('/[1-9]/', $view)) {
+                    // Cette salle est libre (tous les créneaux sont '0')
+                    return true;
+                }
+            }
+
+            // Aucune salle libre trouvée
+            return false;
+
+        } catch (\Exception $e) {
+            // En cas d'erreur, on retourne false pour sécurité
+            return false;
+        }
     }
 }
