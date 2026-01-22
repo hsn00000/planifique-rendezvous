@@ -376,6 +376,9 @@ class BookingController extends AbstractController
         if ($dateLimite && $endPeriod < new \DateTime('today')) return [];
 
         $now = new \DateTime();
+        // Utiliser le délai minimum de réservation configuré par l'admin
+        $delaiMinimum = $event->getDelaiMinimumReservation() ?? 0; // En minutes
+        $minBookingTime = (clone $now)->modify("+$delaiMinimum minutes");
 
         // Chargement des RDV du conseiller
         $allRdvs = $rdvRepo->createQueryBuilder('r')
@@ -392,11 +395,11 @@ class BookingController extends AbstractController
             $entityManager = $rdvRepo->getEntityManager();
             $query = $entityManager->createQuery(
                 'SELECT r, b
-             FROM App\Entity\RendezVous r
-             INNER JOIN r.bureau b
-             WHERE b.lieu = :lieu
-             AND r.dateDebut >= :start
-             AND r.dateDebut <= :end'
+         FROM App\Entity\RendezVous r
+         INNER JOIN r.bureau b
+         WHERE b.lieu = :lieu
+         AND r.dateDebut >= :start
+         AND r.dateDebut <= :end'
             )->setParameters([
                 'lieu' => $lieu,
                 'start' => $startPeriod,
@@ -457,10 +460,9 @@ class BookingController extends AbstractController
                         $slotEnd = (clone $start)->modify("+$duration minutes");
                         if ($slotEnd > $end) break;
 
-                        // VÉRIFICATION : Le créneau ne doit pas être dans le passé
-                        // On recrée la date actuelle à chaque vérification pour être sûr d'avoir l'heure exacte
-                        $currentTime = new \DateTime();
-                        if ($start < $currentTime) {
+                        // VÉRIFICATION : Le créneau doit respecter le délai minimum de réservation
+                        // Utilise le délai configuré par l'admin au lieu de vérifier l'heure actuelle à chaque fois
+                        if ($start < $minBookingTime) {
                             $start->modify("+$increment minutes");
                             continue;
                         }
@@ -503,8 +505,7 @@ class BookingController extends AbstractController
                             if (empty($freeBureauxInBdd)) {
                                 $isFree = false; // Aucune salle libre en BDD → on masque ce créneau
                             } else {
-                                // Vérification Outlook optimisée : vérifie toutes les salles en une seule requête batch
-                                // OPTIMISATION : On vérifie Outlook seulement pour les 14 prochains jours pour éviter les timeouts
+                                // Vérification Outlook optimisée : seulement pour les 14 prochains jours
                                 $daysFromNow = (int)(($currentDate->getTimestamp() - $now->getTimestamp()) / 86400);
                                 if ($daysFromNow >= 0 && $daysFromNow <= 14) {
                                     try {
@@ -514,7 +515,6 @@ class BookingController extends AbstractController
                                         }
                                     } catch (\Exception $e) {
                                         // En cas d'erreur/timeout Outlook, on bloque le créneau par sécurité
-                                        // pour éviter de proposer un créneau qui pourrait être occupé
                                         $isFree = false;
                                     }
                                 }

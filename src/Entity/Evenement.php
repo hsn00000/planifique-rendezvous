@@ -41,6 +41,9 @@ class Evenement
     #[ORM\Column(options: ['default' => 0])]
     private ?int $tamponApres = 0; // En minutes (ex: 60)
 
+    #[ORM\Column(options: ['default' => 0])]
+    private ?int $delaiMinimumReservation = 0; // Délai minimum en minutes avant de pouvoir réserver (ex: 120 = 2h)
+
     #[ORM\ManyToOne(inversedBy: 'evenements')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Groupe $groupe = null;
@@ -164,6 +167,16 @@ class Evenement
         return $this;
     }
 
+    public function getDelaiMinimumReservation(): ?int
+    {
+        return $this->delaiMinimumReservation;
+    }
+
+    public function setDelaiMinimumReservation(int $delaiMinimumReservation): static
+    {
+        $this->delaiMinimumReservation = $delaiMinimumReservation;
+        return $this;
+    }
 
     public function __toString(): string
     {

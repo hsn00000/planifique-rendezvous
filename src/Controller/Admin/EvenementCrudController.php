@@ -39,6 +39,9 @@ class EvenementCrudController extends AbstractCrudController
             IntegerField::new('tamponApres', 'Pause APRES (min)')
                 ->setHelp('Temps bloqué après la fin pour le debriefing ou le trajet.')
                 ->setColumns(6),
+            IntegerField::new('delaiMinimumReservation', 'Délai minimum de réservation (min)')
+                ->setHelp('Délai minimum en minutes avant de pouvoir réserver un créneau (ex: 120 = 2h). Les créneaux dans ce délai ne seront pas affichés.')
+                ->setColumns(6),
 
             FormField::addPanel('Options'),
             AssociationField::new('groupe', 'Groupe associé'),
