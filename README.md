@@ -26,7 +26,7 @@
 
 ## 🎯 Présentation
 
-**Planifique** est une application web interne développée pour simplifier la gestion des rendez-vous entre conseillers et clients. L'application s'intègre nativement avec Microsoft 365 et synchronise automatiquement les créneaux avec Outlook.
+**Planifique Rendez-vous** est une application web interne développée pour simplifier la gestion des rendez-vous entre conseillers et clients. L'application s'intègre nativement avec Microsoft 365 et synchronise automatiquement les créneaux avec Outlook.
 
 ### ✨ Points clés
 
