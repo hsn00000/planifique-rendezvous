@@ -63,7 +63,19 @@
                 {# --- DROITE --- #}
                 <div class="col-lg-8 bg-white position-relative d-flex flex-column">
 
-                    <div id="calendar-container" class="p-4 p-md-5 flex-grow-1 h-100 d-flex flex-column">
+                    {# Loader initial - reste affiché jusqu'à ce que le calendrier soit prêt #}
+                    <div id="calendar-loader" class="p-4 p-md-5 flex-grow-1 h-100 d-flex flex-column align-items-center justify-content-center position-absolute top-0 start-0 w-100 h-100 bg-white" style="z-index: 1000; pointer-events: auto;">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
+                                <span class="visually-hidden">Chargement...</span>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-2">Chargement du calendrier</h5>
+                            <p class="text-muted small mb-0">Vérification des disponibilités en cours...</p>
+                            <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Cela peut prendre quelques secondes</p>
+                        </div>
+                    </div>
+
+                    <div id="calendar-container" class="p-4 p-md-5 flex-grow-1 h-100 d-flex flex-column" style="opacity: 0; pointer-events: none;">
 
                         <div class="mb-4">
                              <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill fw-bold mb-3 text-uppercase" style="font-size: 0.7rem; letter-spacing: 1px;">
@@ -79,10 +91,10 @@
                                 Chargement...
                             </h4>
                             <div class="d-flex gap-2">
-                                <button onclick="changeMonth(-1)" class="btn btn-light btn-sm rounded-circle border" id="prev-month-btn" style="width: 32px; height: 32px;">
+                                <button onclick="changeMonth(-1)" class="btn btn-light btn-sm rounded-circle border" id="prev-month-btn" style="width: 32px; height: 32px;" disabled>
                                     <i class="fas fa-chevron-left text-muted"></i>
                                 </button>
-                                <button onclick="changeMonth(1)" class="btn btn-light btn-sm rounded-circle border" id="next-month-btn" style="width: 32px; height: 32px;">
+                                <button onclick="changeMonth(1)" class="btn btn-light btn-sm rounded-circle border" id="next-month-btn" style="width: 32px; height: 32px;" disabled>
                                     <i class="fas fa-chevron-right text-muted"></i>
                                 </button>
                             </div>
@@ -93,12 +105,14 @@
                             <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
                         </div>
 
-                        {# Mois #}
+                        {# Mois - Chargement progressif comme Calendly #}
                         <div id="months-wrapper" class="flex-grow-1 position-relative">
                             {% for monthData in slotsByDay %}
                                 <div class="month-grid d-none w-100"
                                      data-index="{{ loop.index0 }}"
-                                     data-label="{{ monthData.label|format_datetime(pattern='MMMM yyyy', locale='fr')|capitalize }}">
+                                     data-month-key="{{ monthData.label|date('Y-m') }}"
+                                     data-label="{{ monthData.label|format_datetime(pattern='MMMM yyyy', locale='fr')|capitalize }}"
+                                     data-loaded="true">
 
                                     <div class="calendar-grid">
                                         {% set firstDay = monthData.days|first %}
@@ -124,6 +138,18 @@
                                     <p class="text-muted">Aucune disponibilité.</p>
                                 </div>
                             {% endfor %}
+
+                            {# Placeholder pour les mois non chargés #}
+                            <div id="month-loading" class="month-grid d-none w-100" style="min-height: 300px;">
+                                <div class="d-flex align-items-center justify-content-center h-100">
+                                    <div class="text-center">
+                                        <div class="spinner-border text-primary mb-3" role="status">
+                                            <span class="visually-hidden">Chargement...</span>
+                                        </div>
+                                        <p class="text-muted small mb-0">Chargement du mois...</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -150,12 +176,26 @@
     </div>
 
     <script>
+        // Variables globales
+        let calendarReady = false;
         let currentIndex = 0;
-        const months = document.querySelectorAll('.month-grid');
+        let months = Array.from(document.querySelectorAll('.month-grid[data-loaded="true"]'));
         const label = document.getElementById('current-month-label');
         const prevBtn = document.getElementById('prev-month-btn');
         const nextBtn = document.getElementById('next-month-btn');
         const slotsPanel = document.getElementById('slots-panel');
+        const monthsWrapper = document.getElementById('months-wrapper');
+        const monthLoading = document.getElementById('month-loading');
+        const eventId = {{ event.id }};
+        const userId = {{ userId|default('null') }};
+        const loadedMonths = new Set(); // Cache des mois déjà chargés
+
+        // Initialiser le cache avec les mois déjà chargés
+        months.forEach(m => {
+            if (m.dataset.monthKey) {
+                loadedMonths.add(m.dataset.monthKey);
+            }
+        });
 
         function updateCalendar() {
             months.forEach((m, index) => {
@@ -166,22 +206,239 @@
                     m.classList.add('d-none');
                 }
             });
-            prevBtn.disabled = (currentIndex === 0);
-            nextBtn.disabled = (currentIndex === months.length - 1);
-            prevBtn.style.opacity = (currentIndex === 0) ? '0.3' : '1';
-            nextBtn.style.opacity = (currentIndex === months.length - 1) ? '0.3' : '1';
+            monthLoading.classList.add('d-none');
+
+            // Activer les boutons seulement si le calendrier est prêt
+            if (calendarReady) {
+                prevBtn.disabled = false;
+                nextBtn.disabled = false;
+                prevBtn.style.opacity = '1';
+                nextBtn.style.opacity = '1';
+            } else {
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+                prevBtn.style.opacity = '0.3';
+                nextBtn.style.opacity = '0.3';
+            }
         }
 
-        function changeMonth(dir) {
-            if (dir === 1 && currentIndex < months.length - 1) currentIndex++;
-            if (dir === -1 && currentIndex > 0) currentIndex--;
+        // Charger un mois via AJAX (lazy loading comme Calendly)
+        async function loadMonth(monthKey) {
+            if (loadedMonths.has(monthKey)) {
+                return; // Déjà chargé
+            }
+
+            // Afficher le loader
+            monthLoading.classList.remove('d-none');
+            monthLoading.style.display = 'block';
+
+            try {
+                const url = `{{ path('app_booking_calendar_month', {'eventId': event.id}) }}?month=${monthKey}${userId ? '&user=' + userId : ''}`;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error('Erreur lors du chargement');
+                }
+
+                const monthData = await response.json();
+
+                // Créer l'élément HTML pour le mois
+                const monthElement = createMonthElement(monthData, monthKey);
+                monthsWrapper.insertBefore(monthElement, monthLoading);
+
+                // Mettre à jour la liste des mois
+                months = Array.from(document.querySelectorAll('.month-grid[data-loaded="true"]'));
+
+                // Marquer comme chargé
+                loadedMonths.add(monthKey);
+
+                // Si c'est le mois actuel, l'afficher
+                if (currentIndex === months.length - 1) {
+                    updateCalendar();
+                }
+            } catch (error) {
+                console.error('Erreur lors du chargement du mois:', error);
+                label.textContent = 'Erreur de chargement';
+            } finally {
+                monthLoading.classList.add('d-none');
+            }
+        }
+
+        // Créer l'élément HTML pour un mois
+        function createMonthElement(monthData, monthKey) {
+            const div = document.createElement('div');
+            div.className = 'month-grid d-none w-100';
+            div.dataset.monthKey = monthKey;
+            div.dataset.loaded = 'true';
+            div.dataset.label = monthData.label || '';
+            div.dataset.index = months.length; // Index pour la navigation
+
+            const calendarGrid = document.createElement('div');
+            calendarGrid.className = 'calendar-grid';
+
+            // Padding pour le premier jour
+            if (monthData.days && monthData.days.length > 0) {
+                const firstDay = monthData.days[0];
+                const firstDate = new Date(firstDay.dateObj + 'T00:00:00');
+                const dayOfWeek = firstDate.getDay();
+                const startPadding = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                for (let i = 0; i < startPadding; i++) {
+                    calendarGrid.appendChild(document.createElement('div'));
+                }
+            }
+
+            // Ajouter les jours
+            if (monthData.days) {
+                monthData.days.forEach(day => {
+                    if (day.hasAvailability) {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn btn-day' + (day.isToday ? ' today' : '');
+                        btn.textContent = day.dayNum;
+
+                        // Formater la date pour l'affichage
+                        const dateObj = new Date(day.dateObj + 'T00:00:00');
+                        const dateText = dateObj.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                        const dateValue = day.dateValue || day.dateObj;
+
+                        btn.onclick = () => selectDate(btn, day.slots, dateText, dateValue);
+                        calendarGrid.appendChild(btn);
+                    } else {
+                        const divDay = document.createElement('div');
+                        divDay.className = 'day-disabled';
+                        divDay.textContent = day.dayNum;
+                        calendarGrid.appendChild(divDay);
+                    }
+                });
+            }
+
+            div.appendChild(calendarGrid);
+            return div;
+        }
+
+        // Calculer la clé du mois (YYYY-MM) à partir de l'index
+        function getMonthKeyFromIndex(index) {
+            const now = new Date();
+            const targetMonth = new Date(now.getFullYear(), now.getMonth() + index, 1);
+            return targetMonth.getFullYear() + '-' + String(targetMonth.getMonth() + 1).padStart(2, '0');
+        }
+
+        async function changeMonth(dir) {
+            if (!calendarReady) {
+                return false;
+            }
+
+            const newIndex = currentIndex + dir;
+
+            // Charger le mois suivant/précédent s'il n'est pas encore chargé
+            const targetMonthKey = getMonthKeyFromIndex(newIndex);
+            if (!loadedMonths.has(targetMonthKey)) {
+                await loadMonth(targetMonthKey);
+            }
+
+            if (dir === 1 && newIndex < months.length) {
+                currentIndex = newIndex;
+            } else if (dir === -1 && newIndex >= 0) {
+                currentIndex = newIndex;
+            }
+
             updateCalendar();
             closeSlots();
         }
 
-        if (months.length > 0) updateCalendar();
+        // Masquer le loader et afficher le calendrier une fois que tout est prêt
+        function showCalendar() {
+            const loader = document.getElementById('calendar-loader');
+            const container = document.getElementById('calendar-container');
+
+            if (!loader || !container) {
+                console.error('Éléments du calendrier non trouvés');
+                return;
+            }
+
+            // Initialiser le calendrier d'abord
+            if (months.length > 0) {
+                updateCalendar();
+            }
+
+            // Masquer le loader et afficher le calendrier
+            loader.style.transition = 'opacity 0.3s ease';
+            container.style.transition = 'opacity 0.3s ease';
+
+            setTimeout(function() {
+                loader.style.opacity = '0';
+                setTimeout(function() {
+                    // Masquer complètement le loader
+                    loader.style.display = 'none';
+                    loader.style.visibility = 'hidden';
+                    loader.style.pointerEvents = 'none';
+
+                    // Activer le calendrier
+                    container.style.opacity = '1';
+                    container.style.pointerEvents = 'auto';
+                    container.style.visibility = 'visible';
+
+                    // Marquer le calendrier comme prêt
+                    calendarReady = true;
+
+                    // Réactiver les boutons de navigation
+                    updateCalendar();
+
+                    console.log('Calendrier activé et prêt');
+                }, 300);
+            }, 100);
+        }
+
+        // Attendre que le DOM soit chargé
+        function initCalendar() {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    setTimeout(showCalendar, 100);
+                });
+            } else {
+                // DOM déjà chargé
+                setTimeout(showCalendar, 100);
+            }
+        }
+
+        // Initialiser le calendrier
+        initCalendar();
+
+        // Fallback de sécurité : forcer l'activation après 1 seconde maximum
+        setTimeout(function() {
+            if (!calendarReady) {
+                console.log('Fallback: activation forcée du calendrier');
+                const loader = document.getElementById('calendar-loader');
+                const container = document.getElementById('calendar-container');
+
+                if (loader) {
+                    loader.style.display = 'none';
+                    loader.style.visibility = 'hidden';
+                    loader.style.pointerEvents = 'none';
+                    loader.style.opacity = '0';
+                }
+
+                if (container) {
+                    container.style.opacity = '1';
+                    container.style.pointerEvents = 'auto';
+                    container.style.visibility = 'visible';
+                }
+
+                calendarReady = true;
+
+                if (months.length > 0) {
+                    updateCalendar();
+                }
+
+                console.log('Calendrier activé par fallback');
+            }
+        }, 1000);
 
         function selectDate(btn, slots, dateText, dateValue) {
+            // Empêcher la sélection si le calendrier n'est pas encore prêt
+            if (!calendarReady) {
+                return false;
+            }
+
             document.querySelectorAll('.btn-day').forEach(b => b.classList.remove('active-day'));
             btn.classList.add('active-day');
             document.getElementById('selected-date-title').textContent = dateText;
@@ -245,5 +502,12 @@
 
         .slot-btn { border: 1px solid var(--primary-color); color: var(--primary-color); transition: 0.2s; }
         .slot-btn:hover { background-color: var(--primary-color); color: white; transform: translateX(5px); }
+
+        /* Désactiver les interactions pendant le chargement */
+        #calendar-container[style*="pointer-events: none"] .btn-day {
+            pointer-events: none !important;
+            opacity: 0.5;
+            cursor: not-allowed !important;
+        }
     </style>
 {% endblock %}

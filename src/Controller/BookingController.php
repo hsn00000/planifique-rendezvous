@@ -169,14 +169,122 @@ class BookingController extends AbstractController
         // Elle est coûteuse en temps et peut être faite en arrière-plan ou moins fréquemment
         // $outlookService->synchronizeCalendar($calculationUser);
 
-        $slotsByDay = $this->generateSlots($calculationUser, $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, $lieuChoisi);
+        // Chargement progressif : ne charger que les 2 premiers mois initialement
+        $slotsByDay = $this->generateSlots($calculationUser, $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, $lieuChoisi, 2);
 
         return $this->render('booking/index.html.twig', [
             'conseiller' => $viewUser,
             'event' => $event,
             'slotsByDay' => $slotsByDay,
-            'lieuChoisi' => $lieuChoisi
+            'lieuChoisi' => $lieuChoisi,
+            'eventId' => $eventId,
+            'userId' => $targetUserId
         ]);
+    }
+
+    /**
+     * Route AJAX pour charger les créneaux d'un mois spécifique (lazy loading)
+     */
+    #[Route('/book/calendar/{eventId}/month', name: 'app_booking_calendar_month', methods: ['GET'])]
+    public function loadMonth(
+        Request $request,
+        int $eventId,
+        EvenementRepository $eventRepo,
+        UserRepository $userRepo,
+        RendezVousRepository $rdvRepo,
+        DisponibiliteHebdomadaireRepository $dispoRepo,
+        BureauRepository $bureauRepo,
+        OutlookService $outlookService
+    ): \Symfony\Component\HttpFoundation\JsonResponse {
+        $session = $request->getSession();
+        if (!$session->has('temp_booking_data')) {
+            return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => 'Session expirée'], 403);
+        }
+
+        $month = $request->query->get('month'); // Format: YYYY-MM
+        if (!$month) {
+            return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => 'Mois manquant'], 400);
+        }
+
+        $data = $session->get('temp_booking_data');
+        $lieuChoisi = $data['lieu'];
+        $event = $eventRepo->find($eventId);
+        $targetUserId = $request->query->get('user');
+
+        // Déterminer l'utilisateur
+        $calculationUser = null;
+        if (!empty($data['conseiller_id'])) {
+            $calculationUser = $userRepo->find($data['conseiller_id']);
+        } elseif ($targetUserId) {
+            $calculationUser = $userRepo->find($targetUserId);
+        } else {
+            $calculationUser = $event->getGroupe()->getUsers()->first();
+        }
+
+        if (!$calculationUser) {
+            return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => 'Utilisateur non trouvé'], 404);
+        }
+
+        // Générer les créneaux pour le mois spécifique
+        $monthStart = new \DateTime($month . '-01');
+        $monthEnd = (clone $monthStart)->modify('last day of this month');
+
+        $slots = $this->generateSlotsForMonth(
+            $calculationUser,
+            $event,
+            $rdvRepo,
+            $dispoRepo,
+            $bureauRepo,
+            $outlookService,
+            $lieuChoisi,
+            $monthStart,
+            $monthEnd
+        );
+
+        // Retourner seulement le mois demandé au format attendu par le frontend
+        $monthKey = $monthStart->format('Y-m');
+        $monthData = null;
+
+        // Chercher le mois dans les résultats
+        foreach ($slots as $slot) {
+            if ($slot['label'] instanceof \DateTime) {
+                $slotMonthKey = $slot['label']->format('Y-m');
+                if ($slotMonthKey === $monthKey) {
+                    $monthData = $slot;
+                    break;
+                }
+            }
+        }
+
+        if (!$monthData) {
+            return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => 'Mois non trouvé'], 404);
+        }
+
+        // Formater les données pour le frontend
+        $formattedData = [
+            'label' => $monthData['label'] instanceof \DateTime
+                ? $monthData['label']->format('F Y')
+                : $monthData['label'],
+            'days' => array_map(function($day) {
+                return [
+                    'dateObj' => $day['dateObj'] instanceof \DateTime
+                        ? $day['dateObj']->format('Y-m-d')
+                        : $day['dateObj'],
+                    'dayNum' => $day['dayNum'],
+                    'isToday' => $day['isToday'] ?? false,
+                    'hasAvailability' => $day['hasAvailability'] ?? false,
+                    'slots' => $day['slots'] ?? [],
+                    'dateText' => $day['dateObj'] instanceof \DateTime
+                        ? $day['dateObj']->format('Y-m-d')
+                        : '',
+                    'dateValue' => $day['dateObj'] instanceof \DateTime
+                        ? $day['dateObj']->format('Y-m-d')
+                        : ''
+                ];
+            }, $monthData['days'] ?? [])
+        ];
+
+        return new \Symfony\Component\HttpFoundation\JsonResponse($formattedData);
     }
 
     /**
@@ -367,15 +475,26 @@ class BookingController extends AbstractController
     // --- FONCTIONS PRIVÉES ---
     // =========================================================================
 
-    private function generateSlots($user, $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, string $lieu): array
+    private function generateSlots($user, $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, string $lieu, int $monthsToLoad = 2): array
     {
         $calendarData = [];
         $duration = $event->getDuree();
         $increment = 30;
         $startPeriod = new \DateTime('first day of this month');
         $dateLimite = $event->getDateLimite();
-        $endPeriod = $dateLimite ? clone $dateLimite : (clone $startPeriod)->modify('+12 months')->modify('last day of this month');
+        // Chargement progressif : charger seulement X mois initialement (par défaut 2)
+        // Les autres mois seront chargés via AJAX quand l'utilisateur navigue
+        $endPeriod = $dateLimite ? clone $dateLimite : (clone $startPeriod)->modify("+$monthsToLoad months")->modify('last day of this month');
         if ($dateLimite && $endPeriod < new \DateTime('today')) return [];
+
+        return $this->generateSlotsForMonth($user, $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, $lieu, $startPeriod, $endPeriod);
+    }
+
+    private function generateSlotsForMonth($user, $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, string $lieu, \DateTime $startPeriod, \DateTime $endPeriod): array
+    {
+        $calendarData = [];
+        $duration = $event->getDuree();
+        $increment = 30;
 
         $now = new \DateTime();
         // Utiliser le délai minimum de réservation configuré par l'admin
@@ -420,7 +539,9 @@ class BookingController extends AbstractController
             $allBureaux = $bureauRepo->findBy(['lieu' => $lieu]);
         }
 
-        // OPTIMISATION CRITIQUE : Cache pour les vérifications Outlook par créneau horaire
+        // OPTIMISATION CRITIQUE : Cache pour les vérifications Outlook par demi-journée
+        // Évite les centaines d'appels API (un par créneau) en vérifiant seulement 2 fois par jour
+        // Limité aux 3 prochains mois (90 jours) pour équilibrer performance et précision
         $outlookDayCache = [];
 
         $currentDate = clone $startPeriod;
@@ -466,6 +587,7 @@ class BookingController extends AbstractController
                         if ($slotEnd > $end) break;
 
                         // VÉRIFICATION : Le créneau doit respecter le délai minimum de réservation
+                        // Utilise le délai configuré par l'admin au lieu de vérifier l'heure actuelle à chaque fois
                         if ($start < $minBookingTime) {
                             $start->modify("+$increment minutes");
                             continue;
@@ -509,31 +631,32 @@ class BookingController extends AbstractController
                             if (empty($freeBureauxInBdd)) {
                                 $isFree = false; // Aucune salle libre en BDD → on masque ce créneau
                             } else {
-                                // OPTIMISATION CRITIQUE : Vérification Outlook avec cache par créneau horaire
-                                // Augmenté à 30 jours pour couvrir plus de dates futures
+                                // OPTIMISATION : Vérification Outlook limitée aux 3 prochains mois avec cache par demi-journée
+                                // Compromis entre performance et précision : vérifie 2 fois par jour au lieu de chaque créneau
                                 $daysFromNow = (int)(($currentDate->getTimestamp() - $now->getTimestamp()) / 86400);
-                                if ($daysFromNow >= 0 && $daysFromNow <= 30) {
-                                    // Clé du cache : date + heure (par tranche de 1h pour plus de précision)
-                                    $hourSlot = (int)$start->format('H');
-                                    $cacheKey = $currentDate->format('Y-m-d') . '_' . $hourSlot;
+                                if ($daysFromNow >= 0 && $daysFromNow <= 90) {
+                                    // Clé du cache : date + période (matin = avant 13h, après-midi = 13h et après)
+                                    $period = (int)$start->format('H') < 13 ? 'morning' : 'afternoon';
+                                    $cacheKey = $currentDate->format('Y-m-d') . '_' . $period;
 
                                     if (!isset($outlookDayCache[$cacheKey])) {
-                                        // Vérifier par tranche d'1h pour plus de précision (au lieu de demi-journée)
-                                        $hourStart = (clone $currentDate)->setTime($hourSlot, 0, 0);
-                                        $hourEnd = (clone $currentDate)->setTime($hourSlot + 1, 0, 0);
+                                        // Vérifier une seule fois par demi-journée pour toutes les salles libres en BDD
+                                        $periodStart = (clone $currentDate)->setTime($period === 'morning' ? 8 : 13, 0, 0);
+                                        $periodEnd = (clone $currentDate)->setTime($period === 'morning' ? 13 : 18, 0, 0);
                                         try {
-                                            $outlookDayCache[$cacheKey] = $outlookService->hasAtLeastOneFreeRoomOnOutlook($user, $freeBureauxInBdd, $hourStart, $hourEnd);
+                                            $outlookDayCache[$cacheKey] = $outlookService->hasAtLeastOneFreeRoomOnOutlook($user, $freeBureauxInBdd, $periodStart, $periodEnd);
                                         } catch (\Exception $e) {
-                                            // En cas d'erreur/timeout Outlook, on bloque la tranche horaire par sécurité
+                                            // En cas d'erreur/timeout Outlook, on bloque la période par sécurité
                                             $outlookDayCache[$cacheKey] = false;
                                         }
                                     }
-                                    // Utiliser le résultat du cache pour cette tranche horaire
+                                    // Utiliser le résultat du cache pour cette période
                                     if (!$outlookDayCache[$cacheKey]) {
-                                        $isFree = false; // Aucune salle libre côté Outlook pour cette tranche horaire → on masque ce créneau
+                                        $isFree = false; // Aucune salle libre côté Outlook pour cette période → on masque ce créneau
                                     }
                                 }
-                                // Pour les jours au-delà de 30 jours, on se base uniquement sur la BDD locale
+                                // Pour les jours au-delà de 3 mois (90 jours), on se base uniquement sur la BDD locale
+                                // La vérification Outlook complète sera faite lors de la finalisation dans finalize()
                             }
                         }
 
