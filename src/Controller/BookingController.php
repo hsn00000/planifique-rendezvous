@@ -793,9 +793,20 @@ class BookingController extends AbstractController
             ]);
         }
 
+        $event = $rendezVous->getEvenement();
+        
+        // Vérifier le délai de fin de modification (en heures)
+        $delaiFinModification = $event->getDelaiFinModification() ?? 24; // Par défaut 24h
+        $dateLimiteModification = (clone $rendezVous->getDateDebut())->modify("-{$delaiFinModification} hours");
+        $canCancel = new \DateTime() <= $dateLimiteModification;
+        
+        if (!$canCancel) {
+            $this->addFlash('warning', "Vous ne pouvez plus annuler ce rendez-vous. Le délai d'annulation est de {$delaiFinModification} heures avant le rendez-vous.");
+        }
+
         return $this->render('booking/cancel.html.twig', [
             'rendezvous' => $rendezVous,
-            'canCancel' => true
+            'canCancel' => $canCancel
         ]);
     }
 
@@ -824,6 +835,16 @@ class BookingController extends AbstractController
                 'rendezvous' => $rendezVous,
                 'canCancel' => false
             ]);
+        }
+
+        $event = $rendezVous->getEvenement();
+        
+        // Vérifier le délai de fin de modification (en heures)
+        $delaiFinModification = $event->getDelaiFinModification() ?? 24; // Par défaut 24h
+        $dateLimiteModification = (clone $rendezVous->getDateDebut())->modify("-{$delaiFinModification} hours");
+        if (new \DateTime() > $dateLimiteModification) {
+            $this->addFlash('warning', "Vous ne pouvez plus annuler ce rendez-vous. Le délai d'annulation est de {$delaiFinModification} heures avant le rendez-vous.");
+            return $this->redirectToRoute('app_booking_cancel', ['token' => $token]);
         }
 
         // Supprimer l'événement Outlook
@@ -879,10 +900,27 @@ class BookingController extends AbstractController
         }
 
         $event = $rendezVous->getEvenement();
+        
+        // Vérifier le délai de fin de modification (en heures)
+        $delaiFinModification = $event->getDelaiFinModification() ?? 24; // Par défaut 24h
+        $dateLimiteModification = (clone $rendezVous->getDateDebut())->modify("-{$delaiFinModification} hours");
+        if (new \DateTime() > $dateLimiteModification) {
+            $this->addFlash('warning', "Vous ne pouvez plus modifier ce rendez-vous. Le délai de modification est de {$delaiFinModification} heures avant le rendez-vous.");
+            return $this->redirectToRoute('app_home');
+        }
         $lieuChoisi = $rendezVous->getTypeLieu();
 
-        // Générer les créneaux disponibles pour le groupe
-        $slotsByDay = $this->generateSlots($event->getGroupe(), $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, $lieuChoisi, 2);
+        // OPTIMISATION : Pour la modification, générer les créneaux uniquement pour le conseiller du rendez-vous
+        // au lieu de tout le groupe, pour éviter les timeouts
+        $conseiller = $rendezVous->getConseiller();
+        if (!$conseiller) {
+            $this->addFlash('danger', 'Aucun conseiller associé à ce rendez-vous.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        // OPTIMISATION : Générer les créneaux disponibles uniquement pour ce conseiller
+        // Limiter à 1 mois pour la modification (plus rapide que 2 mois)
+        $slotsByDay = $this->generateSlots($conseiller, $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, $lieuChoisi, 1);
 
         return $this->render('booking/modify.html.twig', [
             'rendezvous' => $rendezVous,
@@ -892,6 +930,110 @@ class BookingController extends AbstractController
             'eventId' => $event->getId(),
             'userId' => $rendezVous->getConseiller()?->getId()
         ]);
+    }
+
+    /**
+     * MODIFICATION : Charge un mois supplémentaire via AJAX
+     */
+    #[Route('/book/modify/{token}/month', name: 'app_booking_modify_month', methods: ['GET'])]
+    public function modifyLoadMonth(
+        string $token,
+        Request $request,
+        RendezVousRepository $rdvRepo,
+        EvenementRepository $eventRepo,
+        DisponibiliteHebdomadaireRepository $dispoRepo,
+        BureauRepository $bureauRepo,
+        OutlookService $outlookService
+    ): \Symfony\Component\HttpFoundation\JsonResponse {
+        $rendezVous = $rdvRepo->findOneBy(['cancelToken' => $token]);
+        
+        if (!$rendezVous) {
+            return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => 'Lien invalide'], 404);
+        }
+
+        $month = $request->query->get('month'); // Format: YYYY-MM
+        if (!$month) {
+            return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => 'Mois manquant'], 400);
+        }
+
+        $event = $rendezVous->getEvenement();
+        $conseiller = $rendezVous->getConseiller();
+        
+        if (!$conseiller) {
+            return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => 'Conseiller non trouvé'], 404);
+        }
+
+        $lieuChoisi = $rendezVous->getTypeLieu();
+
+        try {
+            // Générer les créneaux pour le mois spécifique
+            $monthStart = new \DateTime($month . '-01');
+            $monthEnd = (clone $monthStart)->modify('last day of this month');
+            
+            // Vérifier que le mois demandé n'est pas au-delà de la limite
+            $now = new \DateTime();
+            $maxMonthsAhead = $event->getLimiteMoisReservation() ?? 12;
+            $maxDate = (clone $now)->modify("+$maxMonthsAhead months")->modify('last day of this month');
+            
+            if ($monthStart > $maxDate) {
+                $formattedData = [
+                    'label' => $this->formatMonthLabel($monthStart),
+                    'days' => []
+                ];
+                return new \Symfony\Component\HttpFoundation\JsonResponse($formattedData);
+            }
+            
+            // Générer les créneaux pour ce conseiller uniquement
+            $slots = $this->generateSlotsForMonth(
+                $conseiller,
+                $event,
+                $rdvRepo,
+                $dispoRepo,
+                $bureauRepo,
+                $outlookService,
+                $lieuChoisi,
+                $monthStart,
+                $monthEnd
+            );
+
+            // Formater les données pour le JSON
+            $monthData = $slots[$month] ?? null;
+            if (!$monthData) {
+                // Si le mois n'est pas dans les résultats, créer une structure vide
+                $formattedData = [
+                    'label' => $this->formatMonthLabel($monthStart),
+                    'days' => []
+                ];
+            } else {
+                $formattedData = [
+                    'label' => $monthData['label'] instanceof \DateTime 
+                        ? $this->formatMonthLabel($monthData['label'])
+                        : ($monthData['label'] ?? $this->formatMonthLabel($monthStart)),
+                    'days' => array_map(function($day) {
+                        return [
+                            'dateObj' => $day['dateObj'] instanceof \DateTime 
+                                ? $day['dateObj']->format('Y-m-d') 
+                                : $day['dateObj'],
+                            'dayNum' => $day['dayNum'] ?? '',
+                            'isToday' => $day['isToday'] ?? false,
+                            'hasAvailability' => $day['hasAvailability'] ?? false,
+                            'slots' => $day['slots'] ?? [],
+                            'dateText' => $day['dateObj'] instanceof \DateTime 
+                                ? $day['dateObj']->format('Y-m-d') 
+                                : '',
+                            'dateValue' => $day['dateObj'] instanceof \DateTime 
+                                ? $day['dateObj']->format('Y-m-d') 
+                                : ''
+                        ];
+                    }, $monthData['days'] ?? [])
+                ];
+            }
+
+            return new \Symfony\Component\HttpFoundation\JsonResponse($formattedData);
+        } catch (\Exception $e) {
+            error_log('Erreur lors du chargement du mois pour modification: ' . $e->getMessage());
+            return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => 'Erreur serveur'], 500);
+        }
     }
 
     /**
@@ -923,18 +1065,42 @@ class BookingController extends AbstractController
             return $this->redirectToRoute('app_booking_modify', ['token' => $token]);
         }
 
+        $event = $rendezVous->getEvenement();
+        
+        // Vérifier le délai de fin de modification (en heures)
+        $delaiFinModification = $event->getDelaiFinModification() ?? 24; // Par défaut 24h
+        $dateLimiteModification = (clone $rendezVous->getDateDebut())->modify("-{$delaiFinModification} hours");
+        if (new \DateTime() > $dateLimiteModification) {
+            $this->addFlash('warning', "Vous ne pouvez plus modifier ce rendez-vous. Le délai de modification est de {$delaiFinModification} heures avant le rendez-vous.");
+            return $this->redirectToRoute('app_booking_modify', ['token' => $token]);
+        }
+
         $dateParam = $request->request->get('date');
         if (!$dateParam) {
             $this->addFlash('danger', 'Veuillez sélectionner une nouvelle date.');
             return $this->redirectToRoute('app_booking_modify', ['token' => $token]);
         }
-
-        $event = $rendezVous->getEvenement();
         $oldDateDebut = clone $rendezVous->getDateDebut();
         $oldDateFin = clone $rendezVous->getDateFin();
 
-        // Nouvelle date
-        $newDateDebut = new \DateTime($dateParam);
+        // Nouvelle date - gérer le format "Y-m-d H:i" ou "Y-m-d"
+        if (strpos($dateParam, ' ') !== false) {
+            // Format "2026-01-29 09:30"
+            $newDateDebut = \DateTime::createFromFormat('Y-m-d H:i', $dateParam);
+            if (!$newDateDebut) {
+                // Essayer avec un format plus flexible
+                $newDateDebut = new \DateTime($dateParam);
+            }
+        } else {
+            // Format "2026-01-29" seulement
+            $newDateDebut = new \DateTime($dateParam);
+        }
+        
+        if (!$newDateDebut) {
+            $this->addFlash('danger', 'Format de date invalide.');
+            return $this->redirectToRoute('app_booking_modify', ['token' => $token]);
+        }
+        
         $newDateFin = (clone $newDateDebut)->modify('+' . $event->getDuree() . ' minutes');
 
         // Vérifier la disponibilité du conseiller (en excluant le RDV actuel)
@@ -1521,7 +1687,7 @@ class BookingController extends AbstractController
         $lieu = $rdv->getTypeLieu();
         $adresse = $rdv->getAdresse() ?: '';
         if (strcasecmp($lieu, 'Cabinet-geneve') === 0) {
-            $adresse = 'Chemin du Pavillon 2, 1218 Le Grand-Saconnex';
+            $adresse = 'Chemin du Pavillon 2, 1218 Le Grand-Saconnex, Suisse';
         } elseif (strcasecmp($lieu, 'Cabinet-archamps') === 0) {
             $adresse = '160 Rue Georges de Mestral, 74160 Archamps, France';
         }

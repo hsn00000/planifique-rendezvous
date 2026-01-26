@@ -16,43 +16,64 @@
             {# CARTE BLANCHE #}
             <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow: hidden;">
 
-                {# 1. EN-TÊTE BLEU #}
+                {# 1. EN-TÊTE BLEU AMÉLIORÉ #}
                 <tr>
-                    <td style="background-color: #2563eb; padding: 30px; text-align: center;">
-                        {# Logo intégré en base64 pour fonctionner dans les emails #}
-                        <img src="{{ image_to_base64('img/logo.png') }}" alt="Planifique" width="150" style="max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto; filter: brightness(0) invert(1);">
-                        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Confirmation de rendez-vous</h1>
-                    </td>
-                </tr>
-
-                {# 2. MESSAGE DE BIENVENUE #}
-                <tr>
-                    <td style="padding: 40px 40px 20px 40px;">
-                        <p style="margin: 0; color: #374151; font-size: 16px; line-height: 24px;">
-                            Bonjour <strong>{{ rdv.prenom }}</strong>,
-                        </p>
-                        <p style="margin: 15px 0 0 0; color: #374151; font-size: 16px; line-height: 24px;">
-                            Votre rendez-vous est confirmé. Nous avons hâte de vous rencontrer pour votre entretien <strong>{{ rdv.evenement.titre }}</strong>.
-                        </p>
-                    </td>
-                </tr>
-
-                {# 3. DÉTAILS DU RENDEZ-VOUS (BLOC GRIS) #}
-                <tr>
-                    <td style="padding: 0 40px;">
-                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <td style="background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); padding: 40px 30px; text-align: center;">
+                        {# Logo Planifique en blanc - Base64 pour fonctionner partout en production #}
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 25px;">
                             <tr>
-                                <td style="padding: 20px;">
+                                <td align="center" style="padding: 0;">
+                                    {% set logoBase64 = image_to_base64('img/logo.png') %}
+                                    {% if logoBase64 and logoBase64 != '' and logoBase64|length > 50 %}
+                                        {# Logo en base64 - fonctionne partout, même si Gmail bloque les images externes #}
+                                        <img src="{{ logoBase64 }}" alt="Planifique" width="180" height="auto" style="max-width: 180px; width: 180px; height: auto; display: block !important; margin: 0 auto 0 auto; filter: brightness(0) invert(1); border: 0; outline: none; -ms-interpolation-mode: bicubic;" />
+                                    {% else %}
+                                        {# Fallback avec URL publique si base64 ne fonctionne pas #}
+                                        <img src="https://planification-retraite.planifique.com/img/logo.png" alt="Planifique" width="180" height="auto" style="max-width: 180px; width: 180px; height: auto; display: block !important; margin: 0 auto 0 auto; filter: brightness(0) invert(1); border: 0; outline: none; -ms-interpolation-mode: bicubic;" />
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">Confirmation de rendez-vous</h1>
+                    </td>
+                </tr>
 
-                                    {# DATE ET HEURE #}
+                {# 2. MESSAGE DE BIENVENUE AMÉLIORÉ #}
+                <tr>
+                    <td style="padding: 45px 40px 25px 40px; background-color: #ffffff;">
+                        <p style="margin: 0 0 8px 0; color: #111827; font-size: 18px; line-height: 28px; font-weight: 500;">
+                            Bonjour <strong style="color: #2563eb;">{{ rdv.prenom }}</strong>,
+                        </p>
+                        <p style="margin: 15px 0 0 0; color: #4b5563; font-size: 16px; line-height: 26px;">
+                            <strong style="color: #059669; font-size: 17px;">✅ Votre réservation est confirmée !</strong>
+                        </p>
+                        <p style="margin: 12px 0 0 0; color: #4b5563; font-size: 16px; line-height: 26px;">
+                            Nous avons bien enregistré votre rendez-vous pour votre entretien <strong style="color: #111827;">{{ rdv.evenement.titre }}</strong>. Nous avons hâte de vous rencontrer !
+                        </p>
+                        <p style="margin: 15px 0 0 0; color: #6b7280; font-size: 14px; line-height: 22px; font-style: italic;">
+                            Vous trouverez ci-dessous tous les détails de votre rendez-vous. Un fichier calendrier (.ics) est également joint à cet email pour que vous puissiez l'ajouter à votre agenda.
+                        </p>
+                    </td>
+                </tr>
+
+                {# 3. DÉTAILS DU RENDEZ-VOUS (BLOC AMÉLIORÉ) #}
+                <tr>
+                    <td style="padding: 0 40px 30px 40px;">
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fafb; border-radius: 12px; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <tr>
+                                <td style="padding: 30px 25px;">
+
+                                    {# DATE ET HEURE AMÉLIORÉ #}
                                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                                         <tr>
-                                            <td width="30" style="vertical-align: top; padding-right: 15px;">
-                                                <img src="https://img.icons8.com/ios-filled/50/2563eb/calendar--v1.png" width="24" height="24" alt="Date">
+                                            <td width="40" style="vertical-align: top; padding-right: 15px;">
+                                                <div style="width: 40px; height: 40px; background-color: #eff6ff; border-radius: 8px; display: inline-block; text-align: center; line-height: 40px; font-size: 20px;">
+                                                    📅
+                                                </div>
                                             </td>
-                                            <td style="padding-bottom: 20px;">
-                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Quand ?</div>
-                                                <div style="font-size: 16px; color: #111827; font-weight: 600;">
+                                            <td style="padding-bottom: 25px;">
+                                                <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px;">Quand ?</div>
+                                                <div style="font-size: 17px; color: #111827; font-weight: 700; margin-bottom: 4px;">
                                                     {{ rdv.dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr')|title }}
                                                 </div>
                                                 <div style="font-size: 16px; color: #2563eb; font-weight: 600;">
@@ -62,34 +83,38 @@
                                         </tr>
                                     </table>
 
-                                    {# CONSEILLER #}
+                                    {# CONSEILLER AMÉLIORÉ #}
                                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                                         <tr>
-                                            <td width="30" style="vertical-align: top; padding-right: 15px;">
-                                                <img src="https://img.icons8.com/ios-filled/50/2563eb/user-male-circle.png" width="24" height="24" alt="Conseiller">
+                                            <td width="40" style="vertical-align: top; padding-right: 15px;">
+                                                <div style="width: 40px; height: 40px; background-color: #eff6ff; border-radius: 8px; display: inline-block; text-align: center; line-height: 40px; font-size: 20px;">
+                                                    👤
+                                                </div>
                                             </td>
-                                            <td style="padding-bottom: 20px;">
-                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Avec qui ?</div>
-                                                <div style="font-size: 16px; color: #111827;">
+                                            <td style="padding-bottom: 25px;">
+                                                <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px;">Avec qui ?</div>
+                                                <div style="font-size: 16px; color: #111827; font-weight: 600;">
                                                     {{ rdv.conseiller.firstName }} {{ rdv.conseiller.lastName }}
                                                 </div>
                                             </td>
                                         </tr>
                                     </table>
 
-                                    {# LIEU #}
+                                    {# LIEU AMÉLIORÉ #}
                                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                                         <tr>
-                                            <td width="30" style="vertical-align: top; padding-right: 15px;">
-                                                <img src="https://img.icons8.com/ios-filled/50/2563eb/marker.png" width="24" height="24" alt="Lieu">
+                                            <td width="40" style="vertical-align: top; padding-right: 15px;">
+                                                <div style="width: 40px; height: 40px; background-color: #eff6ff; border-radius: 8px; display: inline-block; text-align: center; line-height: 40px; font-size: 20px;">
+                                                    📍
+                                                </div>
                                             </td>
                                             <td>
-                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Où ?</div>
+                                                <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px;">Où ?</div>
                                                 <div style="font-size: 16px; color: #111827; font-weight: 600;">
                                                     {% if rdv.typeLieu == 'visio' or rdv.typeLieu == 'Visioconférence' %}
                                                         🌐 En visioconférence (Teams/Zoom)
                                                     {% else %}
-                                                        📍 {{ rdv.typeLieu }}
+                                                        {{ rdv.typeLieu }}
                                                     {% endif %}
                                                 </div>
 
@@ -119,9 +144,19 @@
                                                         </div>
                                                     {% endif %}
                                                 {% elseif rdv.typeLieu == 'Cabinet-geneve' %}
-                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Rue de Genève 12, 1201 Genève</div>
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Chemin du Pavillon 2, 1218 Le Grand-Saconnex, Suisse</div>
+                                                    <div style="margin-top: 8px;">
+                                                        <a href="https://www.google.com/maps/search/?api=1&query=Chemin+du+Pavillon+2%2C+1218+Le+Grand-Saconnex%2C+Suisse" style="color: #2563eb; text-decoration: none; font-size: 13px; font-weight: 500;">
+                                                            Voir sur la carte &rarr;
+                                                        </a>
+                                                    </div>
                                                 {% elseif rdv.typeLieu == 'Cabinet-archamps' %}
-                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Technopole d'Archamps, France</div>
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">160 Rue Georges de Mestral, 74160 Archamps, France</div>
+                                                    <div style="margin-top: 8px;">
+                                                        <a href="https://www.google.com/maps/search/?api=1&query=160+Rue+Georges+de+Mestral%2C+74160+Archamps%2C+France" style="color: #2563eb; text-decoration: none; font-size: 13px; font-weight: 500;">
+                                                            Voir sur la carte &rarr;
+                                                        </a>
+                                                    </div>
                                                 {% endif %}
                                             </td>
                                         </tr>
@@ -133,40 +168,44 @@
                     </td>
                 </tr>
 
-                {# 4. RÉCAPITULATIF INFOS CLIENT #}
+                {# 4. RÉCAPITULATIF INFOS CLIENT AMÉLIORÉ #}
                 <tr>
-                    <td style="padding: 30px 40px;">
-                        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #111827;">Vos coordonnées enregistrées :</h3>
-                        <table width="100%" style="font-size: 14px; color: #4b5563;">
+                    <td style="padding: 30px 40px 20px 40px;">
+                        <h3 style="margin: 0 0 20px 0; font-size: 15px; color: #111827; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Vos coordonnées enregistrées</h3>
+                        <table width="100%" style="font-size: 15px; color: #4b5563;">
                             <tr>
-                                <td style="padding-bottom: 5px; width: 30px;">📞</td>
-                                <td style="padding-bottom: 5px;">{{ rdv.telephone }}</td>
+                                <td style="padding-bottom: 12px; width: 40px; vertical-align: middle;">
+                                    <div style="width: 32px; height: 32px; background-color: #f3f4f6; border-radius: 6px; display: inline-block; text-align: center; line-height: 32px; font-size: 16px;">📞</div>
+                                </td>
+                                <td style="padding-bottom: 12px; vertical-align: middle; font-weight: 500;">{{ rdv.telephone }}</td>
                             </tr>
                             <tr>
-                                <td style="width: 30px;">📧</td>
-                                <td>{{ rdv.email }}</td>
+                                <td style="width: 40px; vertical-align: middle;">
+                                    <div style="width: 32px; height: 32px; background-color: #f3f4f6; border-radius: 6px; display: inline-block; text-align: center; line-height: 32px; font-size: 16px;">📧</div>
+                                </td>
+                                <td style="vertical-align: middle; font-weight: 500;">{{ rdv.email }}</td>
                             </tr>
                         </table>
                     </td>
                 </tr>
 
-                {# 5. ACTIONS RAPIDES #}
+                {# 5. ACTIONS RAPIDES AMÉLIORÉES #}
                 <tr>
-                    <td style="padding: 30px 40px;">
+                    <td style="padding: 20px 40px 35px 40px;">
                         <table border="0" cellpadding="0" cellspacing="0" width="100%">
                             <tr>
-                                <td align="center" style="padding-bottom: 15px;">
+                                <td align="center" style="padding-bottom: 12px;">
                                     <a href="{{ absolute_url(path('app_booking_modify', {'token': rdv.cancelToken})) }}"
-                                       style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; margin-right: 10px;">
-                                        <i class="fas fa-edit" style="margin-right: 8px;"></i>Modifier ce rendez-vous
+                                       style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 10px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2); transition: all 0.2s;">
+                                        ✏️ Modifier ce rendez-vous
                                     </a>
                                 </td>
                             </tr>
                             <tr>
                                 <td align="center">
                                     <a href="{{ absolute_url(path('app_booking_cancel', {'token': rdv.cancelToken})) }}"
-                                       style="display: inline-block; background-color: transparent; color: #dc2626; text-decoration: none; padding: 12px 24px; border: 2px solid #dc2626; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                                        <i class="fas fa-times" style="margin-right: 8px;"></i>Annuler ce rendez-vous
+                                       style="display: inline-block; background-color: transparent; color: #dc2626; text-decoration: none; padding: 14px 28px; border: 2px solid #dc2626; border-radius: 10px; font-weight: 600; font-size: 14px;">
+                                        ✕ Annuler ce rendez-vous
                                     </a>
                                 </td>
                             </tr>
@@ -174,14 +213,14 @@
                     </td>
                 </tr>
 
-                {# 6. PIED DE PAGE #}
+                {# 6. PIED DE PAGE AMÉLIORÉ #}
                 <tr>
-                    <td style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
-                        <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                    <td style="background: linear-gradient(to bottom, #f9fafb 0%, #ffffff 100%); padding: 30px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280; line-height: 20px;">
                             Vous pouvez modifier ou annuler ce rendez-vous en utilisant les liens ci-dessus.
                         </p>
-                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #d1d5db;">
-                            &copy; {{ 'now'|date('Y') }} Planifique - Tous droits réservés.
+                        <p style="margin: 15px 0 0 0; font-size: 12px; color: #9ca3af; font-weight: 500;">
+                            &copy; {{ 'now'|date('Y') }} <strong style="color: #2563eb;">Planifique</strong> - Tous droits réservés.
                         </p>
                     </td>
                 </tr>

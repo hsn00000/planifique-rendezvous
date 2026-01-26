@@ -45,6 +45,9 @@ class EvenementCrudController extends AbstractCrudController
             IntegerField::new('limiteMoisReservation', 'Limite de réservation (mois)')
                 ->setHelp('Nombre maximum de mois à l\'avance pour les réservations. Exemple : 12 = les clients peuvent réserver jusqu\'à 12 mois à l\'avance. Par défaut : 12 mois.')
                 ->setColumns(6),
+            IntegerField::new('delaiFinModification', 'Délai fin modification/annulation (heures)')
+                ->setHelp('Délai en heures avant lequel le client ne peut plus modifier ou annuler son rendez-vous (par défaut 24h). Ex: 24 = 24h avant le RDV. Si le RDV est demain à 14h et que ce délai est 24h, le client ne pourra plus modifier/annuler après aujourd\'hui 14h.')
+                ->setColumns(6),
 
             FormField::addPanel('Options'),
             AssociationField::new('groupe', 'Groupe associé'),

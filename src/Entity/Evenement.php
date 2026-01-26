@@ -46,6 +46,9 @@ class Evenement
     #[ORM\Column(options: ['default' => 12])]
     private ?int $limiteMoisReservation = 12; // Limite en mois pour les réservations futures (ex: 12 = 1 an maximum)
 
+    #[ORM\Column(options: ['default' => 24])]
+    private ?int $delaiFinModification = 24; // Délai en heures avant lequel le client ne peut plus modifier/annuler son rendez-vous (par défaut 24h)
+
     #[ORM\ManyToOne(inversedBy: 'evenements')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Groupe $groupe = null;
@@ -183,6 +186,17 @@ class Evenement
     public function setLimiteMoisReservation(int $limiteMoisReservation): static
     {
         $this->limiteMoisReservation = $limiteMoisReservation;
+        return $this;
+    }
+
+    public function getDelaiFinModification(): ?int
+    {
+        return $this->delaiFinModification;
+    }
+
+    public function setDelaiFinModification(int $delaiFinModification): static
+    {
+        $this->delaiFinModification = $delaiFinModification;
         return $this;
     }
 

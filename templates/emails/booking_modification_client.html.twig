@@ -16,38 +16,53 @@
             {# CARTE BLANCHE #}
             <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow: hidden;">
 
-                {# 1. EN-TÊTE BLEU #}
+                {# 1. EN-TÊTE BLEU AMÉLIORÉ #}
                 <tr>
-                    <td style="background-color: #2563eb; padding: 30px; text-align: center;">
-                        <img src="{{ absolute_url(asset('img/logo.png')) }}" alt="Planifique" width="150" style="max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto; filter: brightness(0) invert(1);">
-                        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Rendez-vous modifié</h1>
+                    <td style="background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); padding: 40px 30px; text-align: center;">
+                        {# Logo Planifique en blanc - Base64 pour fonctionner partout en production #}
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 25px;">
+                            <tr>
+                                <td align="center" style="padding: 0;">
+                                    {% set logoBase64 = image_to_base64('img/logo.png') %}
+                                    {% if logoBase64 and logoBase64 != '' and logoBase64|length > 50 %}
+                                        <img src="{{ logoBase64 }}" alt="Planifique" width="180" height="auto" style="max-width: 180px; width: 180px; height: auto; display: block !important; margin: 0 auto 0 auto; filter: brightness(0) invert(1); border: 0; outline: none; -ms-interpolation-mode: bicubic;" />
+                                    {% else %}
+                                        <img src="https://planification-retraite.planifique.com/img/logo.png" alt="Planifique" width="180" height="auto" style="max-width: 180px; width: 180px; height: auto; display: block !important; margin: 0 auto 0 auto; filter: brightness(0) invert(1); border: 0; outline: none; -ms-interpolation-mode: bicubic;" />
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">Modification de rendez-vous</h1>
                     </td>
                 </tr>
 
-                {# 2. MESSAGE #}
+                {# 2. MESSAGE DE BIENVENUE AMÉLIORÉ #}
                 <tr>
-                    <td style="padding: 40px 40px 20px 40px;">
-                        <p style="margin: 0; color: #374151; font-size: 16px; line-height: 24px;">
-                            Bonjour <strong>{{ rdv.prenom }}</strong>,
+                    <td style="padding: 45px 40px 25px 40px; background-color: #ffffff;">
+                        <p style="margin: 0 0 8px 0; color: #111827; font-size: 18px; line-height: 28px; font-weight: 500;">
+                            Bonjour <strong style="color: #2563eb;">{{ rdv.prenom }}</strong>,
                         </p>
-                        <p style="margin: 15px 0 0 0; color: #374151; font-size: 16px; line-height: 24px;">
-                            Votre rendez-vous <strong>{{ rdv.evenement.titre }}</strong> a été modifié avec succès.
+                        <p style="margin: 15px 0 0 0; color: #4b5563; font-size: 16px; line-height: 26px;">
+                            <strong style="color: #059669; font-size: 17px;">✅ Votre rendez-vous a été modifié avec succès !</strong>
+                        </p>
+                        <p style="margin: 12px 0 0 0; color: #4b5563; font-size: 16px; line-height: 26px;">
+                            Votre rendez-vous pour <strong style="color: #111827;">{{ rdv.evenement.titre }}</strong> a été modifié. Vous trouverez ci-dessous les détails de votre nouveau rendez-vous.
                         </p>
                     </td>
                 </tr>
 
-                {# 3. COMPARAISON ANCIENNE / NOUVELLE DATE #}
+                {# 3. COMPARAISON ANCIENNE / NOUVELLE DATE AMÉLIORÉE #}
                 <tr>
-                    <td style="padding: 0 40px;">
+                    <td style="padding: 0 40px 30px 40px;">
                         {# Ancienne date #}
-                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 15px;">
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fafb; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                             <tr>
                                 <td style="padding: 20px;">
-                                    <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 10px;">Ancienne date</div>
-                                    <div style="font-size: 16px; color: #6b7280; font-weight: 600;">
+                                    <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px;">Ancienne date</div>
+                                    <div style="font-size: 17px; color: #111827; font-weight: 700; margin-bottom: 4px;">
                                         {{ oldDateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr')|title }}
                                     </div>
-                                    <div style="font-size: 16px; color: #9ca3af;">
+                                    <div style="font-size: 16px; color: #6b7280; font-weight: 600;">
                                         {{ oldDateDebut|date('H:i') }} - {{ oldDateFin|date('H:i') }}
                                     </div>
                                 </td>
@@ -55,16 +70,18 @@
                         </table>
 
                         {# Flèche #}
-                        <div style="text-align: center; margin: 10px 0;">
-                            <i class="fas fa-arrow-down" style="color: #2563eb; font-size: 24px;"></i>
+                        <div style="text-align: center; margin: 12px 0;">
+                            <div style="display: inline-block; width: 40px; height: 40px; background-color: #eff6ff; border-radius: 50%; line-height: 40px; text-align: center;">
+                                <span style="color: #2563eb; font-size: 20px;">↓</span>
+                            </div>
                         </div>
 
                         {# Nouvelle date #}
-                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #eff6ff; border-radius: 8px; border: 2px solid #2563eb;">
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #eff6ff; border-radius: 12px; border: 2px solid #2563eb; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.15);">
                             <tr>
                                 <td style="padding: 20px;">
-                                    <div style="font-size: 12px; color: #2563eb; text-transform: uppercase; font-weight: bold; margin-bottom: 10px;">Nouvelle date</div>
-                                    <div style="font-size: 16px; color: #111827; font-weight: 600;">
+                                    <div style="font-size: 11px; color: #2563eb; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px;">Nouvelle date</div>
+                                    <div style="font-size: 17px; color: #111827; font-weight: 700; margin-bottom: 4px;">
                                         {{ rdv.dateDebut|format_datetime(pattern="EEEE d MMMM yyyy", locale='fr')|title }}
                                     </div>
                                     <div style="font-size: 16px; color: #2563eb; font-weight: 600;">
@@ -84,32 +101,36 @@
                                 <td style="padding: 20px;">
                                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                                         <tr>
-                                            <td width="30" style="vertical-align: top; padding-right: 15px; padding-bottom: 15px;">
-                                                <img src="https://img.icons8.com/ios-filled/50/2563eb/user-male-circle.png" width="24" height="24" alt="Conseiller">
+                                            <td width="40" style="vertical-align: top; padding-right: 15px; padding-bottom: 25px;">
+                                                <div style="width: 40px; height: 40px; background-color: #eff6ff; border-radius: 8px; display: inline-block; text-align: center; line-height: 40px; font-size: 20px;">
+                                                    👤
+                                                </div>
                                             </td>
-                                            <td style="padding-bottom: 15px;">
-                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Conseiller</div>
-                                                <div style="font-size: 16px; color: #111827;">
+                                            <td style="padding-bottom: 25px;">
+                                                <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px;">Avec qui ?</div>
+                                                <div style="font-size: 16px; color: #111827; font-weight: 600;">
                                                     {{ rdv.conseiller.firstName }} {{ rdv.conseiller.lastName }}
                                                 </div>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td width="30" style="vertical-align: top; padding-right: 15px;">
-                                                <img src="https://img.icons8.com/ios-filled/50/2563eb/marker.png" width="24" height="24" alt="Lieu">
+                                            <td width="40" style="vertical-align: top; padding-right: 15px;">
+                                                <div style="width: 40px; height: 40px; background-color: #eff6ff; border-radius: 8px; display: inline-block; text-align: center; line-height: 40px; font-size: 20px;">
+                                                    📍
+                                                </div>
                                             </td>
                                             <td>
-                                                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Lieu</div>
+                                                <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px;">Où ?</div>
                                                 <div style="font-size: 16px; color: #111827; font-weight: 600;">
-                                                    {% if rdv.typeLieu == 'Visioconférence' or rdv.typeLieu == 'visio' %}
+                                                    {% if rdv.typeLieu == 'visio' or rdv.typeLieu == 'Visioconférence' %}
                                                         🌐 En visioconférence (Teams/Zoom)
                                                     {% else %}
-                                                        📍 {{ rdv.typeLieu }}
+                                                        {{ rdv.typeLieu }}
                                                     {% endif %}
                                                 </div>
 
                                                 {# Message spécial pour la visioconférence #}
-                                                {% if rdv.typeLieu == 'Visioconférence' or rdv.typeLieu == 'visio' %}
+                                                {% if rdv.typeLieu == 'visio' or rdv.typeLieu == 'Visioconférence' %}
                                                     <div style="margin-top: 12px; padding: 12px; background-color: #eff6ff; border-left: 4px solid #2563eb; border-radius: 4px;">
                                                         <div style="font-size: 14px; color: #1e40af; font-weight: 600; margin-bottom: 4px;">
                                                             📧 Connexion en tant qu'invité
@@ -117,6 +138,35 @@
                                                         <div style="font-size: 13px; color: #1e3a8a; line-height: 1.5;">
                                                             Vous recevrez un lien de connexion par email. Vous pourrez vous connecter en tant qu'invité grâce à votre adresse email : <strong>{{ rdv.email }}</strong>
                                                         </div>
+                                                    </div>
+                                                {% endif %}
+
+                                                {# Affichage intelligent de l'adresse #}
+                                                {% if rdv.adresse %}
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">
+                                                        {{ rdv.adresse }}
+                                                    </div>
+                                                    {# Lien Google Maps si c'est un lieu physique #}
+                                                    {% if rdv.typeLieu != 'visio' and rdv.typeLieu != 'Visioconférence' %}
+                                                        <div style="margin-top: 8px;">
+                                                            <a href="https://www.google.com/maps/search/?api=1&query={{ rdv.adresse|url_encode }}" style="color: #2563eb; text-decoration: none; font-size: 13px; font-weight: 500;">
+                                                                Voir sur la carte &rarr;
+                                                            </a>
+                                                        </div>
+                                                    {% endif %}
+                                                {% elseif rdv.typeLieu == 'Cabinet-geneve' %}
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Chemin du Pavillon 2, 1218 Le Grand-Saconnex, Suisse</div>
+                                                    <div style="margin-top: 8px;">
+                                                        <a href="https://www.google.com/maps/search/?api=1&query=Chemin+du+Pavillon+2%2C+1218+Le+Grand-Saconnex%2C+Suisse" style="color: #2563eb; text-decoration: none; font-size: 13px; font-weight: 500;">
+                                                            Voir sur la carte &rarr;
+                                                        </a>
+                                                    </div>
+                                                {% elseif rdv.typeLieu == 'Cabinet-archamps' %}
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">160 Rue Georges de Mestral, 74160 Archamps, France</div>
+                                                    <div style="margin-top: 8px;">
+                                                        <a href="https://www.google.com/maps/search/?api=1&query=160+Rue+Georges+de+Mestral%2C+74160+Archamps%2C+France" style="color: #2563eb; text-decoration: none; font-size: 13px; font-weight: 500;">
+                                                            Voir sur la carte &rarr;
+                                                        </a>
                                                     </div>
                                                 {% endif %}
                                             </td>
@@ -128,15 +178,23 @@
                     </td>
                 </tr>
 
-                {# 5. ACTIONS RAPIDES #}
+                {# 5. ACTIONS RAPIDES AMÉLIORÉES #}
                 <tr>
-                    <td style="padding: 0 40px 30px 40px;">
+                    <td style="padding: 20px 40px 35px 40px;">
                         <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                            <tr>
+                                <td align="center" style="padding-bottom: 12px;">
+                                    <a href="{{ absolute_url(path('app_booking_modify', {'token': rdv.cancelToken})) }}"
+                                       style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 10px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2); transition: all 0.2s;">
+                                        ✏️ Modifier à nouveau ce rendez-vous
+                                    </a>
+                                </td>
+                            </tr>
                             <tr>
                                 <td align="center">
                                     <a href="{{ absolute_url(path('app_booking_cancel', {'token': rdv.cancelToken})) }}" 
-                                       style="display: inline-block; background-color: transparent; color: #dc2626; text-decoration: none; padding: 12px 24px; border: 2px solid #dc2626; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                                        <i class="fas fa-times" style="margin-right: 8px;"></i>Annuler ce rendez-vous
+                                       style="display: inline-block; background-color: transparent; color: #dc2626; text-decoration: none; padding: 14px 28px; border: 2px solid #dc2626; border-radius: 10px; font-weight: 600; font-size: 14px;">
+                                        ✕ Annuler ce rendez-vous
                                     </a>
                                 </td>
                             </tr>
@@ -144,14 +202,14 @@
                     </td>
                 </tr>
 
-                {# 6. PIED DE PAGE #}
+                {# 6. PIED DE PAGE AMÉLIORÉ #}
                 <tr>
-                    <td style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
-                        <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                            Un nouveau fichier ICS a été joint à cet email avec les nouvelles informations.
+                    <td style="background: linear-gradient(to bottom, #f9fafb 0%, #ffffff 100%); padding: 30px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280; line-height: 20px;">
+                            Un nouveau fichier calendrier (.ics) a été joint à cet email avec les nouvelles informations. Vous pouvez l'ajouter à votre agenda.
                         </p>
-                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #d1d5db;">
-                            &copy; {{ 'now'|date('Y') }} Planifique - Tous droits réservés.
+                        <p style="margin: 15px 0 0 0; font-size: 12px; color: #9ca3af; font-weight: 500;">
+                            &copy; {{ 'now'|date('Y') }} <strong style="color: #2563eb;">Planifique</strong> - Tous droits réservés.
                         </p>
                     </td>
                 </tr>

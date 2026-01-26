@@ -72,7 +72,7 @@ class OutlookService
         $lieuTexte = $rendezVous->getTypeLieu();
         $adresseTexte = $rendezVous->getAdresse() ?: '';
         if (strcasecmp($lieuTexte, 'Cabinet-geneve') === 0) {
-            $adresseTexte = 'Chemin du Pavillon 2, 1218 Le Grand-Saconnex';
+            $adresseTexte = 'Chemin du Pavillon 2, 1218 Le Grand-Saconnex, Suisse';
         } elseif (strcasecmp($lieuTexte, 'Cabinet-archamps') === 0) {
             $adresseTexte = '160 Rue Georges de Mestral, 74160 Archamps, France';
         }
@@ -213,7 +213,7 @@ class OutlookService
         $lieuTexte = $rendezVous->getTypeLieu();
         $adresseTexte = $rendezVous->getAdresse() ?: '';
         if (strcasecmp($lieuTexte, 'Cabinet-geneve') === 0) {
-            $adresseTexte = 'Chemin du Pavillon 2, 1218 Le Grand-Saconnex';
+            $adresseTexte = 'Chemin du Pavillon 2, 1218 Le Grand-Saconnex, Suisse';
         } elseif (strcasecmp($lieuTexte, 'Cabinet-archamps') === 0) {
             $adresseTexte = '160 Rue Georges de Mestral, 74160 Archamps, France';
         }
