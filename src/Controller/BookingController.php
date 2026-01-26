@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Evenement;
+use App\Entity\Groupe;
 use App\Entity\RendezVous;
 use App\Entity\User;
 use App\Form\BookingFormType;
@@ -179,22 +180,41 @@ class BookingController extends AbstractController
             }
         }
 
+        // Vérifier que calculationUser est défini
+        if (!$calculationUser) {
+            return $this->redirectToRoute('app_booking_form', ['eventId' => $eventId]);
+        }
+
         // IMPORTANT : Synchroniser le calendrier Outlook pour supprimer les rendez-vous annulés dans Outlook
         // Cela garantit que les rendez-vous supprimés dans Outlook sont aussi supprimés de la base de données
         // OPTIMISATION : Ne synchroniser qu'une fois par session pour éviter les appels répétés
-        $session = $request->getSession();
-        $lastSyncKey = 'outlook_sync_' . $calculationUser->getId();
-        $lastSync = $session->get($lastSyncKey);
-        $now = time();
+        // NOTE : synchronizeCalendar() nécessite un User, pas un Groupe
+        $userForSync = null;
+        if ($calculationUser instanceof User) {
+            $userForSync = $calculationUser;
+        } elseif ($calculationUser instanceof Groupe) {
+            // Pour un groupe, utiliser le premier utilisateur du groupe pour la synchronisation
+            $firstUser = $calculationUser->getUsers()->first();
+            if ($firstUser) {
+                $userForSync = $firstUser;
+            }
+        }
         
-        // Synchroniser au maximum une fois toutes les 5 minutes pour éviter les appels répétés
-        if (!$lastSync || ($now - $lastSync) > 300) {
-            try {
-                $outlookService->synchronizeCalendar($calculationUser);
-                $session->set($lastSyncKey, $now);
-            } catch (\Exception $e) {
-                // Ne pas bloquer l'affichage du calendrier si la synchronisation échoue
-                error_log('Erreur lors de la synchronisation Outlook: ' . $e->getMessage());
+        if ($userForSync) {
+            $session = $request->getSession();
+            $lastSyncKey = 'outlook_sync_' . $userForSync->getId();
+            $lastSync = $session->get($lastSyncKey);
+            $now = time();
+            
+            // Synchroniser au maximum une fois toutes les 5 minutes pour éviter les appels répétés
+            if (!$lastSync || ($now - $lastSync) > 300) {
+                try {
+                    $outlookService->synchronizeCalendar($userForSync);
+                    $session->set($lastSyncKey, $now);
+                } catch (\Exception $e) {
+                    // Ne pas bloquer l'affichage du calendrier si la synchronisation échoue
+                    error_log('Erreur lors de la synchronisation Outlook: ' . $e->getMessage());
+                }
             }
         }
 
@@ -1015,7 +1035,7 @@ class BookingController extends AbstractController
         if ($endPeriod < new \DateTime('today')) return [];
 
         // Si c'est un groupe, on vérifie tous les conseillers, sinon on vérifie juste l'utilisateur
-        if ($groupeOrUser instanceof \App\Entity\Groupe) {
+        if ($groupeOrUser instanceof Groupe) {
             return $this->generateSlotsForMonth($groupeOrUser, $event, $rdvRepo, $dispoRepo, $bureauRepo, $outlookService, $lieu, $startPeriod, $endPeriod);
         } else {
             // Rétrocompatibilité : si on passe un User, on crée un groupe temporaire avec un seul user
@@ -1035,7 +1055,7 @@ class BookingController extends AbstractController
         $minBookingTime = (clone $now)->modify("+$delaiMinimum minutes");
 
         // Détecter si c'est un groupe ou un user
-        $isGroupe = $groupeOrUser instanceof \App\Entity\Groupe;
+        $isGroupe = $groupeOrUser instanceof Groupe;
         $conseillers = $isGroupe ? $groupeOrUser->getUsers()->toArray() : [$groupeOrUser];
         
         // IMPORTANT : Pour les cabinets, on doit vérifier TOUS les conseillers pour identifier les conflits de salles

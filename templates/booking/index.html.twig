@@ -63,36 +63,60 @@
                 {# --- DROITE --- #}
                 <div class="col-lg-8 bg-white position-relative d-flex flex-column">
 
-                    {# Loader initial avec services Planifique animés #}
-                    <div id="calendar-loader" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white" style="z-index: 1000; pointer-events: auto; overflow-y: auto;">
-                        <div class="container py-4">
+                    {# Loader initial avec ciel étoilé nocturne #}
+                    <div id="calendar-loader" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="z-index: 1000; pointer-events: auto; overflow-y: auto; background: #000000;">
+                        {# Ciel étoilé avec étoiles qui brillent #}
+                        <div class="starry-sky">
+                            <canvas id="calendar-stars-canvas"></canvas>
+                        </div>
+                        
+                        <div class="container py-4 position-relative" style="z-index: 1;">
                             <div class="text-center mb-4">
-                                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
-                                    <span class="visually-hidden">Chargement...</span>
+                                {# Logo Planifique animé #}
+                                <div class="loading-logo-wrapper mb-4" style="animation: fadeInScale 0.8s ease-out;">
+                                    <div class="loading-logo">
+                                        <img src="{{ asset('img/logo.png') }}" alt="Planifique" style="height: 50px; width: auto; filter: brightness(0) invert(1); animation: gentlePulse 2s ease-in-out infinite;">
+                                    </div>
                                 </div>
-                                <h5 class="fw-bold text-dark mb-2">Planifique prépare votre calendrier</h5>
-                                <p class="text-muted small mb-0">Vérification des disponibilités en cours...</p>
+                                
+                                <h5 class="fw-bold text-dark mb-2 loading-title" style="animation: fadeInUp 0.8s ease-out 0.3s both;">Planifique prépare votre calendrier</h5>
+                                <p class="text-muted small mb-3 loading-text" style="min-height: 1.5rem; animation: fadeInUp 0.8s ease-out 0.5s both;">
+                                    <span class="loading-text-item active">Vérification des disponibilités...</span>
+                                </p>
+                                
+                                {# Barre de progression #}
+                                <div class="progress-wrapper mx-auto" style="max-width: 250px; animation: fadeInUp 0.8s ease-out 0.7s both;">
+                                    <div class="progress-bar-animated">
+                                        <div class="progress-fill"></div>
+                                    </div>
+                                </div>
                             </div>
                             
-                            {# Services Planifique (version compacte avec animations) #}
+                            {# Services Planifique avec animations améliorées #}
                             <div class="row g-3 justify-content-center mt-4">
                                 <div class="col-md-4">
-                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.2s both;">
-                                        <i class="fas fa-piggy-bank text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite;"></i>
+                                    <div class="card border-0 shadow-lg h-100 text-center p-3 service-card" style="border-radius: 12px; animation: fadeInUpScale 0.8s ease-out 1.1s both; background: white;">
+                                        <div class="service-icon-wrapper mb-2">
+                                            <i class="fas fa-piggy-bank text-primary service-icon" style="font-size: 2rem; position: relative; z-index: 2;"></i>
+                                        </div>
                                         <h6 class="fw-bold small mb-1">Gestion de Patrimoine</h6>
                                         <p class="text-muted" style="font-size: 0.75rem;">Accompagnement sur-mesure</p>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.4s both;">
-                                        <i class="fas fa-calculator text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite 0.3s;"></i>
+                                    <div class="card border-0 shadow-lg h-100 text-center p-3 service-card" style="border-radius: 12px; animation: fadeInUpScale 0.8s ease-out 1.3s both; background: white;">
+                                        <div class="service-icon-wrapper mb-2">
+                                            <i class="fas fa-calculator text-primary service-icon" style="font-size: 2rem; position: relative; z-index: 2;"></i>
+                                        </div>
                                         <h6 class="fw-bold small mb-1">Optimisation Fiscale</h6>
                                         <p class="text-muted" style="font-size: 0.75rem;">Résidents suisses et frontaliers</p>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.6s both;">
-                                        <i class="fas fa-umbrella text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite 0.6s;"></i>
+                                    <div class="card border-0 shadow-lg h-100 text-center p-3 service-card" style="border-radius: 12px; animation: fadeInUpScale 0.8s ease-out 1.5s both; background: white;">
+                                        <div class="service-icon-wrapper mb-2">
+                                            <i class="fas fa-umbrella text-primary service-icon" style="font-size: 2rem; position: relative; z-index: 2;"></i>
+                                        </div>
                                         <h6 class="fw-bold small mb-1">Sécurisation Retraite</h6>
                                         <p class="text-muted" style="font-size: 0.75rem;">Assurance santé & 2e pilier</p>
                                     </div>
@@ -166,36 +190,55 @@
                             {% endfor %}
                         </div>
                         
-                    {# Loader pour le chargement d'un mois avec services Planifique #}
-                    <div id="month-loading" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center bg-white" style="z-index: 999; pointer-events: auto; overflow-y: auto;">
-                        <div class="container py-4">
+                    {# Loader pour le chargement d'un mois avec ciel étoilé nocturne #}
+                    <div id="month-loading" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center" style="z-index: 999; pointer-events: auto; overflow-y: auto; background: #000000;">
+                        <div class="starry-sky">
+                            <canvas id="month-stars-canvas"></canvas>
+                        </div>
+                        
+                        <div class="container py-4 position-relative" style="z-index: 1;">
                             <div class="text-center mb-4">
-                                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
-                                    <span class="visually-hidden">Chargement...</span>
+                                <div class="loading-logo-wrapper mb-4" style="animation: fadeInScale 0.8s ease-out;">
+                                    <div class="loading-logo">
+                                        <img src="{{ asset('img/logo.png') }}" alt="Planifique" style="height: 50px; width: auto; filter: brightness(0) invert(1); animation: gentlePulse 2s ease-in-out infinite;">
+                                    </div>
                                 </div>
-                                <h5 class="fw-bold text-dark mb-2">Planifique prépare votre calendrier</h5>
-                                <p class="text-muted small mb-0">Vérification des disponibilités en cours...</p>
+                                <h5 class="fw-bold text-dark mb-2 loading-title" style="animation: fadeInUp 0.8s ease-out 0.3s both;">Planifique prépare votre calendrier</h5>
+                                <p class="text-muted small mb-3 loading-text" style="min-height: 1.5rem; animation: fadeInUp 0.8s ease-out 0.5s both;">
+                                    <span class="loading-text-item active">Vérification des disponibilités...</span>
+                                </p>
+                                <div class="progress-wrapper mx-auto" style="max-width: 250px; animation: fadeInUp 0.8s ease-out 0.7s both;">
+                                    <div class="progress-bar-animated">
+                                        <div class="progress-fill"></div>
+                                    </div>
+                                </div>
                             </div>
                             
-                            {# Services Planifique (version compacte avec animations) #}
+                            {# Services Planifique avec animations améliorées #}
                             <div class="row g-3 justify-content-center mt-4">
                                 <div class="col-md-4">
-                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.2s both;">
-                                        <i class="fas fa-piggy-bank text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite;"></i>
+                                    <div class="card border-0 shadow-lg h-100 text-center p-3 service-card" style="border-radius: 12px; animation: fadeInUpScale 0.8s ease-out 1.1s both; background: white;">
+                                        <div class="service-icon-wrapper mb-2">
+                                            <i class="fas fa-piggy-bank text-primary service-icon" style="font-size: 2rem; position: relative; z-index: 2;"></i>
+                                        </div>
                                         <h6 class="fw-bold small mb-1">Gestion de Patrimoine</h6>
                                         <p class="text-muted" style="font-size: 0.75rem;">Accompagnement sur-mesure</p>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.4s both;">
-                                        <i class="fas fa-calculator text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite 0.3s;"></i>
+                                    <div class="card border-0 shadow-lg h-100 text-center p-3 service-card" style="border-radius: 12px; animation: fadeInUpScale 0.8s ease-out 1.3s both; background: white;">
+                                        <div class="service-icon-wrapper mb-2">
+                                            <i class="fas fa-calculator text-primary service-icon" style="font-size: 2rem; position: relative; z-index: 2;"></i>
+                                        </div>
                                         <h6 class="fw-bold small mb-1">Optimisation Fiscale</h6>
                                         <p class="text-muted" style="font-size: 0.75rem;">Résidents suisses et frontaliers</p>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.6s both;">
-                                        <i class="fas fa-umbrella text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite 0.6s;"></i>
+                                    <div class="card border-0 shadow-lg h-100 text-center p-3 service-card" style="border-radius: 12px; animation: fadeInUpScale 0.8s ease-out 1.5s both; background: white;">
+                                        <div class="service-icon-wrapper mb-2">
+                                            <i class="fas fa-umbrella text-primary service-icon" style="font-size: 2rem; position: relative; z-index: 2;"></i>
+                                        </div>
                                         <h6 class="fw-bold small mb-1">Sécurisation Retraite</h6>
                                         <p class="text-muted" style="font-size: 0.75rem;">Assurance santé & 2e pilier</p>
                                     </div>
@@ -602,6 +645,252 @@
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', function() {
                     setTimeout(showCalendar, 100);
+                    
+                    // Animation de texte dynamique pour le loader principal
+                    const loadingText = document.querySelector('#calendar-loader .loading-text-item');
+                    if (loadingText) {
+                        const texts = [
+                            'Vérification des disponibilités...',
+                            'Analyse des créneaux disponibles...',
+                            'Préparation de votre calendrier...',
+                            'Presque terminé...'
+                        ];
+                        let currentIndex = 0;
+                        
+                        setInterval(function() {
+                            currentIndex = (currentIndex + 1) % texts.length;
+                            loadingText.style.transition = 'opacity 0.3s ease';
+                            loadingText.style.opacity = '0';
+                            setTimeout(function() {
+                                loadingText.textContent = texts[currentIndex];
+                                loadingText.style.opacity = '1';
+                            }, 300);
+                        }, 2500);
+                    }
+                    
+                    // Ciel étoilé pour le loader principal
+                    initStarrySky('calendar-stars-canvas');
+                    
+                    // Fonction pour créer le ciel étoilé - version discrète
+                    function initStarrySky(canvasId) {
+                        const canvas = document.getElementById(canvasId);
+                        if (!canvas) return;
+                        
+                        const ctx = canvas.getContext('2d');
+                        const stars = [];
+                        const numStars = 80; // Moins d'étoiles mais qui brillent beaucoup plus
+                        
+                        function resizeCanvas() {
+                            const container = canvas.parentElement;
+                            canvas.width = container.offsetWidth;
+                            canvas.height = container.offsetHeight;
+                        }
+                        resizeCanvas();
+                        window.addEventListener('resize', resizeCanvas);
+                        
+                        // Créer les étoiles - moins nombreuses mais beaucoup plus brillantes
+                        for (let i = 0; i < numStars; i++) {
+                            const rand = Math.random();
+                            const isBrightStar = rand < 0.25; // 25% des étoiles sont très brillantes
+                            const isMediumStar = rand >= 0.25 && rand < 0.55; // 30% des étoiles sont moyennement brillantes
+                            
+                            stars.push({
+                                x: Math.random() * canvas.width,
+                                y: Math.random() * canvas.height,
+                                radius: isBrightStar ? Math.random() * 3.5 + 2.0 : (isMediumStar ? Math.random() * 2.0 + 1.2 : Math.random() * 1.2 + 0.5),
+                                opacity: isBrightStar ? Math.random() * 0.3 + 0.8 : (isMediumStar ? Math.random() * 0.3 + 0.6 : Math.random() * 0.3 + 0.4),
+                                twinkleSpeed: isBrightStar ? Math.random() * 0.05 + 0.04 : (isMediumStar ? Math.random() * 0.04 + 0.03 : Math.random() * 0.03 + 0.02),
+                                twinklePhase: Math.random() * Math.PI * 2,
+                                isBright: isBrightStar,
+                                isMedium: isMediumStar
+                            });
+                        }
+                        
+                        function animateStars() {
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            
+                            stars.forEach(star => {
+                                // Effet de scintillement intense - étoiles qui brillent beaucoup plus
+                                star.twinklePhase += star.twinkleSpeed;
+                                const twinkleRange = star.isBright ? 0.8 : (star.isMedium ? 0.6 : 0.4); // Variation encore plus prononcée
+                                const twinkle = Math.sin(star.twinklePhase) * twinkleRange + (1 - twinkleRange);
+                                const currentOpacity = Math.min(star.opacity * twinkle, 1);
+                                
+                                if (star.isBright) {
+                                    // Étoiles très brillantes avec un glow très intense
+                                    const gradient = ctx.createRadialGradient(
+                                        star.x, star.y, 0,
+                                        star.x, star.y, star.radius * 6
+                                    );
+                                    gradient.addColorStop(0, `rgba(147, 197, 253, ${currentOpacity})`);
+                                    gradient.addColorStop(0.1, `rgba(96, 165, 250, ${currentOpacity * 0.95})`);
+                                    gradient.addColorStop(0.25, `rgba(59, 130, 246, ${currentOpacity * 0.85})`);
+                                    gradient.addColorStop(0.4, `rgba(37, 99, 235, ${currentOpacity * 0.6})`);
+                                    gradient.addColorStop(0.6, `rgba(37, 99, 235, ${currentOpacity * 0.3})`);
+                                    gradient.addColorStop(0.8, `rgba(59, 130, 246, ${currentOpacity * 0.15})`);
+                                    gradient.addColorStop(1, 'rgba(37, 99, 235, 0)');
+                                    
+                                    ctx.fillStyle = gradient;
+                                    ctx.beginPath();
+                                    ctx.arc(star.x, star.y, star.radius * 6, 0, Math.PI * 2);
+                                    ctx.fill();
+                                    
+                                    // Halo intermédiaire très brillant
+                                    const gradient2 = ctx.createRadialGradient(
+                                        star.x, star.y, 0,
+                                        star.x, star.y, star.radius * 4
+                                    );
+                                    gradient2.addColorStop(0, `rgba(191, 219, 254, ${currentOpacity * 1.0})`);
+                                    gradient2.addColorStop(0.3, `rgba(147, 197, 253, ${currentOpacity * 0.8})`);
+                                    gradient2.addColorStop(0.6, `rgba(96, 165, 250, ${currentOpacity * 0.5})`);
+                                    gradient2.addColorStop(1, 'rgba(37, 99, 235, 0)');
+                                    
+                                    ctx.fillStyle = gradient2;
+                                    ctx.beginPath();
+                                    ctx.arc(star.x, star.y, star.radius * 4, 0, Math.PI * 2);
+                                    ctx.fill();
+                                    
+                                    // Point central très brillant
+                                    ctx.fillStyle = `rgba(191, 219, 254, ${currentOpacity})`;
+                                    ctx.beginPath();
+                                    ctx.arc(star.x, star.y, star.radius * 1.2, 0, Math.PI * 2);
+                                    ctx.fill();
+                                    
+                                    // Point blanc très brillant au centre
+                                    ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(currentOpacity * 1.2, 1)})`;
+                                    ctx.beginPath();
+                                    ctx.arc(star.x, star.y, star.radius * 0.7, 0, Math.PI * 2);
+                                    ctx.fill();
+                                    
+                                    // Petit point blanc pur au centre
+                                    ctx.fillStyle = `rgba(255, 255, 255, 1)`;
+                                    ctx.beginPath();
+                                    ctx.arc(star.x, star.y, star.radius * 0.3, 0, Math.PI * 2);
+                                    ctx.fill();
+                                } else if (star.isMedium) {
+                                    // Étoiles moyennement brillantes mais bien visibles
+                                    const gradient = ctx.createRadialGradient(
+                                        star.x, star.y, 0,
+                                        star.x, star.y, star.radius * 4
+                                    );
+                                    gradient.addColorStop(0, `rgba(96, 165, 250, ${currentOpacity})`);
+                                    gradient.addColorStop(0.25, `rgba(59, 130, 246, ${currentOpacity * 0.8})`);
+                                    gradient.addColorStop(0.5, `rgba(37, 99, 235, ${currentOpacity * 0.5})`);
+                                    gradient.addColorStop(0.75, `rgba(37, 99, 235, ${currentOpacity * 0.25})`);
+                                    gradient.addColorStop(1, 'rgba(37, 99, 235, 0)');
+                                    
+                                    ctx.fillStyle = gradient;
+                                    ctx.beginPath();
+                                    ctx.arc(star.x, star.y, star.radius * 4, 0, Math.PI * 2);
+                                    ctx.fill();
+                                    
+                                    // Point central brillant
+                                    ctx.fillStyle = `rgba(96, 165, 250, ${currentOpacity})`;
+                                    ctx.beginPath();
+                                    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                                    ctx.fill();
+                                    
+                                    // Point blanc au centre
+                                    ctx.fillStyle = `rgba(255, 255, 255, ${currentOpacity * 0.8})`;
+                                    ctx.beginPath();
+                                    ctx.arc(star.x, star.y, star.radius * 0.4, 0, Math.PI * 2);
+                                    ctx.fill();
+                                } else {
+                                    // Petites étoiles mais toujours bien visibles
+                                    const gradient = ctx.createRadialGradient(
+                                        star.x, star.y, 0,
+                                        star.x, star.y, star.radius * 3
+                                    );
+                                    gradient.addColorStop(0, `rgba(59, 130, 246, ${currentOpacity})`);
+                                    gradient.addColorStop(0.3, `rgba(37, 99, 235, ${currentOpacity * 0.7})`);
+                                    gradient.addColorStop(0.6, `rgba(37, 99, 235, ${currentOpacity * 0.4})`);
+                                    gradient.addColorStop(1, 'rgba(37, 99, 235, 0)');
+                                    
+                                    ctx.fillStyle = gradient;
+                                    ctx.beginPath();
+                                    ctx.arc(star.x, star.y, star.radius * 3, 0, Math.PI * 2);
+                                    ctx.fill();
+                                    
+                                    // Point central
+                                    ctx.fillStyle = `rgba(59, 130, 246, ${currentOpacity})`;
+                                    ctx.beginPath();
+                                    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                                    ctx.fill();
+                                }
+                            });
+                            
+                            requestAnimationFrame(animateStars);
+                        }
+                        
+                        animateStars();
+                    }
+                    
+                    // Animation de texte dynamique pour le loader de mois
+                    function initMonthLoaderAnimation() {
+                        const monthLoadingText = document.querySelector('#month-loading .loading-text-item');
+                        if (monthLoadingText) {
+                            const texts = [
+                                'Vérification des disponibilités...',
+                                'Analyse des créneaux disponibles...',
+                                'Préparation de votre calendrier...',
+                                'Presque terminé...'
+                            ];
+                            let currentIndex = 0;
+                            
+                            const intervalId = setInterval(function() {
+                                const monthLoader = document.getElementById('month-loading');
+                                if (!monthLoader || monthLoader.classList.contains('d-none')) {
+                                    clearInterval(intervalId);
+                                    return;
+                                }
+                                
+                                currentIndex = (currentIndex + 1) % texts.length;
+                                monthLoadingText.style.transition = 'opacity 0.3s ease';
+                                monthLoadingText.style.opacity = '0';
+                                setTimeout(function() {
+                                    monthLoadingText.textContent = texts[currentIndex];
+                                    monthLoadingText.style.opacity = '1';
+                                }, 300);
+                            }, 2500);
+                        }
+                    }
+                    
+                    // Observer pour détecter quand le loader month-loading apparaît
+                    const monthLoaderObserver = new MutationObserver(function(mutations) {
+                        mutations.forEach(function(mutation) {
+                            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                                const monthLoader = document.getElementById('month-loading');
+                                if (monthLoader && !monthLoader.classList.contains('d-none')) {
+                                    initMonthLoaderAnimation();
+                                }
+                            }
+                        });
+                    });
+                    
+                    const monthLoader = document.getElementById('month-loading');
+                    if (monthLoader) {
+                        monthLoaderObserver.observe(monthLoader, { attributes: true });
+                        if (!monthLoader.classList.contains('d-none')) {
+                            initMonthLoaderAnimation();
+                            initStarrySky('month-stars-canvas');
+                        }
+                    }
+                    
+                    // Observer pour initialiser le ciel étoilé quand month-loading apparaît
+                    const monthLoaderStarsObserver = new MutationObserver(function(mutations) {
+                        mutations.forEach(function(mutation) {
+                            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                                const monthLoader = document.getElementById('month-loading');
+                                if (monthLoader && !monthLoader.classList.contains('d-none')) {
+                                    setTimeout(() => initStarrySky('month-stars-canvas'), 100);
+                                }
+                            }
+                        });
+                    });
+                    
+                    if (monthLoader) {
+                        monthLoaderStarsObserver.observe(monthLoader, { attributes: true });
+                    }
                 });
             } else {
                 // DOM déjà chargé
@@ -772,7 +1061,7 @@
             cursor: not-allowed !important;
         }
         
-        /* Animations pour les services */
+        /* Animations améliorées */
         @keyframes fadeInUp {
             from {
                 opacity: 0;
@@ -784,26 +1073,222 @@
             }
         }
         
-        @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
             }
-            50% {
-                transform: scale(1.1);
+            to {
+                opacity: 1;
+                transform: scale(1);
             }
         }
         
+        @keyframes fadeInUpScale {
+            from {
+                opacity: 0;
+                transform: translateY(40px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.6;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.1);
+                opacity: 0.4;
+            }
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+        
+        @keyframes shimmer {
+            0% {
+                background-position: -1000px 0;
+            }
+            100% {
+                background-position: 1000px 0;
+            }
+        }
+        
+        /* Ciel étoilé nocturne */
+        .starry-sky {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+            background: #000000;
+            margin: 0;
+            padding: 0;
+        }
+        
+        #calendar-stars-canvas,
+        #month-stars-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            margin: 0;
+            padding: 0;
+        }
+        
+        @keyframes gentlePulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.05);
+                opacity: 0.9;
+            }
+        }
+        
+        .loading-logo-wrapper {
+            display: inline-block;
+            position: relative;
+            z-index: 10;
+        }
+        
+        .loading-logo {
+            position: relative;
+            display: inline-block;
+            z-index: 10;
+        }
+        
+        .loading-logo img {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            z-index: 10;
+        }
+        
+        /* Barre de progression */
+        .progress-wrapper {
+            margin-top: 1.5rem;
+        }
+        
+        .progress-bar-animated {
+            width: 100%;
+            height: 5px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2563eb, #3b82f6, #60a5fa, #2563eb);
+            background-size: 200% 100%;
+            border-radius: 10px;
+            animation: shimmer 2s linear infinite, progressFill 3s ease-in-out infinite;
+            width: 0%;
+        }
+        
+        @keyframes progressFill {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+        
+        /* Texte dynamique */
+        .loading-text-item {
+            display: inline-block;
+            animation: fadeInOut 3s ease-in-out infinite;
+        }
+        
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        
+        
+        /* Cartes de services améliorées */
         .service-card {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+            background: white !important;
+        }
+        
+        .service-card::before,
+        .service-card::after {
+            display: none !important;
+            content: none !important;
         }
         
         .service-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .service-card > * {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .service-icon-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem auto;
+            width: 100%;
+            height: 60px;
+            overflow: hidden;
+            background: transparent;
         }
         
         .service-icon {
-            transition: color 0.3s ease;
+            position: relative;
+            z-index: 2;
+            margin: 0;
+            padding: 0;
+            animation: float 3s ease-in-out infinite;
+            transition: transform 0.3s ease;
+            display: inline-block;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+        
+        .service-card:hover .service-icon {
+            transform: scale(1.2) rotate(5deg);
+        }
+        
+        .service-card:nth-child(1) .service-icon {
+            animation-delay: 0s;
+        }
+        
+        .service-card:nth-child(2) .service-icon {
+            animation-delay: 0.3s;
+        }
+        
+        .service-card:nth-child(3) .service-icon {
+            animation-delay: 0.6s;
         }
     </style>
 {% endblock %}
