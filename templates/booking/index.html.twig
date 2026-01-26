@@ -54,7 +54,7 @@
 
                         {# --- BOUTON RETOUR VERS LE FORMULAIRE --- #}
                         {% set userIdParam = app.request.query.get('user') %}
-                        <a href="{{ path('app_booking_form', {'eventId': event.id, 'user': userIdParam}) }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                        <a href="{{ path('app_booking_form', {'eventId': event.id, 'user': userIdParam}) }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-turbo="false">
                             <i class="fas fa-arrow-left me-2"></i> Modifier mes infos
                         </a>
                     </div>
@@ -514,6 +514,39 @@
 
         // Attendre que le DOM soit chargé
         function initCalendar() {
+            // Vérifier si la page vient du cache (retour en arrière)
+            const isFromCache = performance.getEntriesByType('navigation')[0]?.type === 'back_forward';
+            
+            if (isFromCache) {
+                // Si retour en arrière, cacher immédiatement le loader
+                console.log('Page chargée depuis le cache - masquage immédiat du loader');
+                const loader = document.getElementById('calendar-loader');
+                const container = document.getElementById('calendar-container');
+                
+                if (loader) {
+                    loader.style.display = 'none';
+                    loader.style.visibility = 'hidden';
+                    loader.style.pointerEvents = 'none';
+                    loader.style.opacity = '0';
+                }
+                
+                if (container) {
+                    container.style.opacity = '1';
+                    container.style.pointerEvents = 'auto';
+                    container.style.visibility = 'visible';
+                }
+                
+                calendarReady = true;
+                
+                // Charger les mois si nécessaire
+                if (months.length === 0) {
+                    loadInitialMonths();
+                } else {
+                    updateCalendar();
+                }
+                return;
+            }
+            
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', function() {
                     setTimeout(showCalendar, 100);
@@ -556,6 +589,51 @@
                 console.log('Calendrier activé par fallback');
             }
         }, 1000);
+
+        // Gérer le retour en arrière du navigateur
+        // Cacher immédiatement le loader si on revient en arrière
+        window.addEventListener('pageshow', function(event) {
+            // Si la page est chargée depuis le cache (retour en arrière)
+            if (event.persisted) {
+                console.log('Retour en arrière détecté - masquage du loader');
+                const loader = document.getElementById('calendar-loader');
+                const container = document.getElementById('calendar-container');
+                
+                if (loader) {
+                    loader.style.display = 'none';
+                    loader.style.visibility = 'hidden';
+                    loader.style.pointerEvents = 'none';
+                    loader.style.opacity = '0';
+                }
+                
+                if (container) {
+                    container.style.opacity = '1';
+                    container.style.pointerEvents = 'auto';
+                    container.style.visibility = 'visible';
+                }
+                
+                calendarReady = true;
+                
+                // Réinitialiser le calendrier si nécessaire
+                if (months.length === 0) {
+                    loadInitialMonths();
+                } else {
+                    updateCalendar();
+                }
+            }
+        });
+
+        // Désactiver Turbo pour éviter les problèmes de navigation
+        if (typeof Turbo !== 'undefined') {
+            document.addEventListener('turbo:before-visit', function(event) {
+                // Si c'est un retour en arrière, ne pas utiliser Turbo
+                const isBackNavigation = performance.getEntriesByType('navigation')[0]?.type === 'back_forward';
+                if (isBackNavigation) {
+                    event.preventDefault();
+                    window.location.href = event.detail.url;
+                }
+            });
+        }
 
         function selectDate(btn, slots, dateText, dateValue) {
             // Empêcher la sélection si le calendrier n'est pas encore prêt

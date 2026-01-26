@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\EvenementRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -47,6 +49,12 @@ class Evenement
     #[ORM\ManyToOne(inversedBy: 'evenements')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Groupe $groupe = null;
+
+    /**
+     * @var Collection<int, RendezVous>
+     */
+    #[ORM\OneToMany(targetEntity: RendezVous::class, mappedBy: 'evenement')]
+    private Collection $rendezVouses;
 
     public function getId(): ?int
     {
@@ -175,6 +183,41 @@ class Evenement
     public function setLimiteMoisReservation(int $limiteMoisReservation): static
     {
         $this->limiteMoisReservation = $limiteMoisReservation;
+        return $this;
+    }
+
+    public function __construct()
+    {
+        $this->rendezVouses = new ArrayCollection();
+    }
+
+    /**
+     * @return Collection<int, RendezVous>
+     */
+    public function getRendezVouses(): Collection
+    {
+        return $this->rendezVouses;
+    }
+
+    public function addRendezVouse(RendezVous $rendezVouse): static
+    {
+        if (!$this->rendezVouses->contains($rendezVouse)) {
+            $this->rendezVouses->add($rendezVouse);
+            $rendezVouse->setEvenement($this);
+        }
+
+        return $this;
+    }
+
+    public function removeRendezVouse(RendezVous $rendezVouse): static
+    {
+        if ($this->rendezVouses->removeElement($rendezVouse)) {
+            // set the owning side to null (unless already changed)
+            if ($rendezVouse->getEvenement() === $this) {
+                $rendezVouse->setEvenement(null);
+            }
+        }
+
         return $this;
     }
 
