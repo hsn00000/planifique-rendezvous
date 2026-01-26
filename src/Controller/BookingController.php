@@ -663,13 +663,34 @@ class BookingController extends AbstractController
                 'duration_ms' => $duration
             ]);
         } catch (\Exception $e) {
+            $errorMessage = $e->getMessage();
             $logger->error('Erreur lors de l\'envoi de l\'email', [
                 'email' => $rendezVous->getEmail(),
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
+                'code' => $e->getCode(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
-            // On continue même si l'email échoue (le RDV est déjà sauvegardé)
-            // L'utilisateur verra quand même la page de succès
+            
+            // En mode DEV, afficher l'erreur directement pour faciliter le débogage
+            $env = $this->getParameter('kernel.environment');
+            if ($env === 'dev') {
+                // DÉBOGAGE : Décommentez la ligne suivante pour voir l'erreur immédiatement
+                // dd('❌ ERREUR EMAIL', $errorMessage, $e);
+                
+                // Afficher un message flash pour informer l'utilisateur
+                $this->addFlash('warning', '⚠️ L\'email de confirmation n\'a pas pu être envoyé. Erreur: ' . $errorMessage);
+                
+                // Afficher aussi dans la console Symfony
+                $logger->critical('ERREUR EMAIL EN MODE DEV - Vérifiez les logs ci-dessus pour plus de détails', [
+                    'error' => $errorMessage,
+                    'code' => $e->getCode()
+                ]);
+            } else {
+                // En production, on continue silencieusement mais on log l'erreur
+                // L'utilisateur verra quand même la page de succès
+            }
         }
 
         // Redirection vers la page de succès
@@ -1074,7 +1095,8 @@ class BookingController extends AbstractController
                 'isToday' => $currentDate->format('Y-m-d') === $now->format('Y-m-d'),
                 'isPast' => $currentDate < (clone $now)->setTime(0,0,0),
                 'slots' => [],
-                'hasAvailability' => false
+                'hasAvailability' => false,
+                'dateValue' => $currentDate->format('Y-m-d') // Format pour JavaScript/Twig
             ];
 
             if (!$dayData['isPast']) {

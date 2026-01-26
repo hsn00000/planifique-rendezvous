@@ -119,9 +119,9 @@
                                                         </div>
                                                     {% endif %}
                                                 {% elseif rdv.typeLieu == 'Cabinet-geneve' %}
-                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Rue de Genève 12, 1201 Genève</div>
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Chemin du Pavillon 2, 1218 Le Grand-Saconnex, Suisse</div>
                                                 {% elseif rdv.typeLieu == 'Cabinet-archamps' %}
-                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Technopole d'Archamps, France</div>
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">160 Rue Georges de Mestral, 74160 Archamps, France</div>
                                                 {% endif %}
                                             </td>
                                         </tr>
@@ -156,7 +156,7 @@
                         <table border="0" cellpadding="0" cellspacing="0" width="100%">
                             <tr>
                                 <td align="center" style="padding-bottom: 15px;">
-                                    <a href="{{ absolute_url(path('app_booking_modify', {'token': rdv.cancelToken})) }}" 
+                                    <a href="{{ absolute_url(path('app_booking_modify', {'token': rdv.cancelToken})) }}"
                                        style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; margin-right: 10px;">
                                         <i class="fas fa-edit" style="margin-right: 8px;"></i>Modifier ce rendez-vous
                                     </a>
@@ -164,7 +164,7 @@
                             </tr>
                             <tr>
                                 <td align="center">
-                                    <a href="{{ absolute_url(path('app_booking_cancel', {'token': rdv.cancelToken})) }}" 
+                                    <a href="{{ absolute_url(path('app_booking_cancel', {'token': rdv.cancelToken})) }}"
                                        style="display: inline-block; background-color: transparent; color: #dc2626; text-decoration: none; padding: 12px 24px; border: 2px solid #dc2626; border-radius: 8px; font-weight: 600; font-size: 14px;">
                                         <i class="fas fa-times" style="margin-right: 8px;"></i>Annuler ce rendez-vous
                                     </a>
