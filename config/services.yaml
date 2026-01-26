@@ -18,3 +18,8 @@ services:
             $clientId: '%env(OAUTH_AZURE_CLIENT_ID)%'
             $clientSecret: '%env(OAUTH_AZURE_CLIENT_SECRET)%'
             $tenantId: '%env(MICROSOFT_TENANT_ID)%'
+
+    # 🔹 Config pour l'extension Twig
+    App\Twig\AppExtension:
+        arguments:
+            $projectDir: '%kernel.project_dir%'

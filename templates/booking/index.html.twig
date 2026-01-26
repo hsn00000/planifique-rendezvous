@@ -63,15 +63,41 @@
                 {# --- DROITE --- #}
                 <div class="col-lg-8 bg-white position-relative d-flex flex-column">
 
-                    {# Loader initial - reste affiché jusqu'à ce que le calendrier soit prêt #}
-                    <div id="calendar-loader" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white" style="z-index: 1000; pointer-events: auto;">
-                        <div class="text-center">
-                            <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
-                                <span class="visually-hidden">Chargement...</span>
+                    {# Loader initial avec services Planifique animés #}
+                    <div id="calendar-loader" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white" style="z-index: 1000; pointer-events: auto; overflow-y: auto;">
+                        <div class="container py-4">
+                            <div class="text-center mb-4">
+                                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
+                                    <span class="visually-hidden">Chargement...</span>
+                                </div>
+                                <h5 class="fw-bold text-dark mb-2">Planifique prépare votre calendrier</h5>
+                                <p class="text-muted small mb-0">Vérification des disponibilités en cours...</p>
                             </div>
-                            <h5 class="fw-bold text-dark mb-2">Chargement du calendrier</h5>
-                            <p class="text-muted small mb-0">Vérification des disponibilités en cours...</p>
-                            <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Veuillez patienter, cela peut prendre quelques secondes</p>
+                            
+                            {# Services Planifique (version compacte avec animations) #}
+                            <div class="row g-3 justify-content-center mt-4">
+                                <div class="col-md-4">
+                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.2s both;">
+                                        <i class="fas fa-piggy-bank text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite;"></i>
+                                        <h6 class="fw-bold small mb-1">Gestion de Patrimoine</h6>
+                                        <p class="text-muted" style="font-size: 0.75rem;">Accompagnement sur-mesure</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.4s both;">
+                                        <i class="fas fa-calculator text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite 0.3s;"></i>
+                                        <h6 class="fw-bold small mb-1">Optimisation Fiscale</h6>
+                                        <p class="text-muted" style="font-size: 0.75rem;">Résidents suisses et frontaliers</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.6s both;">
+                                        <i class="fas fa-umbrella text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite 0.6s;"></i>
+                                        <h6 class="fw-bold small mb-1">Sécurisation Retraite</h6>
+                                        <p class="text-muted" style="font-size: 0.75rem;">Assurance santé & 2e pilier</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -140,15 +166,41 @@
                             {% endfor %}
                         </div>
                         
-                    {# Loader pour le chargement d'un mois (affiché au centre de la page) #}
-                    <div id="month-loading" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center bg-white" style="z-index: 999; pointer-events: auto;">
-                        <div class="text-center">
-                            <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
-                                <span class="visually-hidden">Chargement...</span>
+                    {# Loader pour le chargement d'un mois avec services Planifique #}
+                    <div id="month-loading" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center bg-white" style="z-index: 999; pointer-events: auto; overflow-y: auto;">
+                        <div class="container py-4">
+                            <div class="text-center mb-4">
+                                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
+                                    <span class="visually-hidden">Chargement...</span>
+                                </div>
+                                <h5 class="fw-bold text-dark mb-2">Planifique prépare votre calendrier</h5>
+                                <p class="text-muted small mb-0">Vérification des disponibilités en cours...</p>
                             </div>
-                            <h5 class="fw-bold text-dark mb-2">Chargement du mois</h5>
-                            <p class="text-muted small mb-0">Vérification des disponibilités en cours...</p>
-                            <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Veuillez patienter</p>
+                            
+                            {# Services Planifique (version compacte avec animations) #}
+                            <div class="row g-3 justify-content-center mt-4">
+                                <div class="col-md-4">
+                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.2s both;">
+                                        <i class="fas fa-piggy-bank text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite;"></i>
+                                        <h6 class="fw-bold small mb-1">Gestion de Patrimoine</h6>
+                                        <p class="text-muted" style="font-size: 0.75rem;">Accompagnement sur-mesure</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.4s both;">
+                                        <i class="fas fa-calculator text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite 0.3s;"></i>
+                                        <h6 class="fw-bold small mb-1">Optimisation Fiscale</h6>
+                                        <p class="text-muted" style="font-size: 0.75rem;">Résidents suisses et frontaliers</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-0 shadow-sm h-100 text-center p-3 service-card" style="border-radius: 8px; animation: fadeInUp 0.5s ease-out 0.6s both;">
+                                        <i class="fas fa-umbrella text-primary mb-2 service-icon" style="font-size: 1.8rem; animation: pulse 2s ease-in-out infinite 0.6s;"></i>
+                                        <h6 class="fw-bold small mb-1">Sécurisation Retraite</h6>
+                                        <p class="text-muted" style="font-size: 0.75rem;">Assurance santé & 2e pilier</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     </div>
@@ -159,7 +211,7 @@
                             <div class="spinner-border text-primary mb-4" role="status" style="width: 3rem; height: 3rem; border-width: 4px;">
                                 <span class="visually-hidden">Chargement...</span>
                             </div>
-                            <h5 class="fw-bold text-dark mb-2">Chargement de la page</h5>
+                            <h5 class="fw-bold text-dark mb-2">Planifique prépare votre rendez-vous</h5>
                             <p class="text-muted small mb-0">Préparation du récapitulatif...</p>
                             <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Veuillez patienter</p>
                         </div>
@@ -718,6 +770,40 @@
             pointer-events: none !important;
             opacity: 0.5;
             cursor: not-allowed !important;
+        }
+        
+        /* Animations pour les services */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+        
+        .service-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+        }
+        
+        .service-icon {
+            transition: color 0.3s ease;
         }
     </style>
 {% endblock %}

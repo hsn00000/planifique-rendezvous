@@ -290,6 +290,9 @@ class OutlookService
 
         $this->refreshAccessTokenIfExpired($account);
 
+        // Récupérer les rendez-vous futurs qui ont un outlookId
+        // On ne peut vérifier que les rendez-vous qui ont été synchronisés avec Outlook
+        // Les rendez-vous sans outlookId ne peuvent pas être vérifiés via l'API Outlook
         $futureRdvs = $this->rdvRepo->createQueryBuilder('r')
             ->where('r.conseiller = :user')
             ->andWhere('r.dateDebut > :now')
@@ -318,14 +321,23 @@ class OutlookService
             $data = json_decode($response->getBody(), true);
             $outlookIds = array_column($data['value'] ?? [], 'id');
 
+            $removedCount = 0;
             foreach ($futureRdvs as $rdv) {
-                if (!in_array($rdv->getOutlookId(), $outlookIds)) {
+                // Si le rendez-vous a un outlookId mais n'existe plus dans Outlook, le supprimer
+                if ($rdv->getOutlookId() && !in_array($rdv->getOutlookId(), $outlookIds)) {
                     $this->em->remove($rdv);
+                    $removedCount++;
                 }
             }
-            $this->em->flush();
+            
+            if ($removedCount > 0) {
+                $this->em->flush();
+                error_log("Synchronisation Outlook: $removedCount rendez-vous supprimés de la base de données");
+            }
 
-        } catch (\Exception $e) {}
+        } catch (\Exception $e) {
+            error_log('Erreur lors de la synchronisation Outlook: ' . $e->getMessage());
+        }
     }
 
     public function getOutlookBusyPeriods(User $user, \DateTime $date): array
@@ -366,6 +378,97 @@ class OutlookService
         } catch (\Exception $e) {
             error_log('Erreur getOutlookBusyPeriods pour user ' . $user->getId() . ': ' . $e->getMessage());
             return [];
+        }
+    }
+
+    /**
+     * Vérifie si au moins un conseiller d'un groupe est disponible côté Outlook pour un créneau donné
+     * Utilise l'API getSchedule pour vérifier tous les conseillers en une seule requête
+     * 
+     * @param User $requestingUser L'utilisateur qui fait la requête (pour le token)
+     * @param array $conseillers Liste des conseillers à vérifier
+     * @param \DateTimeInterface $start Début du créneau
+     * @param \DateTimeInterface $end Fin du créneau
+     * @return bool True si au moins un conseiller est disponible
+     */
+    public function hasAtLeastOneAvailableConseillerOnOutlook(User $requestingUser, array $conseillers, \DateTimeInterface $start, \DateTimeInterface $end): bool
+    {
+        // Récupérer le token de l'utilisateur qui fait la requête
+        $account = $this->accountRepo->findOneBy(['user' => $requestingUser]);
+        if (!$account || !$account->getAccessToken()) {
+            // Si pas de token, on considère comme disponible (ne bloque pas)
+            return true;
+        }
+
+        $this->refreshAccessTokenIfExpired($account);
+        $token = $account->getAccessToken();
+
+        // Récupérer les emails Microsoft de tous les conseillers qui ont un compte Microsoft
+        $conseillerEmails = [];
+        foreach ($conseillers as $conseiller) {
+            $msAccount = $this->accountRepo->findOneBy(['user' => $conseiller]);
+            if ($msAccount && $msAccount->getMicrosoftEmail()) {
+                $conseillerEmails[] = $msAccount->getMicrosoftEmail();
+            } elseif ($conseiller->getEmail() && str_ends_with(strtolower($conseiller->getEmail()), '@planifique.com')) {
+                // Fallback : utiliser l'email de l'utilisateur si pas de microsoftEmail
+                $conseillerEmails[] = $conseiller->getEmail();
+            }
+        }
+
+        if (empty($conseillerEmails)) {
+            // Si aucun conseiller n'a d'email Microsoft, on considère comme disponible
+            return true;
+        }
+
+        try {
+            $client = new \GuzzleHttp\Client([
+                'timeout' => 3,
+                'connect_timeout' => 1
+            ]);
+
+            $payload = [
+                'schedules' => $conseillerEmails,
+                'startTime' => [
+                    'dateTime' => $start->format('Y-m-d\TH:i:s'),
+                    'timeZone' => 'Europe/Paris',
+                ],
+                'endTime' => [
+                    'dateTime' => $end->format('Y-m-d\TH:i:s'),
+                    'timeZone' => 'Europe/Paris',
+                ],
+                'availabilityViewInterval' => 30,
+            ];
+
+            $response = $client->post('https://graph.microsoft.com/v1.0/me/calendar/getSchedule', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type'  => 'application/json',
+                ],
+                'json' => $payload,
+                'timeout' => 3,
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
+            $schedules = $data['value'] ?? [];
+
+            // Vérifier si au moins un conseiller est libre (availabilityView contient uniquement des '0')
+            foreach ($schedules as $schedule) {
+                $view = $schedule['availabilityView'] ?? '';
+                
+                if (is_string($view) && $view !== '' && !preg_match('/[1-9]/', $view)) {
+                    // Ce conseiller est libre (tous les créneaux sont '0' = Free)
+                    return true;
+                }
+            }
+
+            // Aucun conseiller n'est libre
+            return false;
+
+        } catch (\Exception $e) {
+            // En cas d'erreur, on considère comme disponible pour ne pas bloquer
+            // Logger uniquement les erreurs critiques
+            error_log('[OUTLOOK] Erreur vérification conseillers: ' . $e->getMessage());
+            return true;
         }
     }
 

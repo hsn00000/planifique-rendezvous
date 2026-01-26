@@ -22,6 +22,11 @@ Connect-ExchangeOnline
 Set-CASMailbox -Identity "turgay.demirtas@planifique.com" -SmtpClientAuthenticationDisabled $false
 ```
 
+### 2. Mot de passe incorrect
+
+Vérifiez que le mot de passe dans `.env.local` est correct :
+- `Sinan.Sena7432*` (avec le `*` encodé en `%2A`)
+
 ### 3. Authentification multi-facteurs (MFA) activée
 
 Si MFA est activé sur le compte, vous **ne pouvez pas** utiliser le mot de passe normal. Il faut créer un **"Mot de passe d'application"**.

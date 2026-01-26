@@ -179,9 +179,24 @@ class BookingController extends AbstractController
             }
         }
 
-        // OPTIMISATION : Désactiver la synchronisation Outlook à chaque chargement du calendrier
-        // Elle est coûteuse en temps et peut être faite en arrière-plan ou moins fréquemment
-        // $outlookService->synchronizeCalendar($calculationUser);
+        // IMPORTANT : Synchroniser le calendrier Outlook pour supprimer les rendez-vous annulés dans Outlook
+        // Cela garantit que les rendez-vous supprimés dans Outlook sont aussi supprimés de la base de données
+        // OPTIMISATION : Ne synchroniser qu'une fois par session pour éviter les appels répétés
+        $session = $request->getSession();
+        $lastSyncKey = 'outlook_sync_' . $calculationUser->getId();
+        $lastSync = $session->get($lastSyncKey);
+        $now = time();
+        
+        // Synchroniser au maximum une fois toutes les 5 minutes pour éviter les appels répétés
+        if (!$lastSync || ($now - $lastSync) > 300) {
+            try {
+                $outlookService->synchronizeCalendar($calculationUser);
+                $session->set($lastSyncKey, $now);
+            } catch (\Exception $e) {
+                // Ne pas bloquer l'affichage du calendrier si la synchronisation échoue
+                error_log('Erreur lors de la synchronisation Outlook: ' . $e->getMessage());
+            }
+        }
 
         // Chargement progressif : ne charger que les 2 premiers mois initialement
         // IMPORTANT : Passer le bon paramètre selon la logique ci-dessus
@@ -554,7 +569,7 @@ class BookingController extends AbstractController
         if (in_array($data['lieu'], ['Cabinet-geneve', 'Cabinet-archamps'], true)) {
 
             // Fonction helper pour tester un lieu
-            $tryLieu = function (string $lieu) use ($bureauRepo, $outlookService, $rendezVous, $conseiller) {
+            $tryLieu = function (string $lieu) use ($bureauRepo, $outlookService, $rendezVous, $conseiller, $event) {
                 // 1) On récupère toutes les salles libres en BDD pour ce lieu
                 $freeBureaux = $bureauRepo->findAvailableBureaux(
                     $lieu,
@@ -566,7 +581,25 @@ class BookingController extends AbstractController
                     return null;
                 }
 
-                // 2) On vérifie côté Outlook laquelle est vraiment libre
+                // 2) IMPORTANT : Vérifier Outlook pour TOUTES les salles du cabinet (pas seulement celles libres en BDD)
+                // Car un conseiller peut avoir réservé directement dans Outlook sans passer par l'application
+                // Récupérer toutes les salles du cabinet
+                $allBureaux = $bureauRepo->findBy(['lieu' => $lieu]);
+                
+                // Vérifier si au moins une salle est libre côté Outlook (parmi TOUTES les salles)
+                $hasFreeRoom = $outlookService->hasAtLeastOneFreeRoomOnOutlook(
+                    $conseiller,
+                    $allBureaux, // TOUTES les salles, pas seulement celles libres en BDD
+                    $rendezVous->getDateDebut(),
+                    $rendezVous->getDateFin()
+                );
+                
+                if (!$hasFreeRoom) {
+                    // Toutes les salles sont occupées côté Outlook
+                    return null;
+                }
+                
+                // 3) Si au moins une salle est libre côté Outlook, choisir la première parmi celles libres en BDD
                 return $outlookService->pickAvailableBureauOnOutlook(
                     $conseiller,
                     $freeBureaux,
@@ -1005,6 +1038,15 @@ class BookingController extends AbstractController
         $isGroupe = $groupeOrUser instanceof \App\Entity\Groupe;
         $conseillers = $isGroupe ? $groupeOrUser->getUsers()->toArray() : [$groupeOrUser];
         
+        // IMPORTANT : Pour les cabinets, on doit vérifier TOUS les conseillers pour identifier les conflits de salles
+        // Pour "A domicile" ou "Teams", on vérifie uniquement le conseiller concerné
+        $isCabinet = in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps']);
+        $tousLesConseillers = null;
+        if ($isCabinet) {
+            // Récupérer tous les conseillers du groupe de l'événement pour vérifier les conflits de salles
+            $tousLesConseillers = $event->getGroupe()->getUsers()->toArray();
+        }
+        
         if (empty($conseillers)) {
             return [];
         }
@@ -1026,6 +1068,7 @@ class BookingController extends AbstractController
         // OPTIMISATION : Pré-charger tous les RDV avec bureau pour ce lieu (une seule requête)
         // IMPORTANT : Ne charger les RDV avec bureau QUE pour les cabinets physiques
         // Pour "Visioconférence" ou "Domicile", pas besoin de vérifier les salles
+        // IMPORTANT : Les rendez-vous annulés sont supprimés de la base de données, donc ils ne sont pas dans $allBureauxRdvs
         $allBureauxRdvs = [];
         if (in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps'])) {
             $entityManager = $rdvRepo->getEntityManager();
@@ -1078,11 +1121,10 @@ class BookingController extends AbstractController
         // OPTIMISATION CRITIQUE : Cache pour les vérifications Outlook par demi-journée
         // Évite les centaines d'appels API (un par créneau) en vérifiant seulement 2 fois par jour
         // Limité aux 30 prochains jours (1 mois) pour équilibrer performance et précision
+        // Cache pour les vérifications Outlook (actuellement désactivé pour performance)
+        // Les vérifications Outlook sont faites uniquement lors de la finalisation
         $outlookDayCache = [];
-        
-        // Cache pour les vérifications Outlook des conseillers par jour (pour éviter les appels répétés)
-        // Clé : conseiller_id_date (ex: "15_2025-01-23")
-        $outlookConseillerCache = [];
+        $outlookConseillersCache = [];
 
         $currentDate = clone $startPeriod;
         while ($currentDate <= $endPeriod) {
@@ -1123,60 +1165,67 @@ class BookingController extends AbstractController
                     // Aucune disponibilité configurée pour ce jour → pas de créneaux
                     // Le jour sera affiché mais sans horaires disponibles
                 } else {
-                    // Pour chaque règle de disponibilité configurée, vérifier si au moins un conseiller est disponible
-                    foreach ($rulesByDay[$dayOfWeek] as $rule) {
-                        if ($rule->isEstBloque()) continue;
+                    // NOUVELLE APPROCHE : Itérer sur les conseillers et générer les créneaux à partir de leurs disponibilités
+                    // Cela garantit que tous les créneaux sont générés, même si plusieurs règles existent pour le même jour
+                    
+                    // Pour chaque conseiller, trouver ses disponibilités pour ce jour
+                    foreach ($conseillers as $conseiller) {
+                        // Trouver toutes les disponibilités de ce conseiller pour ce jour
+                        $conseillerDispos = array_filter($disposHebdo, function($d) use ($conseiller, $dayOfWeek) {
+                            return $d->getUser() === $conseiller && $d->getJourSemaine() === $dayOfWeek && !$d->isEstBloque();
+                        });
+                        
+                        if (empty($conseillerDispos)) {
+                            // Ce conseiller n'a pas de disponibilité pour ce jour
+                            continue;
+                        }
+                        
+                        // Pour chaque disponibilité de ce conseiller, générer les créneaux
+                        foreach ($conseillerDispos as $dispo) {
+                            $start = (clone $currentDate)->setTime((int)$dispo->getHeureDebut()->format('H'), (int)$dispo->getHeureDebut()->format('i'));
+                            $end = (clone $currentDate)->setTime((int)$dispo->getHeureFin()->format('H'), (int)$dispo->getHeureFin()->format('i'));
 
-                        $start = (clone $currentDate)->setTime((int)$rule->getHeureDebut()->format('H'), (int)$rule->getHeureDebut()->format('i'));
-                        $end = (clone $currentDate)->setTime((int)$rule->getHeureFin()->format('H'), (int)$rule->getHeureFin()->format('i'));
+                            while ($start < $end) {
+                                $slotEnd = (clone $start)->modify("+$duration minutes");
+                                if ($slotEnd > $end) break;
 
-                        while ($start < $end) {
-                            $slotEnd = (clone $start)->modify("+$duration minutes");
-                            if ($slotEnd > $end) break;
+                                // VÉRIFICATION : Le créneau doit respecter le délai minimum de réservation
+                                // IMPORTANT : Cette vérification ne s'applique QUE pour le jour actuel
+                                // Pour les jours futurs, on affiche tous les créneaux disponibles selon les disponibilités
+                                if ($currentDate->format('Y-m-d') === $now->format('Y-m-d') && $start < $minBookingTime) {
+                                    $start->modify("+$increment minutes");
+                                    continue;
+                                }
 
-                            // VÉRIFICATION : Le créneau doit respecter le délai minimum de réservation
-                            if ($start < $minBookingTime) {
-                                $start->modify("+$increment minutes");
-                                continue;
-                            }
-
-                            // VÉRIFIER SI AU MOINS UN CONSEILLER EST DISPONIBLE pour ce créneau
-                            $atLeastOneConseillerAvailable = false;
-                            
-                            // Initialiser $isFree selon le type (groupe = false, conseiller spécifique = false)
-                            $isFree = false;
-                            
-                            foreach ($conseillers as $conseiller) {
+                                // Initialiser $isFree selon le type (groupe = false, conseiller spécifique = false)
+                                $isFree = false;
+                                
+                                // OPTIMISATION : Calculer le quota une seule fois par jour/conseiller au lieu de le faire pour chaque créneau
+                                static $quotaCache = [];
+                                $quotaKey = $conseiller->getId() . '_' . $currentDate->format('Y-m-d');
+                                if (!isset($quotaCache[$quotaKey])) {
+                                    $quotaCache[$quotaKey] = $rdvRepo->countRendezVousForUserOnDate($conseiller, $currentDate);
+                                }
+                                $rdvCount = $quotaCache[$quotaKey];
+                                
                                 // Vérifier le quota 3/jour pour ce conseiller
-                                if ($rdvRepo->countRendezVousForUserOnDate($conseiller, $currentDate) >= 3) {
+                                if ($rdvCount >= 3) {
                                     if (!$isGroupe) {
                                         // Si c'est un conseiller spécifique et qu'il a atteint son quota, le créneau n'est pas disponible
                                         $isFree = false;
-                                        break;
+                                        $start->modify("+$increment minutes");
+                                        continue;
                                     }
-                                    continue; // Pour un groupe, on continue avec les autres conseillers
+                                    // Pour un groupe, on continue avec les autres conseillers
+                                    $start->modify("+$increment minutes");
+                                    continue;
                                 }
                                 
-                                // Vérifier si ce conseiller a une disponibilité pour cette règle ET que le créneau est dans sa plage horaire
-                                $conseillerDispos = array_filter($disposHebdo, function($d) use ($conseiller, $dayOfWeek, $start, $slotEnd, $currentDate) {
-                                    if ($d->getUser() !== $conseiller || $d->getJourSemaine() !== $dayOfWeek || $d->isEstBloque()) {
-                                        return false;
-                                    }
-                                    // Vérifier que le créneau est dans la plage horaire de disponibilité
-                                    $dispoStart = (clone $currentDate)->setTime((int)$d->getHeureDebut()->format('H'), (int)$d->getHeureDebut()->format('i'));
-                                    $dispoEnd = (clone $currentDate)->setTime((int)$d->getHeureFin()->format('H'), (int)$d->getHeureFin()->format('i'));
-                                    return $start >= $dispoStart && $slotEnd <= $dispoEnd;
-                                });
-                                if (empty($conseillerDispos)) {
-                                    if (!$isGroupe) {
-                                        // Si c'est un conseiller spécifique et qu'il n'a pas de disponibilité, le créneau n'est pas disponible
-                                        $isFree = false;
-                                        break;
-                                    }
-                                    continue; // Pour un groupe, on continue avec les autres conseillers
-                                }
+                                // Le créneau est dans la plage de disponibilité (on itère déjà sur les disponibilités du conseiller)
+                                // Pas besoin de vérifier à nouveau, on sait déjà que le créneau est dans la plage
                                 
                                 // Vérifier si ce conseiller est libre (pas de RDV qui chevauche)
+                                // IMPORTANT : Les rendez-vous annulés sont supprimés de la base de données, donc ils ne sont pas dans $rdvsDuJour
                                 $conseillerIsFree = true;
                                 foreach ($rdvsDuJour as $rdv) {
                                     // Ne vérifier que les RDV de ce conseiller
@@ -1186,108 +1235,155 @@ class BookingController extends AbstractController
                                     $tApres = $rdv->getEvenement()->getTamponApres();
                                     $busyStart = (clone $rdv->getDateDebut())->modify("-{$tAvant} minutes");
                                     $busyEnd = (clone $rdv->getDateFin())->modify("+{$tApres} minutes");
+                                    
                                     if ($start < $busyEnd && $slotEnd > $busyStart) {
                                         $conseillerIsFree = false;
                                         break;
                                     }
                                 }
                                 
-                                // OPTIMISATION PERFORMANCE : Désactiver la vérification Outlook pour l'affichage du calendrier
-                                // La vérification Outlook sera faite uniquement lors de la finalisation (finalize())
-                                // Cela réduit drastiquement le temps de chargement (de 8+ secondes à < 1 seconde)
-                                // La vérification Outlook reste active dans checkDispoWithBuffers() pour la validation finale
-                                // if ($conseillerIsFree) {
-                                //     $daysFromNow = (int)(($currentDate->getTimestamp() - $now->getTimestamp()) / 86400);
-                                //     if ($daysFromNow >= 0 && $daysFromNow <= 7) {
-                                        // Clé du cache : conseiller ID + date
-                                        $cacheKey = $conseiller->getId() . '_' . $currentDate->format('Y-m-d');
-                                        
-                                        // CODE DÉSACTIVÉ POUR PERFORMANCE
-                                        // if (!isset($outlookConseillerCache[$cacheKey])) {
-                                        //     try {
-                                        //         $busyPeriods = $outlookService->getOutlookBusyPeriods($conseiller, $currentDate);
-                                        //         $outlookConseillerCache[$cacheKey] = $busyPeriods;
-                                        //     } catch (\Exception $e) {
-                                        //         $outlookConseillerCache[$cacheKey] = null;
-                                        //     }
-                                        // }
-                                        // $busyPeriods = $outlookConseillerCache[$cacheKey];
-                                        // if ($busyPeriods === null) {
-                                        //     $conseillerIsFree = false;
-                                        // } else {
-                                        //     foreach ($busyPeriods as $period) {
-                                        //         if ($start < $period['end'] && $slotEnd > $period['start']) {
-                                        //             $conseillerIsFree = false;
-                                        //             break;
-                                        //         }
-                                        //     }
-                                        // }
-                                    // }
-                                // }
-                                
                                 if ($conseillerIsFree) {
                                     $isFree = true;
-                                    if (!$isGroupe) {
-                                        // Si c'est un conseiller spécifique et qu'il est disponible, on peut arrêter
-                                        break;
-                                    }
+                                    // Pour un conseiller spécifique, on a trouvé un créneau disponible, on peut continuer
                                     // Pour un groupe, on continue pour vérifier les autres conseillers (mais on a déjà trouvé un disponible)
-                                    // On peut garder $isFree = true et continuer pour la vérification des salles
-                                } elseif (!$isGroupe) {
-                                    // Si c'est un conseiller spécifique et qu'il n'est pas libre, le créneau n'est pas disponible
-                                    $isFree = false;
-                                    break;
+                                } else {
+                                    // Le conseiller n'est pas libre pour ce créneau
+                                    // Pour un conseiller spécifique, le créneau n'est pas disponible
+                                    if (!$isGroupe) {
+                                        $isFree = false;
+                                    }
+                                    // Pour un groupe, on continue avec les autres conseillers
                                 }
-                            }
-                            
-                            // Si aucun conseiller n'est disponible, $isFree reste false
-                            // Si au moins un conseiller est disponible (groupe) ou le conseiller spécifique est disponible, $isFree = true
+                                
+                                // OPTIMISATION : Vérification des salles en mémoire (pas de requête SQL)
+                                // IMPORTANT : Ne vérifier les salles QUE pour les cabinets physiques
+                                // Pour "Visioconférence" ou "Domicile", on ne vérifie QUE la disponibilité du conseiller
+                                if ($isFree && in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps']) && !empty($allBureaux)) {
+                                    // On vérifie en mémoire quels bureaux sont occupés pour ce créneau (BDD locale)
+                                    $occupiedBureauIds = [];
+                                    foreach ($bureauxRdvsDuJour as $rdv) {
+                                        $bureau = $rdv->getBureau();
+                                        if ($bureau) {
+                                            // Vérifier si ce RDV chevauche notre créneau
+                                            if ($start < $rdv->getDateFin() && $slotEnd > $rdv->getDateDebut()) {
+                                                $occupiedBureauIds[] = $bureau->getId();
+                                            }
+                                        }
+                                    }
+                                    $occupiedBureauIds = array_unique($occupiedBureauIds);
 
-                            // OPTIMISATION : Vérification des salles en mémoire (pas de requête SQL)
-                            // IMPORTANT : Ne vérifier les salles QUE pour les cabinets physiques
-                            // Pour "Visioconférence" ou "Domicile", on ne vérifie QUE la disponibilité du conseiller
-                            if ($isFree && in_array($lieu, ['Cabinet-geneve', 'Cabinet-archamps']) && !empty($allBureaux)) {
-                                // On vérifie en mémoire quels bureaux sont occupés pour ce créneau (BDD locale)
-                                $occupiedBureauIds = [];
-                                foreach ($bureauxRdvsDuJour as $rdv) {
-                                    $bureau = $rdv->getBureau();
-                                    if ($bureau) {
-                                        // Vérifier si ce RDV chevauche notre créneau
-                                        if ($start < $rdv->getDateFin() && $slotEnd > $rdv->getDateDebut()) {
-                                            $occupiedBureauIds[] = $bureau->getId();
+                                    // Filtrer les bureaux libres en BDD locale
+                                    $freeBureauxInBdd = [];
+                                    foreach ($allBureaux as $bureau) {
+                                        if (!in_array($bureau->getId(), $occupiedBureauIds, true)) {
+                                            $freeBureauxInBdd[] = $bureau;
+                                        }
+                                    }
+
+                                    // Vérifier s'il reste au moins un bureau libre en BDD locale
+                                    if (empty($freeBureauxInBdd)) {
+                                        $isFree = false; // Aucune salle libre en BDD → on masque ce créneau
+                                    } else {
+                                        // IMPORTANT : Vérifier Outlook pour les créneaux libres en BDD locale
+                                        // Car un conseiller peut avoir réservé directement dans Outlook sans passer par l'application
+                                        // OPTIMISATION : On vérifie Outlook UNIQUEMENT pour les créneaux libres en BDD (réduit les appels API)
+                                        // Limité à 7 jours pour équilibrer performance et exactitude
+                                        $daysFromNow = (int)(($currentDate->getTimestamp() - $now->getTimestamp()) / 86400);
+                                        if ($daysFromNow >= 0 && $daysFromNow <= 7) {
+                                            // Pour les cabinets : vérifier TOUTES les salles (pas seulement celles libres en BDD)
+                                            // Car un conseiller peut avoir réservé directement dans Outlook
+                                            if ($isCabinet && !empty($allBureaux)) {
+                                                // Cache en mémoire pour éviter les appels répétés (par jour et heure)
+                                                $cacheKey = $currentDate->format('Y-m-d') . '_' . $start->format('H:i') . '_salles';
+                                                if (!isset($outlookConseillersCache[$cacheKey])) {
+                                                    // Pour les cabinets, on a besoin d'un conseiller pour le token
+                                                    $conseillerPourToken = null;
+                                                    if ($tousLesConseillers && count($tousLesConseillers) > 0) {
+                                                        $conseillerPourToken = $tousLesConseillers[0];
+                                                    } elseif ($conseillers && count($conseillers) > 0) {
+                                                        $conseillerPourToken = $conseillers[0];
+                                                    }
+                                                    
+                                                    if ($conseillerPourToken) {
+                                                        try {
+                                                            // Vérifier TOUTES les salles du cabinet (batch API - une seule requête)
+                                                            $sallesDisponibles = $outlookService->hasAtLeastOneFreeRoomOnOutlook(
+                                                                $conseillerPourToken,
+                                                                $allBureaux, // TOUTES les salles, car un conseiller peut avoir réservé directement dans Outlook
+                                                                $start,
+                                                                $slotEnd
+                                                            );
+                                                            $outlookConseillersCache[$cacheKey] = $sallesDisponibles;
+                                                        } catch (\Exception $e) {
+                                                            error_log('[OUTLOOK] Erreur vérification salles: ' . $e->getMessage());
+                                                            $outlookConseillersCache[$cacheKey] = false; // En cas d'erreur, on masque (sécurité)
+                                                        }
+                                                    } else {
+                                                        $outlookConseillersCache[$cacheKey] = false; // Pas de conseiller = on masque
+                                                    }
+                                                }
+                                                
+                                                // Si toutes les salles sont occupées → masquer le créneau
+                                                if (!$outlookConseillersCache[$cacheKey]) {
+                                                    $isFree = false;
+                                                }
+                                            }
+                                            
+                                            // Pour les groupes (non-cabinet) : vérifier les conseillers
+                                            if ($isGroupe && !empty($conseillers)) {
+                                                $cacheKey = $currentDate->format('Y-m-d') . '_' . $start->format('H:i') . '_conseillers';
+                                                if (!isset($outlookConseillersCache[$cacheKey])) {
+                                                    $firstConseiller = $conseillers[0] ?? null;
+                                                    if ($firstConseiller) {
+                                                        try {
+                                                            // Vérifier les conseillers (batch API - une seule requête)
+                                                            $conseillersDisponibles = $outlookService->hasAtLeastOneAvailableConseillerOnOutlook(
+                                                                $firstConseiller,
+                                                                $conseillers,
+                                                                $start,
+                                                                $slotEnd
+                                                            );
+                                                            $outlookConseillersCache[$cacheKey] = $conseillersDisponibles;
+                                                        } catch (\Exception $e) {
+                                                            error_log('[OUTLOOK] Erreur vérification conseillers: ' . $e->getMessage());
+                                                            $outlookConseillersCache[$cacheKey] = false; // En cas d'erreur, on masque (sécurité)
+                                                        }
+                                                    } else {
+                                                        $outlookConseillersCache[$cacheKey] = false;
+                                                    }
+                                                }
+                                                
+                                                // Si aucun conseiller n'est disponible → masquer le créneau
+                                                if (!$outlookConseillersCache[$cacheKey]) {
+                                                    $isFree = false;
+                                                }
+                                            }
                                         }
                                     }
                                 }
-                                $occupiedBureauIds = array_unique($occupiedBureauIds);
-
-                                // Filtrer les bureaux libres en BDD locale
-                                $freeBureauxInBdd = [];
-                                foreach ($allBureaux as $bureau) {
-                                    if (!in_array($bureau->getId(), $occupiedBureauIds, true)) {
-                                        $freeBureauxInBdd[] = $bureau;
+                                
+                                if ($isFree) {
+                                    // Éviter les doublons (si plusieurs conseillers ont les mêmes disponibilités)
+                                    $slotTime = $start->format('H:i');
+                                    if (!in_array($slotTime, $dayData['slots'], true)) {
+                                        $dayData['slots'][] = $slotTime;
+                                        $dayData['hasAvailability'] = true;
                                     }
                                 }
-
-                                // Vérifier s'il reste au moins un bureau libre en BDD locale
-                                if (empty($freeBureauxInBdd)) {
-                                    $isFree = false; // Aucune salle libre en BDD → on masque ce créneau
-                                }
-                                // OPTIMISATION PERFORMANCE : Désactiver la vérification Outlook pour l'affichage du calendrier
-                                // La vérification Outlook sera faite uniquement lors de la finalisation (finalize())
-                                // Cela réduit drastiquement le temps de chargement (de 8+ secondes à < 1 seconde)
-                                // On se base uniquement sur la BDD locale pour l'affichage
-                                // La vérification Outlook complète sera faite lors de la finalisation dans finalize()
+                                
+                                // Passer au créneau suivant
+                                $start->modify("+$increment minutes");
                             }
-
-                            if ($isFree) {
-                                $dayData['slots'][] = $start->format('H:i');
-                                $dayData['hasAvailability'] = true;
-                            }
-                            $start->modify("+$increment minutes");
                         }
                     }
                 }
             }
+            // Trier et dédupliquer les créneaux pour ce jour
+            if (!empty($dayData['slots'])) {
+                $dayData['slots'] = array_unique($dayData['slots']);
+                sort($dayData['slots']);
+            }
+            
             $calendarData[$sortKey]['days'][] = $dayData;
             $currentDate->modify('+1 day');
         }

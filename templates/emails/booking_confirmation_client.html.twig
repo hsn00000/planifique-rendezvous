@@ -19,8 +19,8 @@
                 {# 1. EN-TÊTE BLEU #}
                 <tr>
                     <td style="background-color: #2563eb; padding: 30px; text-align: center;">
-                        {# Logo en blanc (assurez-vous que le logo existe bien dans public/img/logo.png) #}
-                        <img src="{{ absolute_url(asset('img/logo.png')) }}" alt="Planifique" width="150" style="max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto; filter: brightness(0) invert(1);">
+                        {# Logo intégré en base64 pour fonctionner dans les emails #}
+                        <img src="{{ image_to_base64('img/logo.png') }}" alt="Planifique" width="150" style="max-width: 150px; height: auto; display: block; margin: 0 auto 20px auto; filter: brightness(0) invert(1);">
                         <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Confirmation de rendez-vous</h1>
                     </td>
                 </tr>
@@ -119,9 +119,9 @@
                                                         </div>
                                                     {% endif %}
                                                 {% elseif rdv.typeLieu == 'Cabinet-geneve' %}
-                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Chemin du Pavillon 2, 1218 Le Grand-Saconnex, Suisse</div>
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Rue de Genève 12, 1201 Genève</div>
                                                 {% elseif rdv.typeLieu == 'Cabinet-archamps' %}
-                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">160 Rue Georges de Mestral, 74160 Archamps, France</div>
+                                                    <div style="margin-top: 5px; font-size: 14px; color: #4b5563;">Technopole d'Archamps, France</div>
                                                 {% endif %}
                                             </td>
                                         </tr>
