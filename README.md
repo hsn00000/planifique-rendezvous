@@ -26,7 +26,7 @@
 
 ## 🎯 Présentation
 
-**Planifique** est une application web interne développée pour simplifier la gestion des rendez-vous entre conseillers et clients. L'application s'intègre nativement avec Microsoft 365 et synchronise automatiquement les créneaux avec Outlook.
+**Planifique Rendez-vous** est une application web interne développée pour simplifier la gestion des rendez-vous entre conseillers et clients. L'application s'intègre nativement avec Microsoft 365 et synchronise automatiquement les créneaux avec Outlook.
 
 ### ✨ Points clés
 
@@ -370,7 +370,7 @@ Ce projet a permis de développer les compétences suivantes (Référentiel BTS 
 
 **Étudiant BTS SIO (Option SLAM)**
 
-- 📧 Email : [votre-email]
+- 📧 Email : kanicihasan90@gmail.com
 - 💼 Entreprise : Planifique SA
 - 📅 Période : Stage 2ème année
 
@@ -385,7 +385,6 @@ Ce projet est propriétaire et appartient à **Planifique SA**. Tous droits rés
 ## 🙏 Remerciements
 
 - **Planifique SA** pour l'accueil en stage
-- **L'équipe de développement** pour le support
 - **La communauté Symfony** pour la documentation et les ressources
 
 ---
@@ -397,5 +396,3 @@ Ce projet est propriétaire et appartient à **Planifique SA**. Tous droits rés
 - [EasyAdmin Documentation](https://symfony.com/bundles/EasyAdminBundle/current/index.html)
 
 ---
-
-**⭐ Si ce projet vous a été utile, n'hésitez pas à laisser une étoile !**
